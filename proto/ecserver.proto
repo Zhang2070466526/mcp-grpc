@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package ecserver;
+
+service ExternalCall {
+  rpc PerformAction(Request) returns (Response) {}
+  rpc FetchEvent(FetchEventRequest) returns (stream Event) {}
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  OPEN_PROJECT = 1;
+  SIMULATE_PROJECT = 2;
+  VIEW_PROJECT_NETLIST = 3;
+  LOG_EVENT = 4;
+  ERROR_EVENT = 5;
+  MODEL_REPLACE = 6;
+  CAPTURE_SCHEMATIC = 7;
+  CLOSE_PROJECT = 8;
+  CALL_SIMULATION_CONTROLLER = 9;
+}
+
+enum ResultStatus {
+  RESULT_STATUS_UNKNOWN = 0;
+  RESULT_STATUS_RUNNING = 1;
+  RESULT_STATUS_SUCCESS = 2;
+  RESULT_STATUS_FAILED = 3;
+}
+
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  DEBUG = 1;
+  INFO = 2;
+  WARN = 3;
+  ERROR = 4;
+}
+
+message Request {
+  string client_uuid = 1;
+  string task_id = 2;
+  EventType type = 3;
+  string payload_json = 4;
+}
+
+message Response {
+  int32 code = 1;
+  string message = 2;
+  string client_uuid = 3;
+  string task_id = 4;
+  EventType event_type = 5;
+}
+
+message FetchEventRequest {
+  string client_uuid = 1;
+}
+
+message Event {
+  string client_uuid = 1;
+  string task_id = 2;
+  EventType event_type = 3;
+  ResultStatus status = 4;
+  string message = 5;
+  string payload_json = 6;
+}
+

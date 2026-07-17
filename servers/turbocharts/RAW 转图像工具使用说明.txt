@@ -1,0 +1,53 @@
+RAW 转图像工具 - 用户使用说明
+简介
+本工具用于将 RAW 文件转换为常见图像格式，并支持可选的 CSV 数据导出。您只需通过命令行参数指定输入文件、输出路径及转换类型，即可快速完成转换。
+
+命令格式
+RawConverter --raw <raw_path> --img <image_path> --type <image_type> [--csv <csv_path>] [--linename <line_name>]
+
+必需参数
+参数	说明	示例
+--raw	输入的 RAW 文件路径（须包含文件名）	--raw "D:/data/sample.raw"
+--img	输出的图像文件路径（支持常见格式如 PNG、JPG 等）	--img "D:/output/result.png"
+--type	图像转换类型，决定如何处理 RAW 数据（具体支持的类型由程序内部定义，例如 "SP" "HB"和"XDB"）	--type ”SP“
+
+可选参数
+参数	说明	示例
+--csv	导出的 CSV 文件路径。若提供，程序会在转换图像的同时将 RAW 数据（如像素值、统计信息等）导出到该 CSV 文件	--csv "D:/output/data.csv"
+--linename	绘制线段名称。	--linename "db_s[1,1]"  --linename "real_delays[1,1]"   _前是单位（PS：常用单位db、phase、real(实数),另vswr，aps(附加移向)，af（幅度波动）） 后边是绘制线段名称（PS：时延的线段名称为delays[2,1]）
+--dependcy  依赖
+--ac        精度计算
+
+//ac="ac_type#bit#data#nv_type#nv_value"
+ac 字符串中 必须包含这些 即#分割的5组字符串
+act_type   phase（相位精度） att(衰减精度)
+data       曲线名称（PS:多条曲线可以用&分割，例如DB_S[2,1]&DB_S[1,1] ）
+bit        必须为可以转换成正整数的 数字字符串
+nv_type    fv：固定间隔 cl：完整列表
+nv_value   是一堆用，分割的字符串 固定间隔就填一个值就可以了
+
+使用示例
+时延
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_delay.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SPd.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SPd.png" --type "SP" --linename "real_delayS[2,1]"
+多个数据
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_S_SWEEP.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SPS.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SPS.png" --type "SP" --linename "DB_S[2,1]&DB_S[1,1]" --dependcy "freq" --ac "phase#3#S[2,1]#fv#0.1"
+噪声
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SPnf.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SPS.png" --type "SP" --linename "real_nf(1)" --dependcy "freq"
+
+S参数增益  DB_S[2,1]是输出增益,DB_S[1,2]是反向增益
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_tr.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.png" --type "SP" --linename "DB_S[2,1]" --dependcy "freq"
+
+驻波
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_tr.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.png" --type "SP" --linename "VSWR_S[1,1]" --dependcy "freq"
+
+数控衰减器 附加相移
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_SW.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.png" --type "SP" --linename "APS_S[2,1]" --dependcy "freq"
+
+数控移相器 衰减态
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_SW.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.png" --type "SP" --linename "MAS_S[2,1]" --dependcy "freq"
+
+数控移相器 幅度波动
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_SW.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.png" --type "SP" --linename "MV_S[2,1]" --dependcy "freq"
+
+数控移相器 移相态
+turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_SW.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.png" --type "SP" --linename "PSS_S[2,1]" --dependcy "freq"

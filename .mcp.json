@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "eda": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "D:/GitLabCode/mcp-grpc",
+        "run",
+        "python",
+        "start_servers.py",
+        "--transport",
+        "stdio"
+      ],
+      "env": {
+        "EDA_GRPC_SERVER": "127.0.0.1:50055"
+      }
+    }
+  }
+}
