@@ -23,9 +23,14 @@ D:\GitLabCode\mcp-grpc
 │   ├── __init__.py
 │   ├── registry_server.py          # 工具注册中心（加工具只改这个）
 │   ├── eda/
-│   │   ├── __init__.py
-│   │   ├── server.py               # EDA gRPC 工具定义（4 个工具）
-│   │   └── grpc_client.py          # gRPC 通信层封装
+│   │   ├── __init__.py              # 公共 API + 工具清单文档
+│   │   ├── config.py                # 公用函数 + 配置常量
+│   │   ├── grpc_client.py           # gRPC 通信层
+│   │   ├── project_service.py       # 工程管理（3 个工具）
+│   │   ├── simulation_service.py    # 仿真（2 个工具）
+│   │   ├── analysis_service.py      # 网表/截图（2 个工具）
+│   │   ├── model_service.py         # 模型替换（1 个工具）
+│   │   └── edi_launcher.py          # 启动 EDI（1 个工具）
 │   └── turbocharts/
 │       ├── __init__.py
 │       └── server.py               # RawConverter 工具定义（1 个工具）
@@ -35,11 +40,9 @@ D:\GitLabCode\mcp-grpc
 ├── .env                            # 环境变量配置（唯一配置来源）
 ├── pyproject.toml                  # uv 项目配置
 │
-├── README_MCP.md                   # 项目主文档
 ├── README.md                       # 项目主文档（含工具参数和曲线参考）
 ├── HANDOVER.md                     # 本文档（交接文档）
 ├── EDI系统接口与外部调用汇总.md      # EDI 接口全量文档（不动）
-├── grpc接口调用.md                  # gRPC 调用说明
 │
 └── servers/turbocharts/
     └── RAW 转图像工具使用说明.txt    # RawConverter 参考文档
@@ -56,13 +59,18 @@ D:\GitLabCode\mcp-grpc
 | 序列化 | protobuf >= 6.33.5 | gRPC 消息序列化 |
 | 环境管理 | python-dotenv | .env 文件加载 |
 
-## MCP 工具清单（5 个）
+## MCP 工具清单（10 个）
 
 | 工具 | 所属模块 | 底层协议 | 功能 |
 |---|---|---|---|
+| `list_epp_projects` | servers/eda | 本地 filesystem | 扫描文件夹中的 .epp 工程 |
 | `open_eda_project` | servers/eda | gRPC OPEN_PROJECT | 打开 .epp 工程 |
 | `view_project_netlist` | servers/eda | gRPC VIEW_PROJECT_NETLIST | 导出网表文件 |
 | `simulate_project` | servers/eda | gRPC SIMULATE_PROJECT | 执行仿真 |
+| `capture_schematic` | servers/eda | gRPC CAPTURE_SCHEMATIC | 截取原理图 |
+| `model_replace` | servers/eda | gRPC MODEL_REPLACE | 按 CSV 批量替换模型 |
+| `close_project` | servers/eda | gRPC CLOSE_PROJECT | 关闭工程 |
+| `call_simulation_controller` | servers/eda | gRPC CALL_SIMULATION_CONTROLLER | 调用 ADS 仿真控制器 |
 | `launch_edi` | servers/eda | 本地 subprocess | 启动 EDI 客户端 |
 | `turbocharts_convert` | servers/turbocharts | 本地 subprocess | RAW 转曲线图+CSV |
 
@@ -121,16 +129,14 @@ AI 客户端 → MCP 工具 → subprocess.Popen/run()
 
 ### 添加新的 gRPC 工具
 
-1. 在 `servers/eda/server.py` 中复制现有工具模板
-2. 将 `ecserver_pb2.XXX` 替换为新的事件类型
-3. 构造对应的 `payload_json`
-4. 在 `servers/registry_server.py` 中 import 并注册
+1. 在 `servers/eda/` 对应的 service 文件中添加工具函数（纯函数，不加装饰器）
+2. 在 `servers/eda/__init__.py` 中 re-export
+3. 在 `servers/registry_server.py` 中 import 并调用 `mcp.tool()(func)` 注册
 
 ### 添加新的本地工具
 
-1. 在 `servers/` 下新建子包
-2. 创建 `server.py`，参考 `turbocharts/server.py`
-3. 在 `servers/registry_server.py` 中 import 并注册
+1. 在 `servers/` 下新建子包（参考 turbocharts 结构）
+2. 在 `servers/registry_server.py` 中 import 并注册
 
 ### 重新生成 proto
 
@@ -142,12 +148,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 
 ## 待封装接口
 
-| EventType | 值 | 功能 | 状态 |
-|---|---|---|---|
-| MODEL_REPLACE | 6 | CSV 模型替换 | 待封装 |
-| CAPTURE_SCHEMATIC | 7 | 原理图截图 | 待封装 |
-| CLOSE_PROJECT | 8 | 关闭工程 | 待封装 |
-| CALL_SIMULATION_CONTROLLER | 9 | 调用仿真控制器 | 待封装 |
+所有 proto EventType 已全部封装完毕。
 
 ## 已知问题与注意事项
 
@@ -156,8 +157,10 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 3. `.env` 通过 `python-dotenv` 加载，只在首次 import 时生效
 4. Windows 路径中的反斜杠在 `.env` 中不需要转义
 5. gRPC 服务地址格式必须为 `host:port`（launch_edi 依赖 rsplit(":", 1)）
+6. gRPC 超时无上限限制（仅校验 > 0），仿真等长任务可传任意大值
+7. 端口占用时使用 `netstat -ano | findstr <端口>` 定位后 `taskkill -f -pid <PID>` 关闭
 
 ## 维护人
 
 - 负责人：—
-- 更新时间：2026-07-17
+- 更新时间：2026-07-20

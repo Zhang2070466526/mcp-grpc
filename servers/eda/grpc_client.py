@@ -29,13 +29,13 @@ def call_grpc(
     Args:
         task_type: EventType 枚举值。
         payload: 任务参数字典。
-        timeout_seconds: 总超时秒数（1–600）。
+        timeout_seconds: 总超时秒数（需 > 0），无上限。
 
     Returns:
         包含 success / task_id / task_type / message / details 的结果字典。
     """
-    if timeout_seconds < 1 or timeout_seconds > 600:
-        raise ValueError("timeout_seconds 必须在 1 到 600 之间")
+    if timeout_seconds < 1:
+        raise ValueError("timeout_seconds 必须大于 0")
 
     client_uuid = str(uuid.uuid4())
     task_id = str(uuid.uuid4())

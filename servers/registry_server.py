@@ -1,56 +1,54 @@
 """MCP 工具注册中心 — 集中管理所有工具的注册。
 
-已注册工具（共 6 个）：
-    list_epp_projects     扫描文件夹中的 .epp 工程
-    open_eda_project      打开 .epp 工程
-    view_project_netlist  查看/导出工程网表
-    simulate_project      执行工程仿真
-    launch_edi            启动 EDI 客户端
-    turbocharts_convert   ADS RAW → 曲线图 + CSV
-
-
+已注册工具（共 10 个）：
+    list_epp_projects             扫描文件夹中的 .epp 工程
+    open_eda_project              打开 .epp 工程
+    close_project                 关闭工程
+    simulate_project              执行工程仿真
+    call_simulation_controller    调用 ADS 仿真控制器
+    view_project_netlist          查看/导出工程网表
+    capture_schematic             截取原理图
+    model_replace                 按 CSV 批量替换模型
+    launch_edi                    启动 EDI 客户端
+    turbocharts_convert           ADS RAW → 曲线图 + CSV
 """
 
 from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
-# ---------------------------------------------------------------------------
-# MCP 实例（唯一）
-# ---------------------------------------------------------------------------
-
 mcp = FastMCP(
     "EDA MCP",
     instructions=(
         "EDA 工程操作工具集："
-        "扫描工程、打开工程、网表查看、仿真执行、启动 EDI 客户端、"
-        "RAW 文件图表生成。"
+        "扫描工程、打开工程、网表查看、仿真执行、截图原理图、"
+        "模型替换、关闭工程、ADS 仿真控制、启动 EDI、RAW 图表生成。"
     ),
 )
 
-# ---------------------------------------------------------------------------
-# 注册 EDA gRPC 工具
-# ---------------------------------------------------------------------------
-
-from servers.eda.server import (  # noqa: E402
+# -- EDA gRPC 工具 --
+from servers.eda import (  # noqa: E402
+    call_simulation_controller,
+    capture_schematic,
+    close_project,
     launch_edi,
     list_epp_projects,
+    model_replace,
     open_eda_project,
     simulate_project,
     view_project_netlist,
 )
-
-mcp.tool()(list_epp_projects)
 mcp.tool()(open_eda_project)
-mcp.tool()(view_project_netlist)
+mcp.tool()(list_epp_projects)
+mcp.tool()(close_project)
 mcp.tool()(simulate_project)
+mcp.tool()(call_simulation_controller)
+mcp.tool()(view_project_netlist)
+mcp.tool()(capture_schematic)
+mcp.tool()(model_replace)
 mcp.tool()(launch_edi)
 
-# ---------------------------------------------------------------------------
-# 注册 RawConverter 工具
-# ---------------------------------------------------------------------------
-
+# -- RawConverter 工具 --
 from servers.turbocharts.server import (  # noqa: E402
     turbocharts_convert,
 )
-
 mcp.tool()(turbocharts_convert)
