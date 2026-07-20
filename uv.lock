@@ -34,15 +34,6 @@ wheels = [
 ]
 
 [[package]]
-name = "argparse"
-version = "1.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/18/dd/e617cfc3f6210ae183374cd9f6a26b20514bbb5a792af97949c5aacddf0f/argparse-1.4.0.tar.gz", hash = "sha256:62b089a55be1d8949cd2bc7e0df0bddb9e028faefc8c32038cc84862aefdd6e4", size = 70508, upload-time = "2015-09-12T20:22:16.217Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/94/3af39d34be01a24a6e65433d19e107099374224905f1e0cc6bbe1fd22a2f/argparse-1.4.0-py2.py3-none-any.whl", hash = "sha256:c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314", size = 23000, upload-time = "2015-09-14T16:03:16.137Z" },
-]
-
-[[package]]
 name = "attrs"
 version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -253,20 +244,18 @@ name = "eda-mcp"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "argparse" },
     { name = "grpcio" },
-    { name = "grpcio-reflection" },
     { name = "mcp" },
     { name = "protobuf" },
+    { name = "python-dotenv" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "argparse" },
     { name = "grpcio", specifier = ">=1.81.0" },
-    { name = "grpcio-reflection", specifier = ">=1.82.1" },
     { name = "mcp", specifier = ">=1.0.0" },
     { name = "protobuf", specifier = ">=6.33.5" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 
 [[package]]
@@ -340,19 +329,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/44/27/7ccf2ef00f27a8e47a79d641c8ceaf7d3028c7a03d9a97b4c8a9a783c086/grpcio-1.82.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:7d7ede11d747b4e1bd05e3bc0260e155b65a88735a895a10f6521f19b889511e", size = 7912572, upload-time = "2026-07-08T12:36:08.393Z" },
     { url = "https://files.pythonhosted.org/packages/0d/be/33742482d2753f2d3a1b7641664b6622262d44f2f3b609f13425dd86d36f/grpcio-1.82.1-cp314-cp314-win32.whl", hash = "sha256:3d21f19838dc255ecbb79321b15ae9b98fbddff4c3d4aedb0a81bdd7f4ab572a", size = 4321856, upload-time = "2026-07-08T12:36:10.899Z" },
     { url = "https://files.pythonhosted.org/packages/cc/67/03329c847172c78ddeb1eb9be6b444fdbc12775a84c958b27e427e7b926d/grpcio-1.82.1-cp314-cp314-win_amd64.whl", hash = "sha256:e20f1edbb15f99e3128ec86433f9785fd5a451d8f115e74fe0056134f092a9d5", size = 5141114, upload-time = "2026-07-08T12:36:13.595Z" },
-]
-
-[[package]]
-name = "grpcio-reflection"
-version = "1.82.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "grpcio" },
-    { name = "protobuf" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/0f/85/a3db5bfc805d6dcad07c592e342199e9624b3a5d16a739360124044ed8d1/grpcio_reflection-1.82.1.tar.gz", hash = "sha256:2ec943ead3e17b43f8e0747a5cb417b3a64357fe3d9b4a7bdc39a4c33ea9800d", size = 19217, upload-time = "2026-07-08T12:39:37.892Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/fe/f2fead4c021dad6a419e9b0324918b28b7154ad52edd5a4a3fe005fdb471/grpcio_reflection-1.82.1-py3-none-any.whl", hash = "sha256:4df1a3b9c62a3dbdd910a0f277428bc8f5da03a51057a5e61cd2201b09d985c5", size = 22909, upload-time = "2026-07-08T12:39:24.395Z" },
 ]
 
 [[package]]
