@@ -6,18 +6,18 @@
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
     open_eda_project              打开 .epp 工程
-    close_project                 关闭工程
+    close_eda_project                 关闭工程
 
   仿真：
     simulate_project              执行工程仿真
-    call_simulation_controller    调用 ADS 仿真控制器
+    simulate_netlist_with_ads    调用 ADS 仿真控制器
 
   分析：
-    view_project_netlist          查看/导出工程网表
+    export_project_netlist          查看/导出工程网表
     capture_schematic             截取原理图为图片
 
   模型：
-    model_replace                 按 CSV 批量替换模型
+    replace_models_from_csv                 按 CSV 批量替换模型
 
   启动：
     launch_edi                    启动 EDI 客户端
@@ -41,24 +41,24 @@ mcp = FastMCP(
 
 # -- EDA gRPC 工具 --
 from servers.eda import (  # noqa: E402
-    call_simulation_controller,
+    simulate_netlist_with_ads,
     capture_schematic,
-    close_project,
+    close_eda_project,
     launch_edi,
     list_epp_projects,
-    model_replace,
+    replace_models_from_csv,
     open_eda_project,
     simulate_project,
-    view_project_netlist,
+    export_project_netlist,
 )
 mcp.tool()(open_eda_project)
 mcp.tool()(list_epp_projects)
-mcp.tool()(close_project)
+mcp.tool()(close_eda_project)
 mcp.tool()(simulate_project)
-mcp.tool()(call_simulation_controller)
-mcp.tool()(view_project_netlist)
+mcp.tool()(simulate_netlist_with_ads)
+mcp.tool()(export_project_netlist)
 mcp.tool()(capture_schematic)
-mcp.tool()(model_replace)
+mcp.tool()(replace_models_from_csv)
 mcp.tool()(launch_edi)
 
 # -- RawConverter 工具 --

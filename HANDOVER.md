@@ -26,10 +26,10 @@ D:\GitLabCode\mcp-grpc
 │   │   ├── __init__.py              # 公共 API + 工具清单文档
 │   │   ├── config.py                # 公用函数 + 配置常量
 │   │   ├── grpc_client.py           # gRPC 通信层
-│   │   ├── project_service.py       # 工程管理（3 个工具）
-│   │   ├── simulation_service.py    # 仿真（2 个工具）
-│   │   ├── analysis_service.py      # 网表/截图（2 个工具）
-│   │   ├── model_service.py         # 模型替换（1 个工具）
+│   │   ├── project_manage.py        # 工程管理（3 个工具）
+│   │   ├── simulation.py             # 仿真（2 个工具）
+│   │   ├── design_export.py          # 网表/截图（2 个工具）
+│   │   ├── model_replace.py          # 模型替换（1 个工具）
 │   │   └── edi_launcher.py          # 启动 EDI（1 个工具）
 │   └── turbocharts/
 │       ├── __init__.py
@@ -65,12 +65,12 @@ D:\GitLabCode\mcp-grpc
 |---|---|---|---|
 | `list_epp_projects` | servers/eda | 本地 filesystem | 扫描文件夹中的 .epp 工程 |
 | `open_eda_project` | servers/eda | gRPC OPEN_PROJECT | 打开 .epp 工程 |
-| `view_project_netlist` | servers/eda | gRPC VIEW_PROJECT_NETLIST | 导出网表文件 |
+| `export_project_netlist` | servers/eda | gRPC VIEW_PROJECT_NETLIST | 导出网表文件 |
 | `simulate_project` | servers/eda | gRPC SIMULATE_PROJECT | 执行仿真 |
 | `capture_schematic` | servers/eda | gRPC CAPTURE_SCHEMATIC | 截取原理图 |
-| `model_replace` | servers/eda | gRPC MODEL_REPLACE | 按 CSV 批量替换模型 |
-| `close_project` | servers/eda | gRPC CLOSE_PROJECT | 关闭工程 |
-| `call_simulation_controller` | servers/eda | gRPC CALL_SIMULATION_CONTROLLER | 调用 ADS 仿真控制器 |
+| `replace_models_from_csv` | servers/eda | gRPC MODEL_REPLACE | 按 CSV 批量替换模型 |
+| `close_eda_project` | servers/eda | gRPC CLOSE_PROJECT | 关闭工程 |
+| `simulate_netlist_with_ads` | servers/eda | gRPC CALL_SIMULATION_CONTROLLER | 调用 ADS 仿真控制器 |
 | `launch_edi` | servers/eda | 本地 subprocess | 启动 EDI 客户端 |
 | `turbocharts_convert` | servers/turbocharts | 本地 subprocess | RAW 转曲线图+CSV |
 

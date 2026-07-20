@@ -98,12 +98,12 @@ uv run python start_servers.py --port 9000
 |---|---|---|---|---|
 | `list_epp_projects` | 扫描文件夹，列出所有 .epp 工程 | `folder_path` | 无 |
 | `open_eda_project` | 打开 .epp 工程 | `project_path` | `timeout_seconds`（>0，默认 60） |
-| `view_project_netlist` | 查看/导出工程网表 | `project_path` | `timeout_seconds`（>0，默认 60） |
+| `export_project_netlist` | 查看/导出工程网表 | `project_path` | `timeout_seconds`（>0，默认 60） |
 | `simulate_project` | 执行工程仿真 | `project_path` | `log_source`、`timeout_seconds`（默认 120，无上限） |
 | `capture_schematic` | 截取工程原理图为图片 | `project_path`、`img_path` | `timeout_seconds`（默认 60） |
-| `model_replace` | 按 CSV 批量替换模型 | `project_path`、`csv_path` | `timeout_seconds`（默认 60） |
-| `close_project` | 关闭工程 | `project_path` | `need_save`（默认 false）、`timeout_seconds` |
-| `call_simulation_controller` | 调用 ADS 仿真控制器 | `netlist_path` | `ads_path`、`timeout_seconds`（默认 120，无上限） |
+| `replace_models_from_csv` | 按 CSV 批量替换模型 | `project_path`、`csv_path` | `timeout_seconds`（默认 60） |
+| `close_eda_project` | 关闭工程 | `project_path` | `need_save`（默认 false）、`timeout_seconds` |
+| `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path` | `ads_path`、`timeout_seconds`（默认 120，无上限） |
 | `launch_edi` | 启动 EDI 客户端，等待 gRPC 就绪 | 无 | `edi_path`、`wait_for_grpc`、`wait_timeout` |
 | `turbocharts_convert` | ADS RAW → 曲线图 + CSV | `raw_path`、`img_path`、`chart_type` | `csv_path`、`linename`、`dependency`、`ac_config` |
 
@@ -158,10 +158,10 @@ uv run python start_servers.py --port 9000
 │   ├── eda/
 │   │   ├── config.py              # 公用函数与配置
 │   │   ├── grpc_client.py         # gRPC 通信层
-│   │   ├── project_service.py     # 工程管理（3 个工具）
-│   │   ├── simulation_service.py  # 仿真（2 个工具）
-│   │   ├── analysis_service.py    # 分析（2 个工具）
-│   │   ├── model_service.py       # 模型替换（1 个工具）
+│   │   ├── project_manage.py      # 工程管理（3 个工具）
+│   │   ├── simulation.py           # 仿真（2 个工具）
+│   │   ├── design_export.py        # 分析（2 个工具）
+│   │   ├── model_replace.py        # 模型替换（1 个工具）
 │   │   └── edi_launcher.py        # 启动工具（1 个工具）
 │   └── turbocharts/
 │       └── server.py              # RawConverter 工具（1 个）

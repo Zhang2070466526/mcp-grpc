@@ -2,7 +2,7 @@ r"""EDA 工程管理工具。
 
 list_epp_projects     扫描文件夹中的所有 .epp 工程文件
 open_eda_project      打开 .epp 工程，等待 EDA 返回成功或失败
-close_project         关闭已打开的工程，可选择是否保存
+close_eda_project         关闭已打开的工程，可选择是否保存
 
 自然语言使用示例：
   帮我看看 C:\Users\JGL\EDI-Workspace 下面有哪些 .epp 工程
@@ -14,7 +14,7 @@ close_project         关闭已打开的工程，可选择是否保存
   project_path     EDA 服务所在机器上的 .epp 工程文件绝对路径
   folder_path      要扫描的文件夹绝对路径（list_epp_projects）
   timeout_seconds  最长等待秒数，默认 60 秒
-  need_save        关闭前是否保存工程（close_project），默认 False
+  need_save        关闭前是否保存工程（close_eda_project），默认 False
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def open_eda_project(
     )
 
 
-def close_project(
+def close_eda_project(
         project_path: str,
         need_save: bool = False,
         timeout_seconds: int = 60,

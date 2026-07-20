@@ -1,6 +1,6 @@
 r"""EDA 分析工具。
 
-view_project_netlist  查看/导出 .epp 工程的网表文件
+export_project_netlist  查看/导出 .epp 工程的网表文件
 capture_schematic     截取工程原理图并保存为图片
 
 自然语言使用示例：
@@ -23,7 +23,7 @@ from servers.eda.grpc_client import call_grpc
 from servers.eda.config import validate_project_path
 
 
-def view_project_netlist(
+def export_project_netlist(
     project_path: str,
     timeout_seconds: int = 60,
 ) -> dict[str, Any]:

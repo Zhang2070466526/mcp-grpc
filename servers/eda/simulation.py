@@ -1,7 +1,7 @@
 r"""EDA 仿真工具。
 
 simulate_project              对 .epp 工程执行仿真，等待结果返回
-call_simulation_controller    基于网表文件调用 ADS 仿真控制器
+simulate_netlist_with_ads    基于网表文件调用 ADS 仿真控制器
 
 自然语言使用示例：
   帮我对 EDA 工程 C:\...\EDI_TEST.epp 执行仿真
@@ -10,7 +10,7 @@ call_simulation_controller    基于网表文件调用 ADS 仿真控制器
 
 参数说明：
   project_path     EDA 服务所在机器上的 .epp 工程文件绝对路径
-  netlist_path     网表文件路径（call_simulation_controller）
+  netlist_path     网表文件路径（simulate_netlist_with_ads）
   log_source       调用方日志标识，默认 "mcp_client"
   ads_path         ADS 安装路径，为空则自动判断
   timeout_seconds  最长等待秒数，无上限，默认 600（仿真）/ 120（控制器）
@@ -46,7 +46,7 @@ def simulate_project(
     )
 
 
-def call_simulation_controller(
+def simulate_netlist_with_ads(
     netlist_path: str,
     ads_path: str = "",
     timeout_seconds: int = 120,

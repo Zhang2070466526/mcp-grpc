@@ -1,6 +1,6 @@
 r"""EDA 模型替换工具。
 
-model_replace     根据 CSV 文件内容，批量替换工程中的元件模型
+replace_models_from_csv     根据 CSV 文件内容，批量替换工程中的元件模型
 
 自然语言使用示例：
   帮我用 C:\models\replace_list.csv 替换 EDA 工程 C:\...\EDI_TEST.epp 中的模型
@@ -26,7 +26,7 @@ from servers.eda.grpc_client import call_grpc
 from servers.eda.config import validate_project_path
 
 
-def model_replace(
+def replace_models_from_csv(
     project_path: str,
     csv_path: str,
     timeout_seconds: int = 60,
