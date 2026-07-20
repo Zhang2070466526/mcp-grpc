@@ -40,22 +40,21 @@ mcp = FastMCP(
 )
 
 # -- EDA gRPC 工具 --
-from servers.eda.server import (          # noqa: E402
+from servers.eda.server import (  # noqa: E402
     launch_edi,
     open_eda_project,
     simulate_project,
     view_project_netlist,
 )
 
+# 注册为MCP工具
 mcp.tool()(open_eda_project)
 mcp.tool()(view_project_netlist)
 mcp.tool()(simulate_project)
 mcp.tool()(launch_edi)
 
 # -- Turbocharts 工具 --
-from servers.turbocharts.server import (  # noqa: E402
-    turbocharts_convert,
-)
+from servers.turbocharts.server import turbocharts_convert
 
 mcp.tool()(turbocharts_convert)
 
@@ -66,18 +65,18 @@ mcp.tool()(turbocharts_convert)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="启动所有 MCP 服务")
     parser.add_argument(
-        "--transport",
-        choices=["stdio", "streamable-http"],
-        default=DEFAULT_TRANSPORT,
-        help=f"通信方式（默认: {DEFAULT_TRANSPORT}）",
-    )
+        "--transport",  # 参数名称
+        choices=["stdio", "streamable-http"],  # 可选值列表
+        default=DEFAULT_TRANSPORT,  # 默认值
+        help=f"通信方式（默认: {DEFAULT_TRANSPORT}）",  # 帮助说明
+    )  # 定义 --transport 参数
     parser.add_argument(
         "--port",
         type=int,
         default=DEFAULT_PORT,
         help=f"streamable-http 模式端口（默认: {DEFAULT_PORT}）",
     )
-    args = parser.parse_args()
+    args = parser.parse_args()  # 执行参数解析，作用是将用户在命令行输入的实际参数转换为 Python 对象，供程序后续使用。
 
     tools = [t.name for t in mcp._tool_manager._tools.values()]
     if args.transport == "streamable-http":
