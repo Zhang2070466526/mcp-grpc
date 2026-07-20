@@ -21,6 +21,7 @@ D:\GitLabCode\mcp-grpc
 │
 ├── servers/                        # MCP 服务模块
 │   ├── __init__.py
+│   ├── registry_server.py          # 工具注册中心（加工具只改这个）
 │   ├── eda/
 │   │   ├── __init__.py
 │   │   ├── server.py               # EDA gRPC 工具定义（4 个工具）
@@ -123,13 +124,13 @@ AI 客户端 → MCP 工具 → subprocess.Popen/run()
 1. 在 `servers/eda/server.py` 中复制现有工具模板
 2. 将 `ecserver_pb2.XXX` 替换为新的事件类型
 3. 构造对应的 `payload_json`
-4. 在 `start_servers.py` 中 import 并注册
+4. 在 `servers/registry_server.py` 中 import 并注册
 
 ### 添加新的本地工具
 
 1. 在 `servers/` 下新建子包
 2. 创建 `server.py`，参考 `turbocharts/server.py`
-3. 在 `start_servers.py` 中 import 并注册
+3. 在 `servers/registry_server.py` 中 import 并注册
 
 ### 重新生成 proto
 

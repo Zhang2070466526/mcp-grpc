@@ -22,6 +22,7 @@
 │   ├── ecserver_pb2.py            # 生成的 Python 消息类
 │   └── ecserver_pb2_grpc.py       # 生成的 Python gRPC 客户端
 ├── servers/                       # MCP 服务模块
+│   ├── registry_server.py         # 工具注册中心（加工具只改这个）
 │   ├── eda/
 │   │   ├── server.py              # EDA gRPC 工具（4 个）
 │   │   └── grpc_client.py         # gRPC 通信层
@@ -136,7 +137,7 @@ uv run python start_servers.py --port 9000
 
 EDA gRPC 工具：在 `servers/eda/server.py` 中按模板添加 `@mcp.tool()` 函数，调用 `call_grpc()`。<br>
 本地工具：在 `servers/` 下新建子包，创建 `server.py`。<br>
-最后在 `start_servers.py` 中 import 并注册。
+最后在 `servers/registry_server.py` 中 import 并注册。
 
 ### 重新生成 proto
 
@@ -150,4 +151,4 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 
 - [交接文档](./HANDOVER.md) — 架构、技术栈、通信流程、已知问题
 - [使用说明](./MCP使用说明.md) — 工具参数表、客户端配置模板
-- [接口汇总](./EDI系统接口与外部调用汇总.md) — EDI 全量接口文档
+- [接口汇总](proto/EDI系统接口与外部调用汇总.md) — EDI 全量接口文档
