@@ -1,6 +1,17 @@
-"""EDA 启动工具。
+r"""EDA 启动工具。
 
-launch_edi     启动 EDI 客户端，等待 gRPC 就绪
+launch_edi     启动 EDI 客户端应用程序，自动等待 gRPC 服务就绪。
+               如果 EDI 已在运行则跳过启动，避免重复。
+
+自然语言使用示例：
+  帮我启动 EDI
+  帮我启动 EDI 客户端，等 60 秒确认 gRPC 就绪
+  检查一下 EDI 是否已经在运行
+
+参数说明：
+  edi_path         EDI.exe 路径，默认使用 .env 中配置的 EDI_PATH
+  wait_for_grpc    是否等待 gRPC 服务端口就绪，默认 True
+  wait_timeout     等待 gRPC 就绪的超时秒数，默认 30 秒
 """
 
 from __future__ import annotations

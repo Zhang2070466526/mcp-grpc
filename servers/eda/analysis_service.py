@@ -1,7 +1,17 @@
-"""EDA 分析工具。
+r"""EDA 分析工具。
 
-view_project_netlist  查看/导出工程网表
-capture_schematic     截取原理图为图片
+view_project_netlist  查看/导出 .epp 工程的网表文件
+capture_schematic     截取工程原理图并保存为图片
+
+自然语言使用示例：
+  帮我查看 EDA 工程 C:\...\EDI_TEST.epp 的网表
+  帮我截取这个工程的原理图，保存到 C:\screenshots\circuit.png
+  帮我导出这个工程的网表，超时设为 120 秒
+
+参数说明：
+  project_path     EDA 服务所在机器上的 .epp 工程文件绝对路径
+  img_path         截图输出路径，支持 PNG/JPG 等（capture_schematic）
+  timeout_seconds  最长等待秒数，无上限，默认 60 秒
 """
 
 from __future__ import annotations

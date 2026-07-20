@@ -1,9 +1,18 @@
-r"""MCP 服务启动器 — 只负责启动，工具注册见 servers/registry_server.py。
+r"""EDA MCP 一键启动 — 10 个工具的统一入口。
 
-用法：
-    uv run python start_servers.py
-    uv run python start_servers.py --transport streamable-http --port 8000
-    uv run python start_servers.py --transport stdio
+═══════════════════════════════════════════════════════════
+  工具注册见：servers/registry_server.py
+  工具定义见：servers/eda/*_service.py
+
+  启动方式：
+    uv run python start_servers.py                          # streamable-http（默认）
+    uv run python start_servers.py --transport stdio         # Claude Code
+    uv run python start_servers.py --port 9000               # 自定义端口
+
+  客户端连接：
+    Claude Code   .mcp.json 自动管理，/mcp 重载
+    OpenClaw      http://<IP>:8000/mcp
+═══════════════════════════════════════════════════════════
 """
 
 from __future__ import annotations

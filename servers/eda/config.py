@@ -1,4 +1,16 @@
-"""EDA 工具公用函数与配置。"""
+"""EDA 工具公用函数与配置。
+
+导出的配置常量：
+  EDA_GRPC_SERVER       gRPC 服务地址，默认 localhost:50055
+  EDI_PATH              EDI 客户端可执行文件路径
+  MCP_TRANSPORT         MCP 传输方式（stdio / streamable-http）
+
+导出的公共函数：
+  validate_project_path(path)  校验 .epp 工程路径，返回规范化绝对路径
+
+使用方式：
+  from servers.eda.config import EDA_GRPC_SERVER, validate_project_path
+"""
 
 from __future__ import annotations
 

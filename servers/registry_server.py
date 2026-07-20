@@ -1,16 +1,30 @@
 """MCP 工具注册中心 — 集中管理所有工具的注册。
 
-已注册工具（共 10 个）：
+═══════════════════════════════════════════════════════════
+  已注册工具（共 10 个）：
+
+  工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
     open_eda_project              打开 .epp 工程
     close_project                 关闭工程
+
+  仿真：
     simulate_project              执行工程仿真
     call_simulation_controller    调用 ADS 仿真控制器
+
+  分析：
     view_project_netlist          查看/导出工程网表
-    capture_schematic             截取原理图
+    capture_schematic             截取原理图为图片
+
+  模型：
     model_replace                 按 CSV 批量替换模型
+
+  启动：
     launch_edi                    启动 EDI 客户端
+
+  图表：
     turbocharts_convert           ADS RAW → 曲线图 + CSV
+═══════════════════════════════════════════════════════════
 """
 
 from __future__ import annotations
