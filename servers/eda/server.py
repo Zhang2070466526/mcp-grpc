@@ -1,18 +1,21 @@
 r"""EDA gRPC MCP 工具 — 通过 ExternalCall gRPC 操作 EDA 工程。
 
-open_eda_project     打开 .epp 工程
-view_project_netlist 查看/导出工程网表
-simulate_project     执行工程仿真
-launch_edi           启动 EDI 客户端，等待 gRPC 就绪
+list_epp_projects     扫描文件夹，列出所有 .epp 工程
+open_eda_project      打开 .epp 工程
+view_project_netlist  查看/导出工程网表
+simulate_project      执行工程仿真
+launch_edi            启动 EDI 客户端，等待 gRPC 就绪
 
 
 自然语言调用示例：
+  帮我看看 C:\Users\JGL\EDI-Workspace 下面有哪些 .epp 工程
   帮我启动 EDI
   帮我打开 EDA 工程 C:\Users\JGL\EDI-Workspace\EDI_TEST\EDI_TEST.epp
   帮我查看 EDA 工程 C:\Users\JGL\EDI-Workspace\EDI_TEST\EDI_TEST.epp 的网表
   帮我对 EDA 工程 C:\Users\JGL\EDI-Workspace\EDI_TEST\EDI_TEST.epp 执行仿真
 
 参数说明：
+  folder_path      要扫描的文件夹绝对路径（list_epp_projects）
   project_path     EDA 服务所在机器上的 .epp 工程文件绝对路径（必填）
   timeout_seconds  最长等待秒数，默认 60（open/view）或 120（simulate），范围 1-600
   log_source       simulate_project 的调用方标识，默认 "mcp_client"
@@ -69,6 +72,35 @@ def _validate_project_path(project_path: str) -> str:
 # ---------------------------------------------------------------------------
 # MCP 工具
 # ---------------------------------------------------------------------------
+
+@mcp.tool()
+def list_epp_projects(
+    folder_path: str,
+) -> dict[str, Any]:
+    """扫描指定文件夹，列出其中所有 .epp 工程文件。
+
+    Args:
+        folder_path: 要扫描的文件夹绝对路径。
+    """
+    root = Path(folder_path).expanduser()
+    if not root.is_dir():
+        raise FileNotFoundError(f"文件夹不存在: {folder_path}")
+
+    projects = []
+    for epp in sorted(root.rglob("*.epp")):
+        projects.append({
+            "name": epp.stem,
+            "path": str(epp.resolve()),
+            "size": epp.stat().st_size,
+        })
+
+    return {
+        "success": True,
+        "folder": str(root.resolve()),
+        "count": len(projects),
+        "projects": projects,
+    }
+
 
 @mcp.tool(description="打开一个 EDA .epp 工程，例如C:\\Users\\JGL\\EDI-Workspace\\projects\\1\\1.epp")
 def open_eda_project(

@@ -95,7 +95,8 @@ uv run python start_servers.py --port 9000
 ## 工具参考
 
 | 工具 | 功能 | 必填参数 | 可选参数 |
-|---|---|---|---|
+|---|---|---|---|---|
+| `list_epp_projects` | 扫描文件夹，列出所有 .epp 工程 | `folder_path` | 无 |
 | `open_eda_project` | 打开 .epp 工程 | `project_path` | `timeout_seconds`（1-600，默认 60） |
 | `view_project_netlist` | 查看/导出工程网表 | `project_path` | `timeout_seconds`（1-600，默认 60） |
 | `simulate_project` | 执行工程仿真 | `project_path` | `log_source`、`timeout_seconds`（默认 120） |
@@ -105,6 +106,7 @@ uv run python start_servers.py --port 9000
 使用示例：
 
 ```
+帮我看看 C:\Users\JGL\EDI-Workspace 下面有哪些 .epp 工程
 帮我启动 EDI
 帮我打开 EDA 工程 C:\Users\JGL\EDI-Workspace\EDI_TEST\EDI_TEST.epp
 帮我查看这个工程的网表
@@ -150,7 +152,7 @@ uv run python start_servers.py --port 9000
 ├── servers/                       # MCP 服务模块
 │   ├── registry_server.py         # 工具注册中心（加工具只改这个）
 │   ├── eda/
-│   │   ├── server.py              # EDA gRPC 工具（4 个）
+│   │   ├── server.py              # EDA gRPC 工具（5 个）
 │   │   └── grpc_client.py         # gRPC 通信层
 │   └── turbocharts/
 │       └── server.py              # RawConverter 工具（1 个）
