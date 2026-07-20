@@ -2,7 +2,7 @@
 name = "eda-mcp"
 version = "0.1.0"
 description = "Minimal MCP adapter for the EDA ExternalCall gRPC service"
-readme = "MCP使用说明.md"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "grpcio>=1.81.0",

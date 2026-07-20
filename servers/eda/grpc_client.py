@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 import uuid
 from typing import Any
@@ -15,8 +14,7 @@ from typing import Any
 import grpc
 
 from proto import ecserver_pb2, ecserver_pb2_grpc
-
-EDA_GRPC_SERVER = os.getenv("EDA_GRPC_SERVER", "localhost:50055")
+from servers.eda.config import EDA_GRPC_SERVER
 
 
 def call_grpc(

@@ -53,6 +53,8 @@ def launch_edi(
 
     if already_running:
         return {
+            "process_started": True,
+            "grpc_ready": True,
             "success": True,
             "message": f"EDI 已在运行（gRPC {EDA_GRPC_SERVER} 已就绪）",
             "edi_path": str(exe_path),
@@ -70,7 +72,9 @@ def launch_edi(
         raise RuntimeError(f"无法启动 EDI.exe: {exc}") from exc
 
     result: dict[str, Any] = {
-        "success": True,
+        "process_started": True,
+        "grpc_ready": False,
+        "success": False,
         "message": "EDI 已启动",
         "edi_path": str(exe_path),
         "grpc_server": EDA_GRPC_SERVER,
@@ -82,6 +86,7 @@ def launch_edi(
             try:
                 with socket.create_connection((host, port), timeout=1):
                     result["grpc_ready"] = True
+                    result["success"] = True
                     result["message"] += (
                         f"，gRPC 服务已就绪（{time.monotonic() - started:.1f}s）"
                     )
@@ -89,7 +94,6 @@ def launch_edi(
             except OSError:
                 time.sleep(1)
 
-        result["grpc_ready"] = False
         result["message"] += "，gRPC 服务未在规定时间内就绪"
 
     return result

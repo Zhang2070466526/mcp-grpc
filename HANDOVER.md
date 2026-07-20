@@ -100,12 +100,13 @@ uv run python start_servers.py
 
 `.mcp.json` 已配置，客户端自动拉起。
 
-### 单独启动某个服务
+### 单独启动某个服务模块（开发调试用）
 
 ```powershell
-uv run python servers/eda/server.py
+cd D:\GitLabCode\mcp-grpc
 uv run python servers/turbocharts/server.py
 ```
+> 注：EDA gRPC 工具已移除独立入口，统一通过 `start_servers.py` 启动。
 
 ## 通信流程
 
@@ -146,6 +147,25 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 # import ecserver_pb2 → from proto import ecserver_pb2
 ```
 
+## 工具注册机制
+
+所有工具函数为纯函数（无 MCP 装饰器），定义在 `servers/eda/*.py` 中，
+由 `servers/registry_server.py` 统一导入并注册到 FastMCP 实例。
+`servers/eda/__init__.py` 作为公共 API 入口，re-export 所有工具函数。
+
+```
+servers/eda/project_manage.py   定义工具函数（纯函数）
+       │
+       ▼
+servers/eda/__init__.py         re-export 到包级别
+       │
+       ▼
+servers/registry_server.py       mcp.tool()(func) 注册 + 创建 FastMCP
+       │
+       ▼
+start_servers.py                 解析参数、启动服务
+```
+
 ## 待封装接口
 
 所有 proto EventType 已全部封装完毕。
@@ -154,11 +174,15 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 
 1. 本地 proto 目录名为 `proto`，避免与 grpcio 包名冲突
 2. stdio 模式下不能向 stdout 输出任何内容（会破坏 MCP 协议）
-3. `.env` 通过 `python-dotenv` 加载，只在首次 import 时生效
+3. `.env` 通过 `python-dotenv` 加载，在所有 service 模块首次 import 时生效
 4. Windows 路径中的反斜杠在 `.env` 中不需要转义
 5. gRPC 服务地址格式必须为 `host:port`（launch_edi 依赖 rsplit(":", 1)）
 6. gRPC 超时无上限限制（仅校验 > 0），仿真等长任务可传任意大值
 7. 端口占用时使用 `netstat -ano | findstr <端口>` 定位后 `taskkill -f -pid <PID>` 关闭
+8. `launch_edi` 返回 `success`（gRPC 就绪时才为 True）、`process_started`、`grpc_ready` 三个字段，调用方应检查 `success` 而非仅看 `process_started`
+9. `grpc_client.py` 从 `config.py` 统一导入 `EDA_GRPC_SERVER`，不再独立读取环境变量
+10. `.gitignore` 已排除 `.idea/`、`.claude/`，不要提交个人 IDE 配置
+11. `start_servers.py` 使用 `mcp._tool_manager._tools` 读取工具列表（私有属性），MCP 版本升级后需验证兼容性
 
 ## 维护人
 

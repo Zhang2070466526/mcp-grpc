@@ -99,7 +99,7 @@ uv run python start_servers.py --port 9000
 | `list_epp_projects` | 扫描文件夹，列出所有 .epp 工程 | `folder_path` | 无 |
 | `open_eda_project` | 打开 .epp 工程 | `project_path` | `timeout_seconds`（>0，默认 60） |
 | `export_project_netlist` | 查看/导出工程网表 | `project_path` | `timeout_seconds`（>0，默认 60） |
-| `simulate_project` | 执行工程仿真 | `project_path` | `log_source`、`timeout_seconds`（默认 120，无上限） |
+| `simulate_project` | 执行工程仿真 | `project_path` | `log_source`、`timeout_seconds`（默认 600，无上限） |
 | `capture_schematic` | 截取工程原理图为图片 | `project_path`、`img_path` | `timeout_seconds`（默认 60） |
 | `replace_models_from_csv` | 按 CSV 批量替换模型 | `project_path`、`csv_path` | `timeout_seconds`（默认 60） |
 | `close_eda_project` | 关闭工程 | `project_path` | `need_save`（默认 false）、`timeout_seconds` |
@@ -159,10 +159,10 @@ uv run python start_servers.py --port 9000
 │   │   ├── config.py              # 公用函数与配置
 │   │   ├── grpc_client.py         # gRPC 通信层
 │   │   ├── project_manage.py      # 工程管理（3 个工具）
-│   │   ├── simulation.py           # 仿真（2 个工具）
-│   │   ├── design_export.py        # 分析（2 个工具）
-│   │   ├── model_replace.py        # 模型替换（1 个工具）
-│   │   └── edi_launcher.py        # 启动工具（1 个工具）
+│   │   ├── simulation.py            # 仿真（2 个工具）
+│   │   ├── design_export.py         # 分析（2 个工具）
+│   │   ├── model_replace.py         # 模型替换（1 个工具）
+│   │   └── edi_launcher.py           # 启动工具（1 个工具）
 │   └── turbocharts/
 │       └── server.py              # RawConverter 工具（1 个）
 ├── start_servers.py               # 一键启动入口
@@ -219,9 +219,9 @@ tasklist | findstr EDI.exe
 
 ### 添加新工具
 
-1. EDA gRPC 方向：在 `servers/eda/server.py` 中按模板添加 `@mcp.tool()` 函数，调用 `call_grpc()`
-2. 新方向：在 `servers/` 下新建子包，创建 `server.py`
-3. 在 `servers/registry_server.py` 中 import 并注册
+1. 在 `servers/eda/` 对应分类文件中添加工具函数（纯函数，不加 MCP 装饰器）
+2. 在 `servers/eda/__init__.py` 中 re-export
+3. 在 `servers/registry_server.py` 中 `mcp.tool()(func)` 注册
 
 ### 重新生成 proto
 
