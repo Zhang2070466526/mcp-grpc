@@ -1,4 +1,24 @@
-"""EDA gRPC MCP 服务器 — 工程、网表、仿真。"""
+r"""EDA gRPC MCP 工具 — 通过 ExternalCall gRPC 操作 EDA 工程。
+
+open_eda_project     打开 .epp 工程
+view_project_netlist 查看/导出工程网表
+simulate_project     执行工程仿真
+launch_edi           启动 EDI 客户端，等待 gRPC 就绪
+
+
+自然语言调用示例：
+  帮我启动 EDI
+  帮我打开 EDA 工程 C:\Users\JGL\EDI-Workspace\EDI_TEST\EDI_TEST.epp
+  帮我查看 EDA 工程 C:\Users\JGL\EDI-Workspace\EDI_TEST\EDI_TEST.epp 的网表
+  帮我对 EDA 工程 C:\Users\JGL\EDI-Workspace\EDI_TEST\EDI_TEST.epp 执行仿真
+
+参数说明：
+  project_path     EDA 服务所在机器上的 .epp 工程文件绝对路径（必填）
+  timeout_seconds  最长等待秒数，默认 60（open/view）或 120（simulate），范围 1-600
+  log_source       simulate_project 的调用方标识，默认 "mcp_client"
+  wait_for_grpc    launch_edi 是否等待 gRPC 就绪，默认 True
+  wait_timeout     launch_edi 等待 gRPC 就绪的超时秒数，默认 30
+"""
 
 from __future__ import annotations
 

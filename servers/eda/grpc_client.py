@@ -1,4 +1,8 @@
-"""EDA gRPC 客户端 — 封装与 EDA-PMDS/EDI ExternalCall 的通信。"""
+"""EDA gRPC 通信层 — 封装 PerformAction + FetchEvent 异步调用流程。
+
+内部模块，不直接暴露为 MCP 工具。
+调用 call_grpc(task_type, payload, timeout_seconds) 提交任务并等待结果。
+"""
 
 from __future__ import annotations
 

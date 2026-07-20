@@ -1,4 +1,31 @@
-"""RAW 转图像 MCP 服务器 — 将 ADS RAW 仿真结果转换为曲线图和 CSV。"""
+r"""Turbocharts MCP 工具 — ADS RAW 文件转曲线图与 CSV。
+
+
+turbocharts_convert   将 ADS 仿真 RAW 结果转为 PNG 曲线图和 CSV
+
+
+自然语言调用示例：
+    帮我把 D:\results\result_tr.raw 转成 S 参数增益曲线图，
+    输出到 D:\results\gain.png，曲线 DB_S[2,1]，依赖轴 freq
+
+    帮我把 D:\results\result.raw 转成噪声系数图，输出 noise.png，
+    曲线 real_nf(1)，同时导出 CSV 到 noise.csv
+
+参数说明：
+    raw_path    ADS RAW 结果文件路径（必填）
+    img_path    输出图片路径，支持 PNG/JPG 等（必填）
+    chart_type  转换类型："SP"（S参数）、"HB"（谐波平衡）、"XDB"（必填）
+
+    可选参数：
+    csv_path    同时导出的 CSV 文件路径
+    linename    曲线名，格式 单位_曲线名[端口]，多条用 & 分隔
+              DB_S[2,1]（增益）  DB_S[1,2]（反向增益）
+              real_nf(1)（噪声） VSWR_S[1,1]（驻波）
+              real_delayS[2,1]（时延） APS_S[2,1]（附加相移）
+    dependency  依赖轴，通常为 "freq"
+    ac_config   精度配置，格式 ac_type#bit#data#nv_type#nv_value
+              例 "phase#3#S[2,1]#fv#0.1"
+"""
 
 from __future__ import annotations
 

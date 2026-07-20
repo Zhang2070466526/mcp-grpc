@@ -1,8 +1,13 @@
 """MCP 工具注册中心 — 集中管理所有工具的注册。
 
-添加新工具时只需在此文件中：
-1. import 工具函数
-2. 调用 mcp.tool()(工具函数)
+已注册工具（共 5 个）：
+    open_eda_project      打开 .epp 工程
+    view_project_netlist  查看/导出工程网表
+    simulate_project      执行工程仿真
+    launch_edi            启动 EDI 客户端
+    turbocharts_convert   ADS RAW → 曲线图 + CSV
+
+
 """
 
 from __future__ import annotations
