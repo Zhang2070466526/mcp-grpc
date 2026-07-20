@@ -36,7 +36,7 @@ D:\GitLabCode\mcp-grpc
 ├── pyproject.toml                  # uv 项目配置
 │
 ├── README_MCP.md                   # 项目主文档
-├── MCP使用说明.md                   # 中文快速参考
+├── README.md                       # 项目主文档（含工具参数和曲线参考）
 ├── HANDOVER.md                     # 本文档（交接文档）
 ├── EDI系统接口与外部调用汇总.md      # EDI 接口全量文档（不动）
 ├── grpc接口调用.md                  # gRPC 调用说明
