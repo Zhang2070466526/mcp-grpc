@@ -46,4 +46,5 @@ def replace_models_from_csv(
         ecserver_pb2.MODEL_REPLACE,
         {"project_path": resolved_path, "csv_path": str(csv.resolve())},
         timeout_seconds,
+        max_timeout_seconds=300,
     )

@@ -106,10 +106,15 @@ async def _check_tcp(endpoint: str) -> bool:
 
 @mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
 async def health_check(request: Request) -> JSONResponse:  # noqa
+    import os as _os
     eda_ready = await _check_tcp(EDA_GRPC_SERVER)
+    tc_path = _os.getenv("TURBOCHARTS_PATH", "")
+    turbocharts_ready = bool(tc_path) and __import__("pathlib").Path(tc_path).is_file()
     return JSONResponse({
         "status": "ok" if eda_ready else "degraded",
+        "version": "0.1.0",
         "mcp_ready": True,
         "eda_grpc_ready": eda_ready,
+        "turbocharts_ready": turbocharts_ready,
         "eda_grpc_server": EDA_GRPC_SERVER,
     })

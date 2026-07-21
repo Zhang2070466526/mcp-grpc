@@ -25,19 +25,23 @@ def call_grpc(
     task_type: int,
     payload: dict[str, Any],
     timeout_seconds: int,
+    max_timeout_seconds: int = 3600,
 ) -> dict[str, Any]:
     """通用 gRPC 调用（带锁串行化）。
 
     Args:
         task_type: EventType 枚举值。
         payload: 任务参数字典。
-        timeout_seconds: 总超时秒数（需 > 0），无上限。
+        timeout_seconds: 总超时秒数（需 > 0）。
+        max_timeout_seconds: 最大允许秒数，默认 3600。
 
     Returns:
         包含 success / task_id / task_type / message / details 的结果字典。
     """
     if timeout_seconds < 1:
         raise ValueError("timeout_seconds 必须大于 0")
+    if timeout_seconds > max_timeout_seconds:
+        raise ValueError(f"timeout_seconds 不能超过 {max_timeout_seconds} 秒")
 
     with _EDA_LOCK:
         return _call_grpc_unlocked(task_type, payload, timeout_seconds)

@@ -190,8 +190,11 @@ uv run python start_servers.py --port 9000
 │       ├── runner.py            # 串行执行器
 │       └── server.py            # RAW 转图（1 工具）
 ├── start_servers.py             # 入口
+├── tests/                       # 测试套件
+├── scripts/build.ps1            # 打包脚本
+├── eda_mcp.spec                 # PyInstaller 配置
 ├── .mcp.json                    # Claude Code 配置
-├── .env                         # 环境变量
+├── .env.example                 # 配置模板
 └── pyproject.toml
 ```
 
@@ -234,6 +237,23 @@ curl http://127.0.0.1:8000/health
 ---
 
 ## 开发
+
+### 运行测试
+
+```powershell
+uv run python tests/test_project_reader.py
+uv run python tests/test_component_tools.py
+uv run python tests/test_turbocharts_runner.py
+uv run python tests/test_health.py
+uv run python tests/test_tool_registry.py
+```
+
+### 打包
+
+```powershell
+powershell -File scripts/build.ps1
+# 输出: dist/EDA MCP/eda-mcp.exe（目录型，约 137 MB）
+```
 
 ### 添加新工具
 

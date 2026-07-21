@@ -17,14 +17,17 @@ def run_turbocharts(
 
     Args:
         command: 命令行参数序列（含可执行文件路径）。
-        timeout_seconds: 超时秒数。
+        timeout_seconds: 超时秒数（1-600）。
 
     Returns:
         subprocess.CompletedProcess 对象。
 
     Raises:
+        ValueError: timeout_seconds 不在 1-600 范围内。
         RuntimeError: 执行超时。
     """
+    if timeout_seconds < 1 or timeout_seconds > 600:
+        raise ValueError("timeout_seconds 必须在 1 到 600 之间")
     with _TURBOCHARTS_SEMAPHORE:
         try:
             return subprocess.run(

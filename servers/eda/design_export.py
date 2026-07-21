@@ -38,6 +38,7 @@ def export_project_netlist(
         ecserver_pb2.VIEW_PROJECT_NETLIST,
         {"project_path": resolved_path},
         timeout_seconds,
+        max_timeout_seconds=300,
     )
 
 
@@ -58,4 +59,5 @@ def capture_schematic(
         ecserver_pb2.CAPTURE_SCHEMATIC,
         {"project_path": resolved_path, "img_path": img_path},
         timeout_seconds,
+        max_timeout_seconds=300,
     )

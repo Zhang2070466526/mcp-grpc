@@ -43,6 +43,7 @@ def simulate_project(
         ecserver_pb2.SIMULATE_PROJECT,
         {"project_path": resolved_path, "log_source": log_source},
         timeout_seconds,
+        max_timeout_seconds=3600,
     )
 
 
@@ -65,4 +66,5 @@ def simulate_netlist_with_ads(
         ecserver_pb2.CALL_SIMULATION_CONTROLLER,
         {"netlist_path": str(netlist.resolve()), "ads_path": ads_path},
         timeout_seconds,
+        max_timeout_seconds=3600,
     )

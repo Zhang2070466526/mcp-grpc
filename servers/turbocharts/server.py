@@ -130,6 +130,11 @@ def turbocharts_convert(
     _validate_file(raw_path, "RAW 文件")
     _validate_file(TURBOCHARTS_PATH, "RawConverter")
 
+    # 校验输出图片扩展名
+    img_ext = Path(img_path).suffix.lower()
+    if img_ext not in (".png", ".jpg", ".jpeg", ".bmp", ".svg"):
+        raise ValueError(f"img_path 扩展名不支持: {img_ext}，请使用 PNG/JPG/BMP/SVG")
+
     cmd = [TURBOCHARTS_PATH, "--raw", raw_path, "--img", img_path, "--type", chart_type]
 
     if csv_path:

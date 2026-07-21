@@ -156,7 +156,35 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 # import ecserver_pb2 → from proto import ecserver_pb2
 ```
 
-## 工具注册机制
+## 测试
+
+Windows PowerShell
+°æȨËùÓУ¨C£© Microsoft Corporation¡£±£ÁôËùÓÐȨÀû¡£
+
+°²װ×îÐµÄ PowerShell£¬Á˽âÐ¹¦Äܺ͸Ľø£¡https://aka.ms/PSWindows
+
+PS D:\GitLabCode\mcp-grpc> test_project_reader.py: all passed
+test_component_tools.py: all passed
+test_turbocharts_runner.py: all passed
+test_health.py: all passed
+test_tool_registry.py: all passed
+
+## 打包
+
+Windows PowerShell
+°æȨËùÓУ¨C£© Microsoft Corporation¡£±£ÁôËùÓÐȨÀû¡£
+
+°²װ×îÐµÄ PowerShell£¬Á˽âÐ¹¦Äܺ͸Ľø£¡https://aka.ms/PSWindows
+
+PS D:\GitLabCode\mcp-grpc> === EDA MCP Build ===
+[1/4] Cleaning...
+[2/4] Running tests...
+All passed
+[3/4] Building with PyInstaller...
+[4/4] Verifying...
+OK: dist/EDA MCP/eda-mcp.exe (48.9 MB)
+
+## 工具注册机制## 工具注册机制
 
 所有工具函数为纯函数（无 MCP 装饰器），定义在 `servers/eda/*.py` 中，
 由 `servers/registry_server.py` 统一导入并注册到 FastMCP 实例。

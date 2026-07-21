@@ -34,12 +34,48 @@ DEFAULT_PORT = int(os.getenv("MCP_PORT", "8000"))
 from servers.registry_server import mcp  # noqa: E402
 
 
+def _setup_logging() -> None:
+    """按大小轮转的文件日志，写入 logs/mcp.log。"""
+    import logging
+    from logging.handlers import RotatingFileHandler
+    from pathlib import Path
+
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+
+    handler = RotatingFileHandler(
+        log_dir / "mcp.log",
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    root = logging.getLogger()
+    root.addHandler(handler)
+    root.setLevel(logging.INFO)
+    root.info("EDA MCP v0.1.0 starting")
+
+
 def _run_http_server(port: int) -> None:
     """Streamable HTTP 模式入口。
 
     Windows 上强制使用 SelectorEventLoop，避免 Proactor AcceptEx 异常
     导致监听 Socket 被关闭（WinError 64）。
     """
+    # 单实例检查
+    import socket as _sock
+    _test = _sock.socket()
+    try:
+        _test.settimeout(1)
+        if _test.connect_ex(("127.0.0.1", port)) == 0:
+            print(f"端口 {port} 已被占用，MCP 可能已在运行。")
+            sys.exit(1)
+    finally:
+        _test.close()
+
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(
             asyncio.WindowsSelectorEventLoopPolicy()
@@ -73,6 +109,7 @@ if __name__ == "__main__":
 
 
     if args.transport == "streamable-http":
+        _setup_logging()
         _run_http_server(args.port)
     else:
         mcp.run(transport="stdio")
