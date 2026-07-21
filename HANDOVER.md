@@ -37,9 +37,11 @@ D:\GitLabCode\mcp-grpc
 │       ├── runner.py                # 串行执行器（BoundedSemaphore）
 │       └── server.py                # RawConverter 工具定义（1 个工具）
 │
-├── start_servers.py                # 一键启动入口（合并所有工具）
-├── .mcp.json                       # Claude Code MCP 配置
-├── .env                            # 环境变量配置（唯一配置来源）
+├── start_servers.py                # 一键启动入口
+├── tests/                          # 测试套件
+├── scripts/                        # 打包脚本 + PyInstaller 配置
+├── .mcp.json                       # Claude Code 配置
+├── .env                            # 环境变量（不提交 Git）
 ├── pyproject.toml                  # uv 项目配置
 │
 ├── README.md                       # 项目主文档（含工具参数和曲线参考）
