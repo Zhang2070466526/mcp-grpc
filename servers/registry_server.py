@@ -79,42 +79,10 @@ from servers.turbocharts.server import (  # noqa: E402
 )
 mcp.tool()(turbocharts_convert)
 
-# ---------------------------------------------------------------------------
-# 健康检查
-# ---------------------------------------------------------------------------
+# -- Web 路由 --
+from servers.web_routes import ui_page, health_check, chat_endpoint  # noqa: E402
 
-import asyncio  # noqa: E402
-
-from starlette.requests import Request  # noqa: E402
-from starlette.responses import JSONResponse  # noqa: E402
-from servers.eda.config import EDA_GRPC_SERVER  # noqa: E402
-
-
-async def _check_tcp(endpoint: str) -> bool:
-    try:
-        host, port_text = endpoint.rsplit(":", 1)
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(host, int(port_text)),
-            timeout=0.5,
-        )
-        writer.close()
-        await writer.wait_closed()
-        return True
-    except (OSError, ValueError, asyncio.TimeoutError):
-        return False
-
-
-@mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
-async def health_check(request: Request) -> JSONResponse:  # noqa
-    import os as _os
-    eda_ready = await _check_tcp(EDA_GRPC_SERVER)
-    tc_path = _os.getenv("TURBOCHARTS_PATH", "")
-    turbocharts_ready = bool(tc_path) and __import__("pathlib").Path(tc_path).is_file()
-    return JSONResponse({
-        "status": "ok" if eda_ready else "degraded",
-        "version": "0.1.0",
-        "mcp_ready": True,
-        "eda_grpc_ready": eda_ready,
-        "turbocharts_ready": turbocharts_ready,
-        "eda_grpc_server": EDA_GRPC_SERVER,
-    })
+mcp.custom_route("/", methods=["GET"])(ui_page)
+mcp.custom_route("/ui", methods=["GET"])(ui_page)
+mcp.custom_route("/health", methods=["GET"])(health_check)
+mcp.custom_route("/chat", methods=["POST"])(chat_endpoint)

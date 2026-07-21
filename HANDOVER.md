@@ -29,6 +29,7 @@ servers/
   turbocharts/
     runner.py            # 串行执行器（BoundedSemaphore）
     server.py            # RAW 转图（1 工具）
+  web_routes.py          # Web 路由（/health, /chat, /ui）
 start_servers.py         # 一键启动入口
 tests/                   # 测试套件（5 个文件）
 scripts/                 # 打包脚本 + PyInstaller 配置
@@ -63,7 +64,7 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 EDA_GRPC_SERVER=127.0.0.1:50055
 EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe
 TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
-MCP_TRANSPORT=streamable-http
+MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
 MCP_PORT=8026
 ```
@@ -103,7 +104,7 @@ uv run python tests/test_tool_registry.py
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/EDA MCP/（含 eda-mcp.exe + .env，目录型约 137 MB）
+# 输出: dist/EDA MCP/（含 eda-mcp.exe + start.bat + .env，约 137 MB）
 ```
 
 ## 工具注册机制
@@ -142,6 +143,9 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 13. `/health` 端点可区分 MCP 故障与 EDI 离线
 14. `compare_simulation_results` 使用 Matplotlib + numpy 做叠图插值
 15. 打包为目录型，复制 dist/EDA MCP/ 到目标电脑后创建 .env 即可运行
+16. 使用 SSE 传输模式（支持 /ui /health /chat 自定义路由）
+17. 聊天客户端 `scripts/chat_client.html` 支持独立分发，连接本地 /chat 端点
+18. 打包时自动过滤 LLM_API_KEY 等敏感配置，强制 MCP_TRANSPORT=sse
 
 ## 维护人
 

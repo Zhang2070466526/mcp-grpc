@@ -59,12 +59,8 @@ def _setup_logging() -> None:
     root.info("EDA MCP v0.1.0 starting")
 
 
-def _run_http_server(port: int) -> None:
-    """Streamable HTTP 模式入口。
-
-    Windows 上强制使用 SelectorEventLoop，避免 Proactor AcceptEx 异常
-    导致监听 Socket 被关闭（WinError 64）。
-    """
+def _run_http_server(port: int, transport: str = "streamable-http") -> None:
+    """SSE / streamable-http 模式入口。"""
     # 单实例检查
     import socket as _sock
     _test = _sock.socket()
@@ -82,20 +78,24 @@ def _run_http_server(port: int) -> None:
         )
 
     tools = [t.name for t in mcp._tool_manager._tools.values()]
-    print(f"MCP 服务启动 [transport=streamable-http, port={port}]")
-    print(f"已加载 {len(tools)} 个工具: {', '.join(tools)}")
-    print(f"地址: http://{DEFAULT_HOST}:{port}/mcp")
+    print("=" * 50)
+    print(f"  EDA MCP v0.1.0")
+    print(f"  UI:  http://{DEFAULT_HOST}:{port}/ui")
+    print(f"  MCP: http://{DEFAULT_HOST}:{port}/sse")
+    print(f"  Tools: {len(tools)} loaded")
+    print(f"  Close window to stop")
+    print("=" * 50)
 
     mcp.settings.host = DEFAULT_HOST
     mcp.settings.port = port
-    mcp.run(transport="streamable-http")
+    mcp.run(transport=transport)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="启动所有 MCP 服务")
     parser.add_argument(
         "--transport",  # 参数名称
-        choices=["stdio", "streamable-http"],  # 可选值列表
+        choices=["stdio", "sse", "streamable-http"],  # 可选值列表
         default=DEFAULT_TRANSPORT,  # 默认值
         help=f"通信方式（默认: {DEFAULT_TRANSPORT}）",  # 帮助说明
     )  # 定义 --transport 参数
@@ -108,8 +108,8 @@ if __name__ == "__main__":
     args = parser.parse_args()# 执行参数解析，作用是将用户在命令行输入的实际参数转换为 Python 对象，供程序后续使用。
 
 
-    if args.transport == "streamable-http":
+    if args.transport in ("sse", "streamable-http"):
         _setup_logging()
-        _run_http_server(args.port)
+        _run_http_server(args.port, transport=args.transport)
     else:
         mcp.run(transport="stdio")

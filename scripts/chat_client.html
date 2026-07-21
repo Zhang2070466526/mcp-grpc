@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>EDA Chat</title>
+    <style>
+        :root {
+            --bg: #1a1b26;
+            --surface: #24283b;
+            --overlay: #2f3346;
+            --muted: #565f89;
+            --text: #c0caf5;
+            --subtext: #9aa5ce;
+            --blue: #7aa2f7;
+            --green: #9ece6a;
+            --red: #f7768e;
+            --yellow: #e0af68;
+            --border: #3b4261;
+            --shadow: rgba(0, 0, 0, .3);
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #eff1f5;
+                --surface: #e6e9ef;
+                --overlay: #ccd0da;
+                --muted: #9ca0b0;
+                --text: #4c4f69;
+                --subtext: #5c5f77;
+                --blue: #1e66f5;
+                --green: #40a02b;
+                --red: #d20f39;
+                --yellow: #df8e1d;
+                --border: #bcc0cc;
+                --shadow: rgba(0, 0, 0, .08);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+            overflow: hidden
+        }
+
+        /* sidebar tools */
+        .panel {
+            width: 260px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: width .3s
+        }
+
+        .panel.collapsed {
+            width: 0
+        }
+
+        .panel-head {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        .panel-head h2 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--subtext)
+        }
+
+        .panel-head button {
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 16px
+        }
+
+        .tools-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px
+        }
+
+        .tool-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text);
+            cursor: default
+        }
+
+        .tool-item:hover {
+            background: var(--overlay)
+        }
+
+        .tool-item .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0
+        }
+
+        .tool-item .dot.on {
+            background: var(--green)
+        }
+
+        .tool-item .dot.off {
+            background: var(--red)
+        }
+
+        .tool-item .dot.file {
+            background: var(--blue)
+        }
+
+        .tool-item .name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
+        .cat-label {
+            font-size: 10px;
+            color: var(--muted);
+            font-weight: 600;
+            padding: 10px 10px 4px;
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        /* main chat */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden
+        }
+
+        .top {
+            background: var(--surface);
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .hamburger {
+            background: none;
+            border: none;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 18px
+        }
+
+        .top .logo {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, var(--blue), #bb9af7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff
+        }
+
+        .top .title {
+            font-size: 14px;
+            font-weight: 600
+        }
+
+        .top .sub {
+            font-size: 10px;
+            color: var(--muted);
+            margin-left: auto
+        }
+
+        .msgs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            scroll-behavior: smooth
+        }
+
+        .msg {
+            display: flex;
+            gap: 8px;
+            max-width: 85%;
+            animation: in .2s ease-out
+        }
+
+        @keyframes in {
+            from {
+                opacity: 0;
+                transform: translateY(6px)
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .msg.user {
+            align-self: flex-end;
+            flex-direction: row-reverse
+        }
+
+        .msg.assistant {
+            align-self: flex-start
+        }
+
+        .msg .avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700
+        }
+
+        .msg.user .avatar {
+            background: var(--blue);
+            color: #fff
+        }
+
+        .msg.assistant .avatar {
+            background: var(--overlay);
+            color: var(--blue)
+        }
+
+        .bubble {
+            padding: 9px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word
+        }
+
+        .msg.user .bubble {
+            background: var(--blue);
+            color: #fff;
+            border-bottom-right-radius: 3px
+        }
+
+        .msg.assistant .bubble {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 3px
+        }
+
+        .msg.toolcall .bubble {
+            background: var(--bg);
+            border: 1px dashed var(--yellow);
+            font-size: 11px;
+            color: var(--yellow)
+        }
+
+        .bubble pre {
+            background: var(--bg);
+            padding: 8px 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 11px;
+            margin: 4px 0;
+            border: 1px solid var(--border)
+        }
+
+        .typing {
+            display: flex;
+            gap: 3px;
+            padding: 4px 0;
+            align-self: flex-start
+        }
+
+        .typing span {
+            width: 6px;
+            height: 6px;
+            background: var(--muted);
+            border-radius: 50%;
+            animation: wave 1.4s infinite
+        }
+
+        .typing span:nth-child(2) {
+            animation-delay: .2s
+        }
+
+        .typing span:nth-child(3) {
+            animation-delay: .4s
+        }
+
+        @keyframes wave {
+            0%, 60%, 100% {
+                opacity: .3
+            }
+            30% {
+                opacity: 1
+            }
+        }
+
+        .input-wrap {
+            padding: 10px 20px 14px;
+            background: var(--surface);
+            border-top: 1px solid var(--border)
+        }
+
+        .input-row {
+            display: flex;
+            gap: 6px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 4px;
+            transition: border-color .2s
+        }
+
+        .input-row:focus-within {
+            border-color: var(--blue)
+        }
+
+        .input-row textarea {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            padding: 6px;
+            min-height: 18px;
+            max-height: 100px
+        }
+
+        .input-row button {
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            align-self: flex-end
+        }
+
+        .input-row button:hover {
+            opacity: .85
+        }
+
+        .input-row button:disabled {
+            opacity: .4
+        }
+    </style>
+</head>
+<body>
+
+<!-- tools panel -->
+<div class="panel" id="panel">
+    <div class="panel-head"><h2>TOOLS</h2>
+        <button onclick="togglePanel()" title="collapse">&times;</button>
+    </div>
+    <div class="tools-list" id="toolsList"></div>
+</div>
+
+<!-- chat area -->
+<div class="main">
+    <div class="top">
+        <button class="hamburger" onclick="togglePanel()">&#9776;</button>
+        <div class="logo">E</div>
+        <div class="title">EDA Chat</div>
+        <div class="sub" id="status">loading...</div>
+    </div>
+    <div class="msgs" id="msgs">
+        <div class="msg assistant">
+            <div class="avatar">AI</div>
+            <div class="bubble">你好！我可以帮你操作 EDA 工程。<br>试试：打开工程 / 查看元件 / 工程概览 / 执行仿真</div>
+        </div>
+    </div>
+    <div class="input-wrap">
+        <div class="input-row">
+            <textarea id="q" rows="1" placeholder="输入消息..."
+                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+            <button id="sendBtn" onclick="send()">&#10148;</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const URL = location.origin + "/chat", HLTH = location.origin + "/health";
+
+    // Tool definitions with categories and dependencies
+    const TOOLS = [
+        {cat: "工程管理", deps: "gRPC", name: "list_epp_projects", desc: "扫描 .epp 工程"},
+        {cat: "工程管理", deps: "gRPC", name: "open_eda_project", desc: "打开工程"},
+        {cat: "工程管理", deps: "gRPC", name: "close_eda_project", desc: "关闭工程"},
+        {cat: "工程管理", deps: "file", name: "list_project_components", desc: "列出元件"},
+        {cat: "工程管理", deps: "file", name: "get_component_parameters", desc: "查询元件参数"},
+        {cat: "工程管理", deps: "file", name: "get_project_summary", desc: "工程概览"},
+        {cat: "仿真", deps: "gRPC", name: "simulate_project", desc: "执行仿真"},
+        {cat: "仿真", deps: "gRPC", name: "simulate_netlist_with_ads", desc: "ADS 仿真控制器"},
+        {cat: "仿真", deps: "tc", name: "compare_simulation_results", desc: "多结果对比叠图"},
+        {cat: "分析", deps: "gRPC", name: "export_project_netlist", desc: "导出网表"},
+        {cat: "分析", deps: "gRPC", name: "capture_schematic", desc: "截图原理图"},
+        {cat: "模型", deps: "gRPC", name: "replace_models_from_csv", desc: "CSV 模型替换"},
+        {cat: "启动", deps: "local", name: "launch_edi", desc: "启动 EDI 客户端"},
+        {cat: "图表", deps: "tc", name: "turbocharts_convert", desc: "RAW 转曲线图"},
+    ];
+
+    let edaReady = false, tcReady = false;
+
+    function renderTools() {
+        let h = TOOLS.reduce((a, t) => {
+            if (!a[t.cat]) {
+                a[t.cat] = []
+            }
+            a[t.cat].push(t);
+            return a;
+        }, {});
+        let el = document.getElementById("toolsList"), html = "";
+        for (let cat of Object.keys(h)) {
+            html += `<div class="cat-label">${cat}</div>`;
+            for (let t of h[cat]) {
+                let cls = "off";
+                if (t.deps === "file" || t.deps === "local") cls = "file";
+                else if (t.deps === "gRPC" && edaReady) cls = "on";
+                else if (t.deps === "tc" && tcReady) cls = "on";
+                html += `<div class="tool-item"><span class="dot ${cls}"></span><span class="name" title="${t.name}">${t.name}</span></div>`;
+            }
+        }
+        el.innerHTML = html;
+    }
+
+    async function checkHealth() {
+        try {
+            let r = await fetch(HLTH), d = await r.json();
+            edaReady = d.eda_grpc_ready;
+            tcReady = d.turbocharts_ready;
+            document.getElementById("status").textContent =
+                "gRPC:" + (edaReady ? "ON" : "OFF") + " TC:" + (tcReady ? "ON" : "OFF");
+        } catch (e) {
+            document.getElementById("status").textContent = "server offline"
+        }
+        renderTools();
+    }
+
+    function togglePanel() {
+        document.getElementById("panel").classList.toggle("collapsed");
+    }
+
+    // Chat functions
+    function add(role, text, html = false) {
+        let d = document.createElement("div"), av = document.createElement("div"), b = document.createElement("div");
+        d.className = "msg " + role;
+        av.className = "avatar";
+        b.className = "bubble";
+        if (role === "user") {
+            av.textContent = "U";
+            b.textContent = text
+        } else if (role === "toolcall") {
+            av.textContent = "T";
+            b.innerHTML = text
+        } else {
+            av.textContent = "AI";
+            if (html) {
+                b.innerHTML = text
+            } else {
+                b.textContent = text
+            }
+        }
+        d.append(av, b);
+        document.getElementById("msgs").appendChild(d);
+        scrollDown();
+    }
+
+    function scrollDown() {
+        let m = document.getElementById("msgs");
+        m.scrollTo({top: m.scrollHeight, behavior: "smooth"});
+    }
+
+    function showTyping() {
+        let d = document.createElement("div");
+        d.className = "typing";
+        d.id = "typing";
+        for (let i = 0; i < 3; i++) {
+            let s = document.createElement("span");
+            d.appendChild(s)
+        }
+        document.getElementById("msgs").appendChild(d);
+        scrollDown();
+    }
+
+    function hideTyping() {
+        document.getElementById("typing")?.remove();
+    }
+
+    async function send() {
+        let q = document.getElementById("q"), m = q.value.trim();
+        if (!m) return;
+        q.value = "";
+        q.style.height = "auto";
+        add("user", m);
+        showTyping();
+        document.getElementById("sendBtn").disabled = true;
+        try {
+            let r = await fetch(URL, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({message: m})
+            });
+            let d = await r.json();
+            hideTyping();
+            if (d.tool_call) {
+                let args = JSON.stringify(d.tool_args, null, 2);
+                add("toolcall", "Tool: <b>" + d.tool_call + "</b><br><pre>" + args.replace(/</g, "&lt;") + "</pre>");
+            }
+            if (d.reply) {
+                let formatted = d.reply;
+                try {
+                    let obj = JSON.parse(d.reply);
+                    if (typeof obj === "object") {
+                        formatted = "<pre>" + JSON.stringify(obj, null, 2).replace(/</g, "&lt;") + "</pre>";
+                        add("assistant", formatted, true);
+                        return
+                    }
+                } catch (e) {
+                }
+                add("assistant", formatted);
+            } else if (d.error) {
+                add("assistant", "Error: " + d.error)
+            } else {
+                add("assistant", "Done.")
+            }
+        } catch (e) {
+            hideTyping();
+            add("assistant", "Error: " + e.message)
+        }
+        document.getElementById("sendBtn").disabled = false;
+    }
+
+    document.getElementById("q").addEventListener("input", function () {
+        this.style.height = "auto";
+        this.style.height = Math.min(this.scrollHeight, 100) + "px";
+    });
+
+    checkHealth();
+    setInterval(checkHealth, 30000);
+</script>
+</body>
+</html>

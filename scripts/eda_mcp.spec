@@ -14,6 +14,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(root / 'proto'), 'proto'),
+        (str(root / 'scripts' / 'chat_client.html'), 'scripts'),
     ],
     hiddenimports=[
         'servers', 'servers.eda', 'servers.turbocharts',

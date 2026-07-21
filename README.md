@@ -19,9 +19,14 @@ uv sync
 EDA_GRPC_SERVER=127.0.0.1:50055
 EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe
 TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
-MCP_TRANSPORT=streamable-http
+MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
 MCP_PORT=8026
+
+# 以下可选，用于聊天客户端 AI 对话
+LLM_API_KEY=sk-xxx
+LLM_BASE_URL=https://api.deepseek.com
+LLM_MODEL=deepseek-chat
 ```
 
 ### 3. 前置条件
@@ -41,17 +46,20 @@ uv run python start_servers.py
 
 输出示例：
 ```
-MCP 服务启动 [transport=streamable-http, port=8026]
+MCP 服务启动 [transport=sse, port=8026]
 已加载 14 个工具: list_epp_projects, open_eda_project, ...
-地址: http://127.0.0.1:8026/mcp
+地址: http://127.0.0.1:8026/sse
 INFO:     Uvicorn running on http://127.0.0.1:8026
 ```
 
 启动后自动监听 `127.0.0.1:8026`：
-- 所有本机客户端通过 `http://127.0.0.1:8026/mcp` 连接
+- 所有本机客户端通过 `http://127.0.0.1:8026/sse` 连接
 - EDI gRPC 操作由全局锁保证串行
 - Turbocharts 由信号量保证同一时间一个进程
-- `/health` 端点可检查服务状态
+- `/health` 健康检查 — 返回 EDA gRPC 和 Turbocharts 状态
+- `/ui` 聊天客户端 — 自然语言驱动 14 个工具，带工具面板和系统主题
+- `/chat` 聊天 API — POST `{"message":"..."}` 返回 LLM + 工具执行结果
+- 聊天客户端文件：`scripts/chat_client.html`（独立 HTML，可单独分发）
 
 **stdio 模式** — 由 MCP 客户端管理进程生命周期，适合单客户端调试：
 
@@ -74,9 +82,9 @@ uv run python start_servers.py --port 9000
 
 | 客户端 | 配置 |
 |---|---|
-| Claude Code | `.mcp.json` 已配置，`/mcp` 重载 |
-| OpenClaw / Web | 名称 `eda`，Streamable HTTP，`http://127.0.0.1:8026/mcp` |
-| 其他 stdio 客户端 | `uv --directory D:/GitLabCode/mcp-grpc run python start_servers.py --transport stdio` |
+| Claude Code | `.mcp.json` 已配置，`/sse` 重载 |
+| OpenClaw / Web | 名称 `eda`，Streamable HTTP，`http://127.0.0.1:8026/sse` |
+| 其他 stdio 客户端 | `uv --directory D:/GitLabCode/sse-grpc run python start_servers.py --transport stdio` |
 
 其他 MCP 客户端通用配置：
 
@@ -85,7 +93,7 @@ uv run python start_servers.py --port 9000
   "mcpServers": {
     "eda": {
       "command": "uv",
-      "args": ["--directory", "D:/GitLabCode/mcp-grpc", "run", "python", "start_servers.py", "--transport", "stdio"],
+      "args": ["--directory", "D:/GitLabCode/sse-grpc", "run", "python", "start_servers.py", "--transport", "stdio"],
       "env": { "EDA_GRPC_SERVER": "127.0.0.1:50055" }
     }
   }
@@ -253,7 +261,7 @@ uv run python tests/test_tool_registry.py
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/EDA MCP/（含 eda-mcp.exe + .env 配置模板，约 137 MB）
+# 输出: dist/EDA MCP/（含 eda-mcp.exe + start.bat 启动器 + .env，约 137 MB）
 ```
 
 ### 添加新工具

@@ -12,8 +12,9 @@ if (Test-Path "dist/EDA MCP/eda-mcp.exe") {
     $size = (Get-Item "dist/EDA MCP/eda-mcp.exe").Length / 1MB
     Write-Host "OK: dist/EDA MCP/eda-mcp.exe ($([math]::Round($size,1)) MB)" -ForegroundColor Green
 } else { Write-Host "FAIL" -ForegroundColor Red; exit 1 }
-Write-Host "[5/5] Copying config + cleaning..." -ForegroundColor Yellow
-Copy-Item -Force .env "dist/EDA MCP/"
+Write-Host "[5/5] Copying config + launcher + cleaning..." -ForegroundColor Yellow
+Get-Content .env -Encoding UTF8 | Where-Object { $_ -notmatch "^(LLM_API_KEY|LLM_BASE_URL|LLM_MODEL)=" } | ForEach-Object { $_ -replace "^MCP_TRANSPORT=.*", "MCP_TRANSPORT=sse" } | Set-Content "dist/EDA MCP/.env" -Encoding UTF8
+Copy-Item -Force scripts/run.bat "dist/EDA MCP/start.bat"
 Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
 Remove-Item -Force dist/eda-mcp.exe -ErrorAction SilentlyContinue
 Write-Host "Done. Output: dist/EDA MCP/" -ForegroundColor Green
