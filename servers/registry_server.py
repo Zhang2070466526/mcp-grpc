@@ -78,3 +78,38 @@ from servers.turbocharts.server import (  # noqa: E402
     turbocharts_convert,
 )
 mcp.tool()(turbocharts_convert)
+
+# ---------------------------------------------------------------------------
+# 健康检查
+# ---------------------------------------------------------------------------
+
+import asyncio  # noqa: E402
+
+from starlette.requests import Request  # noqa: E402
+from starlette.responses import JSONResponse  # noqa: E402
+from servers.eda.config import EDA_GRPC_SERVER  # noqa: E402
+
+
+async def _check_tcp(endpoint: str) -> bool:
+    try:
+        host, port_text = endpoint.rsplit(":", 1)
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, int(port_text)),
+            timeout=0.5,
+        )
+        writer.close()
+        await writer.wait_closed()
+        return True
+    except (OSError, ValueError, asyncio.TimeoutError):
+        return False
+
+
+@mcp.custom_route("/health", methods=["GET"], include_in_schema=False)
+async def health_check(request: Request) -> JSONResponse:  # noqa
+    eda_ready = await _check_tcp(EDA_GRPC_SERVER)
+    return JSONResponse({
+        "status": "ok" if eda_ready else "degraded",
+        "mcp_ready": True,
+        "eda_grpc_ready": eda_ready,
+        "eda_grpc_server": EDA_GRPC_SERVER,
+    })

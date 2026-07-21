@@ -2,3 +2,14 @@
 .uv-cache/
 __pycache__/
 *.pyc
+.idea/
+.claude/
+
+# Agent 本地文件
+.agent_token
+agent_jobs.db
+agent_jobs.db-wal
+agent_jobs.db-shm
+.env
+logs/
+*.log

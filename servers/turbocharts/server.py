@@ -141,10 +141,8 @@ def turbocharts_convert(
     if ac_config:
         cmd.extend(["--ac", ac_config])
 
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("RawConverter 执行超时（120秒）")
+    from servers.turbocharts.runner import run_turbocharts
+    result = run_turbocharts(cmd, timeout_seconds=120)
 
     img_generated = Path(img_path).exists()
     csv_generated = bool(csv_path) and Path(csv_path).exists()

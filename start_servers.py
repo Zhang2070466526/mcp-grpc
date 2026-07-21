@@ -18,8 +18,9 @@ r"""EDA MCP 一键启动 — 10 个工具的统一入口。
 from __future__ import annotations
 
 import argparse
-
+import asyncio
 import os
+import sys
 
 from dotenv import load_dotenv
 
@@ -30,7 +31,29 @@ DEFAULT_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
 DEFAULT_HOST = os.getenv("MCP_HOST", "127.0.0.1")    # 就是 FastMCP 暴露的配置接口，底层用的 uvicorn.run(host="0.0.0.0")，0.0.0.0 = 监听本机所有网卡的所有 IP。
 DEFAULT_PORT = int(os.getenv("MCP_PORT", "8000"))
 
-from servers.registry_server import mcp
+from servers.registry_server import mcp  # noqa: E402
+
+
+def _run_http_server(port: int) -> None:
+    """Streamable HTTP 模式入口。
+
+    Windows 上强制使用 SelectorEventLoop，避免 Proactor AcceptEx 异常
+    导致监听 Socket 被关闭（WinError 64）。
+    """
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(
+            asyncio.WindowsSelectorEventLoopPolicy()
+        )
+
+    tools = [t.name for t in mcp._tool_manager._tools.values()]
+    print(f"MCP 服务启动 [transport=streamable-http, port={port}]")
+    print(f"已加载 {len(tools)} 个工具: {', '.join(tools)}")
+    print(f"地址: http://{DEFAULT_HOST}:{port}/mcp")
+
+    mcp.settings.host = DEFAULT_HOST
+    mcp.settings.port = port
+    mcp.run(transport="streamable-http")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="启动所有 MCP 服务")
@@ -46,17 +69,10 @@ if __name__ == "__main__":
         default=DEFAULT_PORT,
         help=f"streamable-http 模式端口（默认: {DEFAULT_PORT}）",
     )
-    args = parser.parse_args()  # 执行参数解析，作用是将用户在命令行输入的实际参数转换为 Python 对象，供程序后续使用。
+    args = parser.parse_args()# 执行参数解析，作用是将用户在命令行输入的实际参数转换为 Python 对象，供程序后续使用。
 
-    tools = [t.name for t in mcp._tool_manager._tools.values()]
 
     if args.transport == "streamable-http":
-        print(f"MCP 服务启动 [transport=streamable-http, port={args.port}]")
-        print(f"已加载 {len(tools)} 个工具: {', '.join(tools)}")
-        print(f"地址: http://{DEFAULT_HOST}:{args.port}/mcp")
-        mcp.settings.host = DEFAULT_HOST
-        mcp.settings.port = args.port
-        mcp.run(transport="streamable-http")
+        _run_http_server(args.port)
     else:
-        # stdio 模式：不向 stdout 输出（MCP 协议通道）
         mcp.run(transport="stdio")

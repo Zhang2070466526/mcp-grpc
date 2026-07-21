@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 import uuid
 from typing import Any
@@ -16,13 +17,16 @@ import grpc
 from proto import ecserver_pb2, ecserver_pb2_grpc
 from servers.eda.config import EDA_GRPC_SERVER
 
+# EDA 操作全局锁 — 确保同一时间只进行一项 gRPC 状态操作
+_EDA_LOCK = threading.RLock()
+
 
 def call_grpc(
     task_type: int,
     payload: dict[str, Any],
     timeout_seconds: int,
 ) -> dict[str, Any]:
-    """通用 gRPC 调用：提交任务并等待最终事件。
+    """通用 gRPC 调用（带锁串行化）。
 
     Args:
         task_type: EventType 枚举值。
@@ -35,6 +39,15 @@ def call_grpc(
     if timeout_seconds < 1:
         raise ValueError("timeout_seconds 必须大于 0")
 
+    with _EDA_LOCK:
+        return _call_grpc_unlocked(task_type, payload, timeout_seconds)
+
+
+def _call_grpc_unlocked(
+    task_type: int,
+    payload: dict[str, Any],
+    timeout_seconds: int,
+) -> dict[str, Any]:
     client_uuid = str(uuid.uuid4())
     task_id = str(uuid.uuid4())
     request = ecserver_pb2.Request(

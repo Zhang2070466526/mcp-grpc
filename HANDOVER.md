@@ -34,7 +34,8 @@ D:\GitLabCode\mcp-grpc
 │   │   └── project_inspection.py    # 仿真对比（1 个工具）
 │   └── turbocharts/
 │       ├── __init__.py
-│       └── server.py               # RawConverter 工具定义（1 个工具）
+│       ├── runner.py                # 串行执行器（BoundedSemaphore）
+│       └── server.py                # RawConverter 工具定义（1 个工具）
 │
 ├── start_servers.py                # 一键启动入口（合并所有工具）
 ├── .mcp.json                       # Claude Code MCP 配置
@@ -81,16 +82,19 @@ D:\GitLabCode\mcp-grpc
 
 ## 配置说明
 
-所有配置集中在 `.env`：
+每台电脑独立配置 `.env`，所有服务均为本机调用：
 
 ```
-EDA_GRPC_SERVER=127.0.0.1:50055       # gRPC 地址
+EDA_GRPC_SERVER=127.0.0.1:50055       # 本机 EDI gRPC（始终本机）
 EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe
 TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
-MCP_TRANSPORT=streamable-http         # stdio | streamable-http
-MCP_HOST=127.0.0.1                    # HTTP 监听地址
-MCP_PORT=8000                         # HTTP 监听端口
+MCP_TRANSPORT=streamable-http         # HTTP 模式（多客户端共享）
+MCP_HOST=127.0.0.1                    # 仅本机监听
+MCP_PORT=8000
 ```
+
+当前版本为 **本地 MCP 模式**：服务、文件、EDI 均在同一台电脑，
+不同电脑互不影响，无需公共服务或远程 Agent。
 
 ## 启动方式
 
@@ -188,6 +192,10 @@ start_servers.py                 解析参数、启动服务
 9. `grpc_client.py` 从 `config.py` 统一导入 `EDA_GRPC_SERVER`，不再独立读取环境变量
 10. `.gitignore` 已排除 `.idea/`、`.claude/`，不要提交个人 IDE 配置
 11. `start_servers.py` 使用 `mcp._tool_manager._tools` 读取工具列表（私有属性），MCP 版本升级后需验证兼容性
+12. `servers/agent/` 为实验性分布式原型，不纳入当前正式版本
+13. Windows HTTP 模式使用 SelectorEventLoop 避免 Proactor AcceptEx 异常（WinError 64）
+14. `/health` 端点可检测 MCP 服务与 EDI gRPC 的连接状态
+15. `compare_simulation_results` 使用 Matplotlib 生成叠图，依赖 numpy 做插值对齐
 
 ## 维护人
 
