@@ -1,18 +1,25 @@
 r"""EDA 工程管理工具。
 
-list_epp_projects     扫描文件夹中的所有 .epp 工程文件
-open_eda_project      打开 .epp 工程，等待 EDA 返回成功或失败
-close_eda_project         关闭已打开的工程，可选择是否保存
+list_epp_projects             扫描文件夹中的所有 .epp 工程文件
+open_eda_project              打开 .epp 工程，等待返回成功或失败
+close_eda_project             关闭已打开的工程，可选择是否保存
+list_project_components       列出工程中的元件（不含完整参数）
+get_component_parameters      查询单个元件的完整参数列表
+get_project_summary           工程概览（元数据、原理图、仿真配置）
 
 自然语言使用示例：
-  帮我看看 C:\Users\JGL\EDI-Workspace 下面有哪些 .epp 工程
-  帮我打开 EDA 工程 C:\...\EDI_TEST.epp
-  帮我关闭这个工程（不保存）
-  帮我保存并关闭 EDA 工程 C:\...\EDI_TEST.epp
+  帮我看看 C:/Users/JGL/EDI-Workspace 下面有哪些 .epp 工程
+  帮我打开 EDA 工程 C:/.../EDI_TEST.epp
+  帮我关闭这个工程
+  帮我看看这个工程有哪些元件
+  帮我查看 TermG1 元件的参数
+  帮我获取这个工程的概览信息
 
 参数说明：
   project_path     EDA 服务所在机器上的 .epp 工程文件绝对路径
   folder_path      要扫描的文件夹绝对路径（list_epp_projects）
+  component_id     元件 UUID（get_component_parameters）
+  schematic_name   原理图名称，默认 main
   timeout_seconds  最长等待秒数，默认 60 秒
   need_save        关闭前是否保存工程（close_eda_project），默认 False
 """
@@ -24,7 +31,7 @@ from typing import Any
 
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
-from servers.eda.config import validate_project_path
+from servers.eda.config import ProjectReader, parse_components, validate_project_path
 
 
 def list_epp_projects(folder_path: str) -> dict[str, Any]:
@@ -54,7 +61,7 @@ def open_eda_project(
         timeout_seconds: int = 60,
 ) -> dict[str, Any]:
     """
-    打开一个 EDA .epp 工程，例如C:\\Users\\JGL\\EDI-Workspace\\projects\\1\\1.epp
+    打开一个.epp 工程，例如C:\\Users\\JGL\\EDI-Workspace\\projects\\1\\1.epp
 
     Args:
         project_path: EDA 服务所在机器上的 .epp 工程文件绝对路径。
@@ -73,7 +80,7 @@ def close_eda_project(
         need_save: bool = False,
         timeout_seconds: int = 60,
 ) -> dict[str, Any]:
-    """关闭 EDA .epp 工程。
+    """关闭一个.epp 工程。
 
     Args:
         project_path: EDA 服务所在机器上的 .epp 工程文件绝对路径。
@@ -86,3 +93,197 @@ def close_eda_project(
         {"project_path": resolved_path, "need_save": need_save},
         timeout_seconds,
     )
+
+
+def list_project_components(
+    project_path: str,
+    schematic_name: str = "main",
+    component_type: str = "",
+    name_contains: str = "",
+    offset: int = 0,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """列出工程原理图中的元件（不含完整参数，避免响应过大）。
+
+    Args:
+        project_path: .epp 工程文件绝对路径。
+        schematic_name: 原理图名称，默认 "main"。
+        component_type: 按类型过滤，如 "TermG"、"VIA2"。
+        name_contains: 按名称模糊匹配。
+        offset: 分页偏移。
+        limit: 每页数量上限，默认 100。
+    """
+    reader = ProjectReader(project_path)
+    raw = reader.read_schematic(schematic_name)
+    if not raw:
+        return {"success": False, "message": f"原理图 {schematic_name} 不存在"}
+
+    all_comps = parse_components(raw)
+
+    filtered = []
+    for c in all_comps:
+        if component_type and c["type"] != component_type:
+            continue
+        if name_contains and name_contains.lower() not in c["name"].lower():
+            continue
+        filtered.append({
+            "component_id": c["component_id"],
+            "name": c["name"],
+            "type": c["type"],
+            "model_id": c["model_id"],
+            "pin_count": c["pin_count"],
+            "parameter_count": c["parameter_count"],
+        })
+
+    total = len(filtered)
+    page = filtered[offset:offset + limit]
+
+    return {
+        "success": True,
+        "project_path": str(reader.epp_path.resolve()),
+        "schematic": schematic_name,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "components": page,
+    }
+
+
+def get_component_parameters(
+    project_path: str,
+    component_id: str,
+    schematic_name: str = "main",
+    include_hidden: bool = False,
+) -> dict[str, Any]:
+    """查询单个元件的完整参数列表。
+
+    Args:
+        project_path: .epp 工程文件绝对路径。
+        component_id: 元件 UUID（从 list_project_components 获取）。
+        schematic_name: 原理图名称。
+        include_hidden: 是否包含 Visible=false 的隐藏参数。
+    """
+    reader = ProjectReader(project_path)
+    raw = reader.read_schematic(schematic_name)
+    if not raw:
+        return {"success": False, "message": f"原理图 {schematic_name} 不存在"}
+
+    for comp in parse_components(raw):
+        if comp["component_id"] != component_id:
+            continue
+
+        params_info = comp.get("paramsinfo", {})
+        parameters = []
+        for key, info in params_info.items():
+            if key == "BasicParameters":
+                continue
+            if not isinstance(info, dict):
+                continue
+            if not include_hidden and info.get("Visible", "true") == "false":
+                continue
+
+            unit_field = info.get("Unit", "")
+            available_units = unit_field.split(",") if unit_field else []
+
+            parameters.append({
+                "key": key,
+                "value": info.get("Value", ""),
+                "unit": info.get("CurrentUnit", info.get("DefaultUnit", "")),
+                "default_unit": info.get("DefaultUnit", ""),
+                "available_units": available_units,
+                "tunable": info.get("Tunable", "false") == "true",
+                "visible": info.get("Visible", "true") != "false",
+            })
+
+        return {
+            "success": True,
+            "component": {
+                "component_id": comp["component_id"],
+                "name": comp["name"],
+                "type": comp["type"],
+            },
+            "parameters": parameters,
+        }
+
+    return {"success": False, "message": f"未找到元件 {component_id}"}
+
+
+def get_project_summary(
+    project_path: str,
+    include_component_types: bool = True,
+    include_latest_result: bool = True,
+) -> dict[str, Any]:
+    """获取 .epp 工程的完整概览。
+
+    Args:
+        project_path: .epp 工程文件绝对路径。
+        include_component_types: 是否统计元件类型分布。
+        include_latest_result: 是否包含最近仿真结果信息。
+    """
+    reader = ProjectReader(project_path)
+    metadata = reader.read_metadata()
+
+    schematics = reader.list_schematics()
+    schematics_info = {"count": len(schematics), "names": schematics}
+
+    components_info: dict[str, Any] = {"total": 0, "by_type": {}}
+    for sname in schematics:
+        raw = reader.read_schematic(sname)
+        if not raw:
+            continue
+        comps = parse_components(raw)
+        components_info["total"] += len(comps)
+        if include_component_types:
+            for c in comps:
+                ct = c["type"]
+                components_info["by_type"][ct] = (
+                    components_info["by_type"].get(ct, 0) + 1
+                )
+
+    simulation_info: dict[str, Any] = {}
+    # Read simulation config from SParameter component in schematic
+    for sname in schematics:
+        raw = reader.read_schematic(sname)
+        if not raw:
+            continue
+        for comp in parse_components(raw):
+            if comp["type"] == "SParameter":
+                pi = comp.get("paramsinfo", {})
+                sim_type = pi.get("CalcS", {}).get("Value", "")
+                start = pi.get("Start", {})
+                stop = pi.get("Stop", {})
+                step = pi.get("Step", {})
+                simulation_info = {
+                    "type": "S_Param" if sim_type == "yes" else sim_type,
+                    "start": f"{start.get('Value','')} {start.get('CurrentUnit','')}".strip(),
+                    "stop": f"{stop.get('Value','')} {stop.get('CurrentUnit','')}".strip(),
+                    "step": f"{step.get('Value','')} {step.get('CurrentUnit','')}".strip(),
+                }
+                break
+
+    latest_result: dict[str, Any] = {}
+    if include_latest_result:
+        result_paths = list(reader.workspace.rglob("*.raw"))
+        if result_paths:
+            rp = sorted(
+                result_paths, key=lambda x: x.stat().st_mtime, reverse=True
+            )[0]
+            latest_result = {
+                "path": str(rp.resolve()),
+                "exists": True,
+                "size": rp.stat().st_size,
+            }
+
+    warnings: list[str] = []
+    if not schematics:
+        warnings.append("未找到原理图")
+
+    return {
+        "success": True,
+        "project": metadata,
+        "schematics": schematics_info,
+        "components": components_info,
+        "simulation": simulation_info,
+        "latest_result": latest_result,
+        "warnings": warnings,
+    }

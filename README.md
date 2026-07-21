@@ -105,17 +105,23 @@ uv run python start_servers.py --port 9000
 | `close_eda_project` | 关闭工程 | `project_path` | `need_save`（默认 false）、`timeout_seconds` |
 | `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path` | `ads_path`、`timeout_seconds`（默认 120，无上限） |
 | `launch_edi` | 启动 EDI 客户端，等待 gRPC 就绪 | 无 | `edi_path`、`wait_for_grpc`、`wait_timeout` |
+| `list_project_components` | 列出工程中的元件 | `project_path` | `schematic_name`、`component_type`、`name_contains` |
+| `get_component_parameters` | 查询元件完整参数 | `project_path`、`component_id` | `schematic_name`、`include_hidden` |
+| `get_project_summary` | 工程概览 | `project_path` | `include_component_types`、`include_latest_result` |
+| `compare_simulation_results` | 多 RAW 结果对比叠图 | `result_paths`、`curve`、`img_path` | `chart_type`、`labels`、`dependency` |
 | `turbocharts_convert` | ADS RAW → 曲线图 + CSV | `raw_path`、`img_path`、`chart_type` | `csv_path`、`linename`、`dependency`、`ac_config` |
 
 使用示例：
 
 ```
-帮我看看 C:\Users\JGL\EDI-Workspace 下面有哪些 .epp 工程
+帮我看看 C:/Users/JGL/EDI-Workspace 下面有哪些 .epp 工程
 帮我启动 EDI
-帮我打开 EDA 工程 C:\Users\JGL\EDI-Workspace\EDI_TEST\EDI_TEST.epp
+帮我打开 EDA 工程 C:/.../EDI_TEST.epp
 帮我查看这个工程的网表
 帮我对这个工程执行仿真
-帮我把 result_tr.raw 转成 S 参数增益曲线图，输出 gain.png，曲线 DB_S[2,1]，依赖轴 freq
+帮我看看这个工程有哪些元件
+帮我获取这个工程的概览
+帮我把 result_tr.raw 转成 S 参数增益曲线图，输出 gain.png
 ```
 
 ### turbocharts_convert 参数详解
@@ -156,13 +162,14 @@ uv run python start_servers.py --port 9000
 ├── servers/                       # MCP 服务模块
 │   ├── registry_server.py         # 工具注册中心（加工具只改这个）
 │   ├── eda/
-│   │   ├── config.py              # 公用函数与配置
+│   │   ├── config.py              # 配置 + ProjectReader + S-expression 解析器
 │   │   ├── grpc_client.py         # gRPC 通信层
-│   │   ├── project_manage.py      # 工程管理（3 个工具）
+│   │   ├── project_manage.py      # 工程管理（6 个工具）
 │   │   ├── simulation.py            # 仿真（2 个工具）
 │   │   ├── design_export.py         # 分析（2 个工具）
 │   │   ├── model_replace.py         # 模型替换（1 个工具）
-│   │   └── edi_launcher.py           # 启动工具（1 个工具）
+│   │   ├── edi_launcher.py           # 启动工具（1 个工具）
+│   │   └── project_inspection.py      # 仿真对比（1 个工具）
 │   └── turbocharts/
 │       └── server.py              # RawConverter 工具（1 个）
 ├── start_servers.py               # 一键启动入口

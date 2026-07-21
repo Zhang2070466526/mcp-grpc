@@ -1,34 +1,35 @@
-r"""EDA gRPC MCP 工具包 — 通过 ExternalCall gRPC 操作 EDA 工程。
+r"""EDA gRPC MCP 工具包 -- 通过 ExternalCall gRPC 操作 EDA 工程。
 
+project_manage.py  工程管理（6 个工具）
+    list_epp_projects             扫描文件夹中的所有 .epp 工程文件
+    open_eda_project              打开 .epp 工程
+    close_eda_project             关闭已打开的工程
+    list_project_components       列出工程中的元件
+    get_component_parameters      查询单个元件的完整参数
+    get_project_summary           工程概览（元数据/原理图/仿真）
+    help: 帮我看看有哪些 .epp 工程 / 打开工程 / 查看元件 / 获取概览
 
-project_manage.py  工程管理
-    list_epp_projects   扫描文件夹中的所有 .epp 工程文件
-    open_eda_project    打开 .epp 工程，等待 EDA 返回成功或失败
-    close_eda_project   关闭已打开的工程
-    ├─ 帮我看看 C:\Users\JGL\EDI-Workspace 下面有哪些 .epp 工程
-    ├─ 帮我打开 EDA 工程 C:\...\EDI_TEST.epp
-    └─ 帮我保存并关闭这个工程
-
-simulation.py    仿真
-    simulate_project            对工程执行仿真，等待结果返回
+simulation.py  仿真（2 个工具）
+    simulate_project            对工程执行仿真
     simulate_netlist_with_ads   基于网表文件调用 ADS 仿真控制器
-    ├─ 帮我对 EDA 工程 C:\...\EDI_TEST.epp 执行仿真
-    └─ 帮我对 C:\...\netlist.log 执行 ADS 仿真
+    help: 帮我对工程执行仿真 / 帮我对 netlist.log 执行 ADS 仿真
 
-design_export.py  分析
+design_export.py  分析（2 个工具）
     export_project_netlist  查看/导出工程网表文件
     capture_schematic       截取原理图并保存为图片
-    ├─ 帮我查看这个工程的网表
-    └─ 帮我截取原理图，保存到 C:\screenshots\circuit.png
+    help: 帮我查看网表 / 帮我截取原理图
 
-model_replace.py    模型替换
+model_replace.py  模型替换（1 个工具）
     replace_models_from_csv  根据 CSV 文件批量替换元件模型
-    └─ 帮我用 C:\models\replace_list.csv 替换工程中的模型
+    help: 帮我用 replace_list.csv 替换工程中的模型
 
-edi_launcher.py     启动 EDI
+project_inspection.py  仿真对比（1 个工具）
+    compare_simulation_results  多个 RAW 文件同一条曲线对比叠图
+    help: 帮我把 result1.raw 和 result2.raw 的 DB_S[2,1] 对比输出
+
+edi_launcher.py  启动 EDI（1 个工具）
     launch_edi  启动 EDI 客户端，自动等待 gRPC 就绪
-    └─ 帮我启动 EDI
-
+    help: 帮我启动 EDI
 """
 
 # -- 工程管理 --
@@ -36,6 +37,9 @@ from servers.eda.project_manage import (  # noqa: F401
     list_epp_projects,
     open_eda_project,
     close_eda_project,
+    list_project_components,
+    get_component_parameters,
+    get_project_summary,
 )
 
 # -- 仿真 --
@@ -53,6 +57,11 @@ from servers.eda.design_export import (  # noqa: F401
 # -- 模型 --
 from servers.eda.model_replace import (  # noqa: F401
     replace_models_from_csv,
+)
+
+# -- 仿真对比 --
+from servers.eda.project_inspection import (  # noqa: F401
+    compare_simulation_results,
 )
 
 # -- 启动 --
