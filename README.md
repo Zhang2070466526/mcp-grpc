@@ -191,10 +191,11 @@ uv run python start_servers.py --port 9000
 │       └── server.py            # RAW 转图（1 工具）
 ├── start_servers.py             # 入口
 ├── tests/                       # 测试套件
-├── scripts/build.ps1            # 打包脚本
-├── eda_mcp.spec                 # PyInstaller 配置
+├── scripts/
+│   ├── build.ps1                 # 打包脚本
+│   └── eda_mcp.spec              # PyInstaller 配置
 ├── .mcp.json                    # Claude Code 配置
-├── .env.example                 # 配置模板
+├── .env                         # 配置文件（不提交 Git）
 └── pyproject.toml
 ```
 
@@ -230,7 +231,7 @@ curl http://127.0.0.1:8000/health
 ## 注意事项
 
 - `project_path` 必须是存在的 `.epp` 文件
-- `timeout_seconds` 必须 > 0，无上限
+- `timeout_seconds` 必须 > 0，超出操作上限会报错（open/close 300s, simulate 3600s, turbocharts 600s）
 - stdio 模式下不要向 stdout 输出调试信息
 - `.env` 配置在服务启动时自动加载
 

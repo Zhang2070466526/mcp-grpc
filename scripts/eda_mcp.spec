@@ -6,14 +6,13 @@ import sys
 from pathlib import Path
 
 block_cipher = None
-root = Path(SPECPATH)
+root = Path(SPECPATH).parent
 
 a = Analysis(
     ['start_servers.py'],
     pathex=[str(root)],
     binaries=[],
     datas=[
-        (str(root / '.env.example'), '.'),
         ('proto', 'proto'),
     ],
     hiddenimports=[
@@ -44,22 +43,6 @@ a = Analysis(
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='eda-mcp',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=True,
-    disable_windowed_traceback=False,
-)
 
 coll = COLLECT(
     exe,
