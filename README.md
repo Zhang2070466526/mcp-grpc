@@ -21,7 +21,7 @@ EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe
 TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
 MCP_TRANSPORT=streamable-http
 MCP_HOST=127.0.0.1
-MCP_PORT=8000
+MCP_PORT=8026
 ```
 
 ### 3. 前置条件
@@ -41,14 +41,14 @@ uv run python start_servers.py
 
 输出示例：
 ```
-MCP 服务启动 [transport=streamable-http, port=8000]
+MCP 服务启动 [transport=streamable-http, port=8026]
 已加载 14 个工具: list_epp_projects, open_eda_project, ...
-地址: http://127.0.0.1:8000/mcp
-INFO:     Uvicorn running on http://127.0.0.1:8000
+地址: http://127.0.0.1:8026/mcp
+INFO:     Uvicorn running on http://127.0.0.1:8026
 ```
 
-启动后自动监听 `127.0.0.1:8000`：
-- 所有本机客户端通过 `http://127.0.0.1:8000/mcp` 连接
+启动后自动监听 `127.0.0.1:8026`：
+- 所有本机客户端通过 `http://127.0.0.1:8026/mcp` 连接
 - EDI gRPC 操作由全局锁保证串行
 - Turbocharts 由信号量保证同一时间一个进程
 - `/health` 端点可检查服务状态
@@ -75,7 +75,7 @@ uv run python start_servers.py --port 9000
 | 客户端 | 配置 |
 |---|---|
 | Claude Code | `.mcp.json` 已配置，`/mcp` 重载 |
-| OpenClaw / Web | 名称 `eda`，Streamable HTTP，`http://127.0.0.1:8000/mcp` |
+| OpenClaw / Web | 名称 `eda`，Streamable HTTP，`http://127.0.0.1:8026/mcp` |
 | 其他 stdio 客户端 | `uv --directory D:/GitLabCode/mcp-grpc run python start_servers.py --transport stdio` |
 
 其他 MCP 客户端通用配置：
@@ -205,7 +205,7 @@ uv run python start_servers.py --port 9000
 
 **端口被占用**
 ```powershell
-netstat -ano | findstr 8000          # 查看占用
+netstat -ano | findstr 8026          # 查看占用
 taskkill -f -pid <PID>               # 关闭进程
 ```
 
@@ -222,7 +222,7 @@ tasklist | findstr EDI.exe           # EDI 进程
 
 **健康检查**
 ```
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8026/health
 # → {"status":"ok", "mcp_ready":true, "eda_grpc_ready":true}
 ```
 
@@ -253,7 +253,7 @@ uv run python tests/test_tool_registry.py
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/EDA MCP/eda-mcp.exe（目录型，约 137 MB）
+# 输出: dist/EDA MCP/（含 eda-mcp.exe + .env 配置模板，约 137 MB）
 ```
 
 ### 添加新工具

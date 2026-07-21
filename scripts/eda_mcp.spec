@@ -9,11 +9,11 @@ block_cipher = None
 root = Path(SPECPATH).parent
 
 a = Analysis(
-    ['start_servers.py'],
+    [str(root / 'start_servers.py')],
     pathex=[str(root)],
     binaries=[],
     datas=[
-        ('proto', 'proto'),
+        (str(root / 'proto'), 'proto'),
     ],
     hiddenimports=[
         'servers', 'servers.eda', 'servers.turbocharts',
@@ -43,6 +43,22 @@ a = Analysis(
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='eda-mcp',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=True,
+    disable_windowed_traceback=False,
+)
 
 coll = COLLECT(
     exe,

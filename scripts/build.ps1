@@ -12,6 +12,8 @@ if (Test-Path "dist/EDA MCP/eda-mcp.exe") {
     $size = (Get-Item "dist/EDA MCP/eda-mcp.exe").Length / 1MB
     Write-Host "OK: dist/EDA MCP/eda-mcp.exe ($([math]::Round($size,1)) MB)" -ForegroundColor Green
 } else { Write-Host "FAIL" -ForegroundColor Red; exit 1 }
-Write-Host "[5/5] Cleaning build artifacts..." -ForegroundColor Yellow
+Write-Host "[5/5] Copying config + cleaning..." -ForegroundColor Yellow
+Copy-Item -Force .env "dist/EDA MCP/"
 Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
+Remove-Item -Force dist/eda-mcp.exe -ErrorAction SilentlyContinue
 Write-Host "Done. Output: dist/EDA MCP/" -ForegroundColor Green
