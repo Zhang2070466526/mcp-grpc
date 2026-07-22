@@ -155,6 +155,9 @@ def parse_sexp(text: str) -> Any:
         if pos >= len(text):
             return None
         ch = peek()
+        if ch == ")":
+            pos += 1
+            return None  # unexpected close paren, skip
         if ch == "(":
             pos += 1
             items = []

@@ -62,6 +62,11 @@ def _setup_logging() -> None:
 
 def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     """SSE / streamable-http 模式入口。"""
+    host = DEFAULT_HOST or "127.0.0.1"
+    if host != "127.0.0.1":
+        print(f"WARNING: MCP_HOST={host} ignored, forcing 127.0.0.1 (local mode)")
+        host = "127.0.0.1"
+
     # 单实例检查
     _test = socket.socket()
     try:
@@ -80,13 +85,13 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     tools = [t.name for t in mcp._tool_manager._tools.values()]
     print("=" * 50)
     print(f"  EDA MCP v0.1.0")
-    print(f"  UI:  http://{DEFAULT_HOST}:{port}/ui")
-    print(f"  MCP: http://{DEFAULT_HOST}:{port}/sse")
+    print(f"  UI:  http://{host}:{port}/ui")
+    print(f"  MCP: http://{host}:{port}/sse")
     print(f"  Tools: {len(tools)} loaded")
     print(f"  Close window to stop")
     print("=" * 50)
 
-    mcp.settings.host = DEFAULT_HOST
+    mcp.settings.host = host
     mcp.settings.port = port
     mcp.run(transport=transport)
 

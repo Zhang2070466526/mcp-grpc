@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 集中管理所有工具的注册。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（共 14 个）：
+  已注册工具（共 17 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -12,7 +12,10 @@
     get_project_summary           工程概览
 
   仿真：
-    simulate_project              执行工程仿真
+    simulate_project              执行工程仿真（同步）
+    start_simulation_async        启动异步仿真
+    get_simulation_async_status   查询异步仿真状态
+    get_simulation_async_result   获取异步仿真结果
     simulate_netlist_with_ads     调用 ADS 仿真控制器
 
   分析：
@@ -50,6 +53,8 @@ from servers.eda import (  # noqa: E402
     export_project_netlist,
     get_component_parameters,
     get_project_summary,
+    get_simulation_async_result,
+    get_simulation_async_status,
     launch_edi,
     list_epp_projects,
     list_project_components,
@@ -57,6 +62,7 @@ from servers.eda import (  # noqa: E402
     replace_models_from_csv,
     simulate_netlist_with_ads,
     simulate_project,
+    start_simulation_async,
 )
 from servers.turbocharts import compare_simulation_results  # noqa: E402
 mcp.tool()(list_epp_projects)
@@ -64,6 +70,9 @@ mcp.tool()(open_eda_project)
 mcp.tool()(close_eda_project)
 mcp.tool()(simulate_project)
 mcp.tool()(simulate_netlist_with_ads)
+mcp.tool()(start_simulation_async)
+mcp.tool()(get_simulation_async_status)
+mcp.tool()(get_simulation_async_result)
 mcp.tool()(export_project_netlist)
 mcp.tool()(capture_schematic)
 mcp.tool()(replace_models_from_csv)

@@ -1,6 +1,6 @@
 # EDA MCP 服务
 
-每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口和命令行工具封装为 14 个 MCP 工具，
+每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口和命令行工具封装为 17 个 MCP 工具，
 支持 **SSE** 和 **stdio** 两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
 
 ---
@@ -47,7 +47,7 @@ uv run python start_servers.py
 输出示例：
 ```
 MCP 服务启动 [transport=sse, port=8026]
-已加载 14 个工具: list_epp_projects, open_eda_project, ...
+已加载 17 个工具: list_epp_projects, open_eda_project, ...
 地址: http://127.0.0.1:8026/sse
 INFO:     Uvicorn running on http://127.0.0.1:8026
 ```
@@ -57,7 +57,7 @@ INFO:     Uvicorn running on http://127.0.0.1:8026
 - EDI gRPC 操作由全局锁保证串行
 - Turbocharts 由信号量保证同一时间一个进程
 - `/health` 健康检查 — 返回 EDA gRPC 和 Turbocharts 状态
-- `/ui` 聊天客户端 — 自然语言驱动 14 个工具，带工具面板和系统主题
+- `/ui` 聊天客户端 — 自然语言驱动 17 个工具，带工具面板和系统主题
 - `/chat` 聊天 API — POST `{"message":"..."}` 返回 LLM + 工具执行结果
 - 聊天客户端文件：`scripts/chat_client.html`（独立 HTML，可单独分发）
 
@@ -102,7 +102,7 @@ uv run python start_servers.py --port 9000
 
 ---
 
-## 工具参考（14 个）
+## 工具参考（17 个）
 
 ### 工程管理
 
@@ -119,8 +119,11 @@ uv run python start_servers.py --port 9000
 
 | 工具 | 说明 | 参数 |
 |---|---|---|
-| `simulate_project` | 执行工程仿真 | `project_path`, `log_source`, `timeout_seconds`（默认 600，无上限） |
-| `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path`, `ads_path`, `timeout_seconds`（默认 120） |
+| `simulate_project` | 执行工程仿真（同步） | `project_path` | `log_source`、`timeout_seconds`（默认 600） |
+| `start_simulation_async` | 启动异步仿真 | `project_path` | `log_source`、`timeout_seconds` |
+| `get_simulation_async_status` | 查询异步仿真状态 | `task_id` | - |
+| `get_simulation_async_result` | 获取异步仿真结果 | `task_id` | - |
+| `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path` | `ads_path`、`timeout_seconds`（默认 120） |
 
 ### 导出与分析
 
@@ -189,7 +192,7 @@ uv run python start_servers.py --port 9000
 │   │   ├── config.py            # 配置 + ProjectReader + S-expression 解析器
 │   │   ├── grpc_client.py       # gRPC 通信（带 EDA 全局锁）
 │   │   ├── project_manage.py    # 工程管理（6 工具）
-│   │   ├── simulation.py        # 仿真（2 工具）
+│   │   ├── simulation.py        # 仿真（5 工具）
 │   │   ├── design_export.py     # 网表/截图（2 工具）
 │   │   ├── model_replace.py     # 模型替换（1 工具）
 │   │   └── edi_launcher.py      # 启动 EDI（1 工具）
@@ -197,8 +200,8 @@ uv run python start_servers.py --port 9000
 │       ├── config.py             # 公共函数（run_turbocharts）
 │       ├── convert_raw.py        # RAW 转图（1 工具）
 │       └── compare_results.py    # 仿真对比（1 工具）
-│   ├── web_routes.py              # Web 路由（/health, /chat, /ui）
-├── start_servers.py               # 入口
+│   ├── web_routes.py            # Web 路由（/health, /chat, /ui）
+├── start_servers.py              # 入口
 ├── tests/                       # 测试套件
 ├── scripts/
 │   ├── build.ps1                 # 打包脚本

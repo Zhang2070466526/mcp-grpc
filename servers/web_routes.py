@@ -90,25 +90,31 @@ async def chat_endpoint(request: Request):
     }
 
     tools = [
-        _tool("list_epp_projects", "Scan a folder for all .epp EDA project files", folder_path="string"),
-        _tool("open_eda_project", "Open an .epp EDA project", project_path="string", timeout_seconds="integer"),
-        _tool("close_eda_project", "Close an .epp EDA project", project_path="string", need_save="boolean"),
-        _tool("list_project_components", "List components in project schematic", project_path="string", schematic_name="string"),
-        _tool("get_component_parameters", "Get parameters of a component by ID", project_path="string", component_id="string"),
-        _tool("get_project_summary", "Get overview of an EDA project", project_path="string"),
-        _tool("simulate_project", "Run simulation on an EDA project", project_path="string", log_source="string", timeout_seconds="integer"),
-        _tool("simulate_netlist_with_ads", "Call ADS simulation controller", netlist_path="string", ads_path="string"),
-        _tool("capture_schematic", "Capture project schematic as image", project_path="string", img_path="string"),
-        _tool("export_project_netlist", "Export netlist of a project", project_path="string"),
-        _tool("replace_models_from_csv", "Replace models via CSV", project_path="string", csv_path="string"),
-        _tool("launch_edi", "Launch EDI client", edi_path="string", wait_for_grpc="boolean"),
-        _tool("compare_simulation_results", "Compare curves across RAW files", result_paths="array", curve="string", img_path="string"),
-        _tool("turbocharts_convert", "Convert RAW to chart and CSV", raw_path="string", img_path="string", chart_type="string"),
+        *_rtool("list_epp_projects", "Scan a folder for .epp project files", {"folder_path": "string"}),
+        *_rtool("open_eda_project", "Open an .epp EDA project", {"project_path": "string"}, {"timeout_seconds": "integer"}),
+        *_rtool("close_eda_project", "Close an EDA project", {"project_path": "string"}, {"need_save": "boolean"}),
+        *_rtool("list_project_components", "List components in schematic", {"project_path": "string"}, {"schematic_name": "string", "component_type": "string", "name_contains": "string"}),
+        *_rtool("get_component_parameters", "Get parameters of a component", {"project_path": "string", "component_id": "string"}, {"schematic_name": "string", "include_hidden": "boolean"}),
+        *_rtool("get_project_summary", "Get overview of an EDA project", {"project_path": "string"}, {"include_component_types": "boolean", "include_latest_result": "boolean"}),
+        *_rtool("simulate_project", "Run simulation on a project", {"project_path": "string"}, {"log_source": "string", "timeout_seconds": "integer"}),
+        *_rtool("simulate_netlist_with_ads", "Call ADS simulation controller", {"netlist_path": "string"}, {"ads_path": "string", "timeout_seconds": "integer"}),
+        *_rtool("capture_schematic", "Capture schematic as image", {"project_path": "string", "img_path": "string"}, {"timeout_seconds": "integer"}),
+        *_rtool("export_project_netlist", "Export netlist of a project", {"project_path": "string"}, {"timeout_seconds": "integer"}),
+        *_rtool("replace_models_from_csv", "Replace models via CSV", {"project_path": "string", "csv_path": "string"}, {"timeout_seconds": "integer"}),
+        *_rtool("launch_edi", "Launch EDI client", {}, {"edi_path": "string", "wait_for_grpc": "boolean", "wait_timeout": "integer"}),
+        *_rtool("compare_simulation_results", "Compare curves across RAW files", {"result_paths": "array", "curve": "string", "img_path": "string"}, {"chart_type": "string", "labels": "array", "dependency": "string", "csv_path": "string", "alignment": "string", "reference_index": "integer"}),
+        *_rtool("turbocharts_convert", "Convert RAW to chart and CSV", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
     ]
 
-    api_key = _os.getenv("LLM_API_KEY", "") or _os.getenv("ANTHROPIC_AUTH_TOKEN", "")
-    base_url = _os.getenv("LLM_BASE_URL", "") or _os.getenv("ANTHROPIC_BASE_URL", "https://api.deepseek.com")
-    model = _os.getenv("LLM_MODEL", "deepseek-chat")
+    api_key = _os.getenv("LLM_API_KEY")
+    base_url = _os.getenv("LLM_BASE_URL")
+    model = _os.getenv("LLM_MODEL")
+
+    if not api_key or not base_url or not model:
+        return JSONResponse({
+            "reply": "Chat not available. Configure LLM_API_KEY/LLM_BASE_URL/LLM_MODEL in .env, or use MCP client to call tools directly.",
+            "tool_call": None,
+        })
 
     messages: list[dict] = [
         {"role": "system", "content": "You are an EDA engineering assistant. Use tools to help. Reply in Chinese."},
@@ -143,7 +149,7 @@ async def chat_endpoint(request: Request):
             func = tool_map.get(tool_name)
             if func:
                 try:
-                    tool_result = func(**tool_args)
+                    tool_result = await asyncio.to_thread(func, **tool_args)
                     reply_text = _json.dumps(tool_result, ensure_ascii=False, indent=2)
                     if len(reply_text) > 3000:
                         reply_text = reply_text[:3000] + "\n...(truncated)"
@@ -157,19 +163,12 @@ async def chat_endpoint(request: Request):
     })
 
 
-def _tool(name: str, desc: str, **props: str) -> dict:
-    properties = {}
-    required = list(props.keys())
-    for k, t in props.items():
+def _rtool(name: str, desc: str, required: dict, optional: dict | None = None) -> list[dict]:
+    """Build tool schema with proper required/optional split."""
+    props = {}
+    for k, t in {**required, **(optional or {})}.items():
         if t == "array":
-            properties[k] = {"type": "array", "items": {"type": "string"}}
+            props[k] = {"type": "array", "items": {"type": "string"}}
         else:
-            properties[k] = {"type": t}
-    return {
-        "type": "function",
-        "function": {
-            "name": name,
-            "description": desc,
-            "parameters": {"type": "object", "properties": properties, "required": required},
-        },
-    }
+            props[k] = {"type": t}
+    return [{"type": "function", "function": {"name": name, "description": desc, "parameters": {"type": "object", "properties": props, "required": list(required.keys())}}}]

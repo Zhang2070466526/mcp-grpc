@@ -44,11 +44,11 @@ HANDOVER.md              # 本文档
 
 Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protobuf >= 6.33.5 / python-dotenv
 
-## MCP 工具清单（14 个）
+## MCP 工具清单（17 个）
 
 **工程管理**：list_epp_projects, open_eda_project, close_eda_project, list_project_components, get_component_parameters, get_project_summary
 
-**仿真**：simulate_project, simulate_netlist_with_ads, compare_simulation_results
+**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist_with_ads, compare_simulation_results
 
 **导出分析**：export_project_netlist, capture_schematic
 

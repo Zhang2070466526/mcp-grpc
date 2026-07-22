@@ -42,6 +42,9 @@ from servers.eda.project_manage import (  # noqa: F401
 from servers.eda.simulation import (  # noqa: F401
     simulate_project,
     simulate_netlist_with_ads,
+    start_simulation_async,
+    get_simulation_async_status,
+    get_simulation_async_result,
 )
 
 # -- 分析 --

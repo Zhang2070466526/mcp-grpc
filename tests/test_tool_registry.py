@@ -5,10 +5,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
-def test_all_14_tools_registered():
+def test_all_tools_registered():
     from start_servers import mcp
     tools = list(mcp._tool_manager._tools.keys())
-    assert len(tools) == 14, f"expected 14 tools, got {len(tools)}"
+    assert len(tools) == 17, f"expected 17 tools, got {len(tools)}"
     required = [
         "list_epp_projects", "open_eda_project", "close_eda_project",
         "list_project_components", "get_component_parameters", "get_project_summary",
@@ -40,7 +40,7 @@ def test_single_instance_check():
 
 
 if __name__ == "__main__":
-    test_all_14_tools_registered()
+    test_all_tools_registered()
     test_grpc_timeout_limits()
     test_single_instance_check()
     print("test_tool_registry.py: all passed")
