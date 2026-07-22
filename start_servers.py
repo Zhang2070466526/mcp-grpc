@@ -5,7 +5,7 @@ r"""EDA MCP 一键启动 — 10 个工具的统一入口。
   工具定义见：servers/eda/*_service.py
 
   启动方式：
-    uv run python start_servers.py                          # streamable-http（默认）
+    uv run python start_servers.py                          # sse（默认）
     uv run python start_servers.py --transport stdio         # Claude Code
     uv run python start_servers.py --port 9000               # 自定义端口
 

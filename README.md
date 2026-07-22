@@ -261,7 +261,7 @@ uv run python tests/test_tool_registry.py
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/EDA MCP/（含 eda-mcp.exe + start.bat 启动器 + .env，约 137 MB）
+# 输出: dist/eda-mcp/（含 eda_mcp_server.exe + start.bat 启动器 + .env，约 137 MB）
 ```
 
 ### 添加新工具

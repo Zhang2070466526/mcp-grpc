@@ -104,7 +104,7 @@ uv run python tests/test_tool_registry.py
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/EDA MCP/（含 eda-mcp.exe + start.bat + .env，约 137 MB）
+# 输出: dist/eda-mcp/（含 eda_mcp_server.exe + start_server.bat + .env，约 137 MB）
 ```
 
 ## 工具注册机制
@@ -142,7 +142,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 12. Windows HTTP 使用 SelectorEventLoop 避免 WinError 64
 13. `/health` 端点可区分 MCP 故障与 EDI 离线
 14. `compare_simulation_results` 使用 Matplotlib + numpy 做叠图插值
-15. 打包为目录型，复制 dist/EDA MCP/ 到目标电脑后创建 .env 即可运行
+15. 打包为目录型，复制 dist/eda-mcp/ 到目标电脑后创建 .env 即可运行
 16. 使用 SSE 传输模式（支持 /ui /health /chat 自定义路由）
 17. 聊天客户端 `scripts/chat_client.html` 支持独立分发，连接本地 /chat 端点
 18. 打包时自动过滤 LLM_API_KEY 等敏感配置，强制 MCP_TRANSPORT=sse

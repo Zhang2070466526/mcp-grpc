@@ -52,7 +52,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='eda-mcp',
+    name='eda_mcp_server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -69,5 +69,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='EDA MCP',
+    name='eda-mcp',
 )
