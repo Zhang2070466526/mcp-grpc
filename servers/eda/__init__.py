@@ -23,10 +23,6 @@ model_replace.py  模型替换（1 个工具）
     replace_models_from_csv  根据 CSV 文件批量替换元件模型
     help: 帮我用 replace_list.csv 替换工程中的模型
 
-project_inspection.py  仿真对比（1 个工具）
-    compare_simulation_results  多个 RAW 文件同一条曲线对比叠图
-    help: 帮我把 result1.raw 和 result2.raw 的 DB_S[2,1] 对比输出
-
 edi_launcher.py  启动 EDI（1 个工具）
     launch_edi  启动 EDI 客户端，自动等待 gRPC 就绪
     help: 帮我启动 EDI
@@ -57,11 +53,6 @@ from servers.eda.design_export import (  # noqa: F401
 # -- 模型 --
 from servers.eda.model_replace import (  # noqa: F401
     replace_models_from_csv,
-)
-
-# -- 仿真对比 --
-from servers.eda.project_inspection import (  # noqa: F401
-    compare_simulation_results,
 )
 
 # -- 启动 --

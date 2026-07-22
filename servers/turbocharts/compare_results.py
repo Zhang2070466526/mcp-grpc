@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from servers.turbocharts.runner import run_turbocharts
+from servers.turbocharts.config import run_turbocharts
 
 
 def compare_simulation_results(
@@ -41,9 +41,7 @@ def compare_simulation_results(
         alignment: 对齐方式，"intersection"(交集) 或 "interpolation"(插值)。
         reference_index: interpolation 模式下的参考文件索引。
     """
-    turbocharts_path = os.getenv(
-        "TURBOCHARTS_PATH", r"C:\Program Files (x86)\EDI\turbocharts_app.exe"
-    )
+    turbocharts_path = os.getenv("TURBOCHARTS_PATH")
     if not Path(turbocharts_path).is_file():
         return {
             "success": False,

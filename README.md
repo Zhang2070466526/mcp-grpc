@@ -1,7 +1,7 @@
 # EDA MCP 服务
 
 每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口和命令行工具封装为 14 个 MCP 工具，
-支持 **Streamable HTTP** 和 **stdio** 两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
+支持 **SSE** 和 **stdio** 两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
 
 ---
 
@@ -82,9 +82,9 @@ uv run python start_servers.py --port 9000
 
 | 客户端 | 配置 |
 |---|---|
-| Claude Code | `.mcp.json` 已配置，`/sse` 重载 |
+| Claude Code | `.mcp.json` 已配置，`/mcp` 重载 |
 | OpenClaw / Web | 名称 `eda`，Streamable HTTP，`http://127.0.0.1:8026/sse` |
-| 其他 stdio 客户端 | `uv --directory D:/GitLabCode/sse-grpc run python start_servers.py --transport stdio` |
+| 其他 stdio 客户端 | `uv --directory D:/GitLabCode/mcp-grpc run python start_servers.py --transport stdio` |
 
 其他 MCP 客户端通用配置：
 
@@ -93,7 +93,7 @@ uv run python start_servers.py --port 9000
   "mcpServers": {
     "eda": {
       "command": "uv",
-      "args": ["--directory", "D:/GitLabCode/sse-grpc", "run", "python", "start_servers.py", "--transport", "stdio"],
+      "args": ["--directory", "D:/GitLabCode/mcp-grpc", "run", "python", "start_servers.py", "--transport", "stdio"],
       "env": { "EDA_GRPC_SERVER": "127.0.0.1:50055" }
     }
   }
@@ -121,7 +121,6 @@ uv run python start_servers.py --port 9000
 |---|---|---|
 | `simulate_project` | 执行工程仿真 | `project_path`, `log_source`, `timeout_seconds`（默认 600，无上限） |
 | `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path`, `ads_path`, `timeout_seconds`（默认 120） |
-| `compare_simulation_results` | 多 RAW 同曲线对比叠图 | `result_paths`, `curve`, `img_path`, `chart_type`, `labels`, `dependency` |
 
 ### 导出与分析
 
@@ -141,6 +140,7 @@ uv run python start_servers.py --port 9000
 
 | 工具 | 说明 | 参数 |
 |---|---|---|
+| `compare_simulation_results` | 多 RAW 同曲线对比叠图 | `result_paths`, `curve`, `img_path`, `chart_type`, `labels`, `dependency` |
 | `turbocharts_convert` | ADS RAW → 曲线图 + CSV | `raw_path`, `img_path`, `chart_type`, `csv_path`, `linename`, `dependency`, `ac_config` |
 
 自然语言调用示例：
@@ -192,16 +192,17 @@ uv run python start_servers.py --port 9000
 │   │   ├── simulation.py        # 仿真（2 工具）
 │   │   ├── design_export.py     # 网表/截图（2 工具）
 │   │   ├── model_replace.py     # 模型替换（1 工具）
-│   │   ├── edi_launcher.py      # 启动 EDI（1 工具）
-│   │   └── project_inspection.py # 仿真对比（1 工具）
+│   │   └── edi_launcher.py      # 启动 EDI（1 工具）
 │   └── turbocharts/
-│       ├── runner.py            # 串行执行器
-│       └── server.py            # RAW 转图（1 工具）
-├── start_servers.py             # 入口
+│       ├── config.py             # 公共函数（run_turbocharts）
+│       ├── convert_raw.py        # RAW 转图（1 工具）
+│       └── compare_results.py    # 仿真对比（1 工具）
+│   ├── web_routes.py              # Web 路由（/health, /chat, /ui）
+├── start_servers.py               # 入口
 ├── tests/                       # 测试套件
 ├── scripts/
 │   ├── build.ps1                 # 打包脚本
-│   └── eda_mcp.spec              # PyInstaller 配置
+│   └── eda_mcp_server.spec       # PyInstaller 配置
 ├── .mcp.json                    # Claude Code 配置
 ├── .env                         # 配置文件（不提交 Git）
 └── pyproject.toml
@@ -261,7 +262,7 @@ uv run python tests/test_tool_registry.py
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/eda-mcp/（含 eda_mcp_server.exe + start.bat 启动器 + .env，约 137 MB）
+# 输出: dist/eda-mcp/（含 eda_mcp_server.exe + start_server.bat + .env，约 137 MB）
 ```
 
 ### 添加新工具

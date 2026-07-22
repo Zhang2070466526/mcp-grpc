@@ -27,9 +27,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # -- 配置 --
-DEFAULT_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
-DEFAULT_HOST = os.getenv("MCP_HOST", "127.0.0.1")    # 就是 FastMCP 暴露的配置接口，底层用的 uvicorn.run(host="0.0.0.0")，0.0.0.0 = 监听本机所有网卡的所有 IP。
-DEFAULT_PORT = int(os.getenv("MCP_PORT", "8000"))
+DEFAULT_TRANSPORT = os.getenv("MCP_TRANSPORT")
+DEFAULT_HOST = os.getenv("MCP_HOST")    # 就是 FastMCP 暴露的配置接口，底层用的 uvicorn.run(host="0.0.0.0")，0.0.0.0 = 监听本机所有网卡的所有 IP。
+DEFAULT_PORT = int(os.getenv("MCP_PORT"))
 
 from servers.registry_server import mcp  # noqa: E402
 

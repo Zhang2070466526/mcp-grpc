@@ -23,9 +23,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-EDA_GRPC_SERVER = os.getenv("EDA_GRPC_SERVER", "localhost:50055")
-EDI_PATH = os.getenv("EDI_PATH", r"C:\Program Files (x86)\EDI\EDI.exe")
-MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
+EDA_GRPC_SERVER = os.getenv("EDA_GRPC_SERVER")
+EDI_PATH = os.getenv("EDI_PATH")
+MCP_TRANSPORT = os.getenv("MCP_TRANSPORT")
 
 
 def validate_project_path(project_path: str) -> str:

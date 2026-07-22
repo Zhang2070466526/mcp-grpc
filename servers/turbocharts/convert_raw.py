@@ -39,11 +39,8 @@ from mcp.server.fastmcp import FastMCP
 
 load_dotenv()
 
-# -- 配置 --
-TURBOCHARTS_PATH = os.getenv(
-    "TURBOCHARTS_PATH", r"C:\Program Files (x86)\EDI\turbocharts_app.exe"
-)
-MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
+TURBOCHARTS_PATH = os.getenv("TURBOCHARTS_PATH")
+MCP_TRANSPORT = os.getenv("MCP_TRANSPORT")
 
 # ---------------------------------------------------------------------------
 # MCP 实例
@@ -146,7 +143,7 @@ def turbocharts_convert(
     if ac_config:
         cmd.extend(["--ac", ac_config])
 
-    from servers.turbocharts.runner import run_turbocharts
+    from servers.turbocharts.config import run_turbocharts
     result = run_turbocharts(cmd, timeout_seconds=120)
 
     img_generated = Path(img_path).exists()

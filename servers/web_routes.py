@@ -70,8 +70,8 @@ async def chat_endpoint(request: Request):
     from servers.eda.design_export import export_project_netlist, capture_schematic
     from servers.eda.model_replace import replace_models_from_csv
     from servers.eda.edi_launcher import launch_edi
-    from servers.eda.project_inspection import compare_simulation_results
-    from servers.turbocharts.server import turbocharts_convert
+    from servers.turbocharts.compare_results import compare_simulation_results
+    from servers.turbocharts.convert_raw import turbocharts_convert
 
     tool_map = {
         "open_eda_project": open_eda_project,

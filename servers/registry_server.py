@@ -14,7 +14,6 @@
   仿真：
     simulate_project              执行工程仿真
     simulate_netlist_with_ads     调用 ADS 仿真控制器
-    compare_simulation_results    多 RAW 结果对比叠图
 
   分析：
     export_project_netlist        查看/导出工程网表
@@ -27,6 +26,7 @@
     launch_edi                    启动 EDI 客户端
 
   图表：
+    compare_simulation_results    多 RAW 结果对比叠图
     turbocharts_convert           ADS RAW → 曲线图 + CSV
 ═══════════════════════════════════════════════════════════
 """
@@ -47,7 +47,6 @@ mcp = FastMCP(
 from servers.eda import (  # noqa: E402
     capture_schematic,
     close_eda_project,
-    compare_simulation_results,
     export_project_netlist,
     get_component_parameters,
     get_project_summary,
@@ -59,6 +58,7 @@ from servers.eda import (  # noqa: E402
     simulate_netlist_with_ads,
     simulate_project,
 )
+from servers.turbocharts import compare_simulation_results  # noqa: E402
 mcp.tool()(list_epp_projects)
 mcp.tool()(open_eda_project)
 mcp.tool()(close_eda_project)
@@ -74,7 +74,7 @@ mcp.tool()(get_project_summary)
 mcp.tool()(compare_simulation_results)
 
 # -- RawConverter 工具 --
-from servers.turbocharts.server import (  # noqa: E402
+from servers.turbocharts.convert_raw import (  # noqa: E402
     turbocharts_convert,
 )
 mcp.tool()(turbocharts_convert)

@@ -25,10 +25,10 @@ servers/
     design_export.py     # 网表/截图（2 工具）
     model_replace.py     # 模型替换（1 工具）
     edi_launcher.py      # 启动 EDI（1 工具）
-    project_inspection.py # 仿真对比（1 工具）
+    compare_results.py   # 仿真对比（1 工具）
   turbocharts/
-    runner.py            # 串行执行器（BoundedSemaphore）
-    server.py            # RAW 转图（1 工具）
+    config.py            # 公共函数（run_turbocharts）
+    convert_raw.py       # RAW 转图（1 工具）
   web_routes.py          # Web 路由（/health, /chat, /ui）
 start_servers.py         # 一键启动入口
 tests/                   # 测试套件（5 个文件）

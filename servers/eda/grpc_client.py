@@ -15,7 +15,7 @@ from typing import Any
 import grpc
 
 from proto import ecserver_pb2, ecserver_pb2_grpc
-from servers.eda.config import EDA_GRPC_SERVER
+from servers.eda.config import EDA_GRPC_SERVER  # 从 config 统一读取
 
 # EDA 操作全局锁 — 确保同一时间只进行一项 gRPC 状态操作
 _EDA_LOCK = threading.RLock()
