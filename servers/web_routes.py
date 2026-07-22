@@ -12,6 +12,17 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 
 from servers.eda.config import EDA_GRPC_SERVER
+from servers.eda.project_manage import (
+    open_eda_project, close_eda_project,
+    list_epp_projects, list_project_components,
+    get_component_parameters, get_project_summary,
+)
+from servers.eda.simulation import simulate_project, simulate_netlist_with_ads
+from servers.eda.design_export import export_project_netlist, capture_schematic
+from servers.eda.model_replace import replace_models_from_csv
+from servers.eda.edi_launcher import launch_edi
+from servers.turbocharts.compare_results import compare_simulation_results
+from servers.turbocharts.convert_raw import turbocharts_convert
 
 import sys as _sys
 if getattr(_sys, "frozen", False):
@@ -60,18 +71,6 @@ async def chat_endpoint(request: Request):
     user_msg = body.get("message", "").strip()
     if not user_msg:
         return JSONResponse({"error": "message required"}, status_code=400)
-
-    from servers.eda.project_manage import (
-        open_eda_project, close_eda_project,
-        list_epp_projects, list_project_components,
-        get_component_parameters, get_project_summary,
-    )
-    from servers.eda.simulation import simulate_project, simulate_netlist_with_ads
-    from servers.eda.design_export import export_project_netlist, capture_schematic
-    from servers.eda.model_replace import replace_models_from_csv
-    from servers.eda.edi_launcher import launch_edi
-    from servers.turbocharts.compare_results import compare_simulation_results
-    from servers.turbocharts.convert_raw import turbocharts_convert
 
     tool_map = {
         "open_eda_project": open_eda_project,

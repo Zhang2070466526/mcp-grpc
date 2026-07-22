@@ -26,6 +26,7 @@ get_project_summary           工程概览（元数据、原理图、仿真配�
 
 from __future__ import annotations
 
+from itertools import islice
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +37,6 @@ from servers.eda.config import ProjectReader, parse_components, validate_project
 
 def list_epp_projects(folder_path: str) -> dict[str, Any]:
     """扫描指定文件夹，列出其中所有 .epp 工程文件（最多 1000 个）。"""
-    from itertools import islice
     root = Path(folder_path).expanduser()
     if not root.is_dir():
         raise FileNotFoundError(f"文件夹不存在: {folder_path}")

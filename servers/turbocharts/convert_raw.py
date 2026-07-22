@@ -30,12 +30,12 @@ turbocharts_convert   将 ADS 仿真 RAW 结果转为 PNG 曲线图和 CSV
 from __future__ import annotations
 
 import os
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
+from servers.turbocharts.config import run_turbocharts
 
 load_dotenv()
 
@@ -143,7 +143,6 @@ def turbocharts_convert(
     if ac_config:
         cmd.extend(["--ac", ac_config])
 
-    from servers.turbocharts.config import run_turbocharts
     result = run_turbocharts(cmd, timeout_seconds=120)
 
     img_generated = Path(img_path).exists()

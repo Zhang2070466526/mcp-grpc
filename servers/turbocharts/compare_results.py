@@ -11,7 +11,12 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 from servers.turbocharts.config import run_turbocharts
+
+matplotlib.use("Agg")
 
 
 def compare_simulation_results(
@@ -104,7 +109,6 @@ def compare_simulation_results(
             curves_aligned[i] = [x_to_y.get(p, 0.0) for p in common_x]
     else:
         # interpolation
-        import numpy as np
         ref_x, ref_y = raw_curves[reference_index]
         common_x = ref_x
         curves_aligned[reference_index] = ref_y
@@ -140,10 +144,6 @@ def compare_simulation_results(
             })
 
     # Step 4: generate comparison image with Matplotlib
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
     fig, ax = plt.subplots(figsize=(10, 6))
     for i, yv in enumerate(aligned):
         ax.plot(common_x, yv, label=labels[i], linewidth=1.5)

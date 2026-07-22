@@ -19,8 +19,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import os
+import socket
 import sys
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -37,10 +41,6 @@ from servers.registry_server import mcp  # noqa: E402
 
 def _setup_logging() -> None:
     """按大小轮转的文件日志，写入 logs/mcp.log。"""
-    import logging
-    from logging.handlers import RotatingFileHandler
-    from pathlib import Path
-
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
 
@@ -63,8 +63,7 @@ def _setup_logging() -> None:
 def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     """SSE / streamable-http 模式入口。"""
     # 单实例检查
-    import socket as _sock
-    _test = _sock.socket()
+    _test = socket.socket()
     try:
         _test.settimeout(1)
         if _test.connect_ex(("127.0.0.1", port)) == 0:
