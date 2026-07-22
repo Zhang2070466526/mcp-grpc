@@ -18,7 +18,7 @@ servers/
   registry_server.py    # 工具注册中心 + /health
   eda/                  # EDA 工具（13 个）
     __init__.py          # 公共 API + 工具清单
-    config.py            # 配置 + ProjectReader + S-expression 解析器
+    config.py            # 配置 + validate_file + ProjectReader + S-expression
     grpc_client.py       # gRPC 通信层（带 EDA 全局锁）
     project_manage.py    # 工程管理（6 工具）
     simulation.py        # 仿真（2 工具）
@@ -44,11 +44,13 @@ HANDOVER.md              # 本文档
 
 Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protobuf >= 6.33.5 / python-dotenv
 
-## MCP 工具清单（17 个）
+## MCP 工具清单（23 个）
 
 **工程管理**：list_epp_projects, open_eda_project, close_eda_project, list_project_components, get_component_parameters, get_project_summary
 
 **仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist_with_ads, compare_simulation_results
+
+**ANSYS**：open_hfss_project（GetActiveObject附着/单启动）, close_hfss_project（COM优先+PID记录）, launch_aedt, get_hfss_project_info（纯查询不启动）
 
 **导出分析**：export_project_netlist, capture_schematic
 
@@ -118,7 +120,7 @@ project_manage.py  ->  __init__.py  ->  registry_server.py  ->  start_servers.py
 
 ## 扩展开发
 
-添加 gRPC 工具：在 servers/eda/ 对应文件中添加纯函数 -> __init__.py re-export -> registry_server.py 注册
+添加 gRPC 工具：在 servers/eda/ 对应文件中添加 @mcp.tool() 装饰器 -> registry_server.py import 模块
 
 重新生成 proto：
 ```powershell

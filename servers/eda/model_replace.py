@@ -18,12 +18,11 @@ CSV 格式参考：模型替换_LJ.csv（项目根目录）
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
-from servers.eda.config import validate_project_path
+from servers.eda.config import validate_file, validate_project_path
 from servers.mcp_instance import mcp
 
 
@@ -41,12 +40,10 @@ def replace_models_from_csv(
         timeout_seconds: 最长等待时间，默认 60 秒。
     """
     resolved_path = validate_project_path(project_path)
-    csv = Path(csv_path).expanduser()
-    if not csv.is_file():
-        raise FileNotFoundError(f"CSV 文件不存在: {csv}")
+    resolved_csv = validate_file(csv_path, (".csv",))
     return call_grpc(
         ecserver_pb2.MODEL_REPLACE,
-        {"project_path": resolved_path, "csv_path": str(csv.resolve())},
+        {"project_path": resolved_path, "csv_path": resolved_csv},
         timeout_seconds,
         max_timeout_seconds=300,
     )

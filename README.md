@@ -1,6 +1,6 @@
 # EDA MCP 服务
 
-每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口和命令行工具封装为 17 个 MCP 工具，
+每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 23 个 MCP 工具，
 支持 **SSE** 和 **stdio** 两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
 
 ---
@@ -47,7 +47,7 @@ uv run python start_servers.py
 输出示例：
 ```
 MCP 服务启动 [transport=sse, port=8026]
-已加载 17 个工具: list_epp_projects, open_eda_project, ...
+已加载 23 个工具: list_epp_projects, open_eda_project, ...
 地址: http://127.0.0.1:8026/sse
 INFO:     Uvicorn running on http://127.0.0.1:8026
 ```
@@ -57,7 +57,7 @@ INFO:     Uvicorn running on http://127.0.0.1:8026
 - EDI gRPC 操作由全局锁保证串行
 - Turbocharts 由信号量保证同一时间一个进程
 - `/health` 健康检查 — 返回 EDA gRPC 和 Turbocharts 状态
-- `/ui` 聊天客户端 — 自然语言驱动 17 个工具，带工具面板和系统主题
+- `/ui` 聊天客户端 — 自然语言驱动 23 个工具，带工具面板和系统主题
 - `/chat` 聊天 API — POST `{"message":"..."}` 返回 LLM + 工具执行结果
 - 聊天客户端文件：`scripts/chat_client.html`（独立 HTML，可单独分发）
 
@@ -102,7 +102,7 @@ uv run python start_servers.py --port 9000
 
 ---
 
-## 工具参考（17 个）
+## 工具参考（23 个）
 
 ### 工程管理
 
@@ -137,7 +137,18 @@ uv run python start_servers.py --port 9000
 | 工具 | 说明 | 参数 |
 |---|---|---|
 | `replace_models_from_csv` | 按 CSV 批量替换模型 | `project_path`, `csv_path`, `timeout_seconds`（默认 60） |
-| `launch_edi` | 启动 EDI 客户端，等待 gRPC 就绪 | `edi_path`, `wait_for_grpc`（默认 true）, `wait_timeout` |
+| `launch_edi` | 启动 EDI 客户端 | `edi_path`, `wait_for_grpc`（默认 true）, `wait_timeout` |
+
+### ANSYS HFSS
+
+| 工具 | 说明 | 参数 |
+|---|---|---|
+| `open_hfss_project` | 启动 AEDT 并打开 .aedt 项目（COM 优先/验证） | `project_path`, `aedt_path`, `wait_timeout` |
+| `close_hfss_project` | 关闭 AEDT 项目（COM 优先/可强制） | `project_name`, `save_before_close`, `force` |
+| `launch_aedt` | 启动 AEDT（已运行检测+就绪等待） | `aedt_path`, `wait_timeout` |
+| `get_hfss_project_info` | 获取项目列表/活动项目/设计 | — |
+| `start_hfss_analysis_async` | 异步启动 HFSS 仿真 | `project_path`, `design_name`, `setup_name` |
+| `get_hfss_analysis_status` | 查询 HFSS 仿真状态 | `task_id`, `refresh_from_aedt` |
 
 ### 图表
 
@@ -187,9 +198,10 @@ uv run python start_servers.py --port 9000
 │   ├── ecserver_pb2.py
 │   └── ecserver_pb2_grpc.py
 ├── servers/
-│   ├── registry_server.py       # 工具注册中心
+│   ├── mcp_instance.py          # 全局 MCP 实例（装饰器注册）
+│   ├── registry_server.py       # 工具导入入口
 │   ├── eda/
-│   │   ├── config.py            # 配置 + ProjectReader + S-expression 解析器
+│   │   ├── config.py            # 配置 + validate_file + ProjectReader + S-expression
 │   │   ├── grpc_client.py       # gRPC 通信（带 EDA 全局锁）
 │   │   ├── project_manage.py    # 工程管理（6 工具）
 │   │   ├── simulation.py        # 仿真（5 工具）
@@ -200,7 +212,11 @@ uv run python start_servers.py --port 9000
 │       ├── config.py             # 公共函数（run_turbocharts）
 │       ├── convert_raw.py        # RAW 转图（1 工具）
 │       └── compare_results.py    # 仿真对比（1 工具）
-│   ├── web_routes.py            # Web 路由（/health, /chat, /ui）
+│   ├── web_routes.py            # Web 路由
+│   ├── ansys/                     # ANSYS 工具（6 个）
+│   │   ├── config.py              # 公共工具
+│   │   ├── project_manage.py      # 工程管理 + 信息查询
+│   │   └── run_analysis.py        # 异步仿真
 ├── start_servers.py              # 入口
 ├── tests/                       # 测试套件
 ├── scripts/
@@ -270,9 +286,8 @@ powershell -File scripts/build.ps1
 
 ### 添加新工具
 
-1. 在 `servers/eda/` 对应分类文件中添加工具函数（纯函数，无 MCP 装饰器）
-2. 在 `servers/eda/__init__.py` 中 re-export
-3. 在 `servers/registry_server.py` 中 `mcp.tool()(func)` 注册
+1. 在对应分类文件中添加函数 + `@mcp.tool()` 装饰器
+2. 在 `servers/registry_server.py` 中 `import` 该模块（触发装饰器注册）
 
 ### 重新生成 proto
 

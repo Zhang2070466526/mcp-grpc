@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 def test_all_tools_registered():
     from start_servers import mcp
     tools = list(mcp._tool_manager._tools.keys())
-    assert len(tools) == 21, f"expected 21 tools, got {len(tools)}"
+    assert len(tools) == 23, f"expected 23 tools, got {len(tools)}"
     required = [
         "list_epp_projects", "open_eda_project", "close_eda_project",
         "list_project_components", "get_component_parameters", "get_project_summary",
@@ -17,6 +17,7 @@ def test_all_tools_registered():
         "export_project_netlist", "capture_schematic",
         "replace_models_from_csv", "launch_edi", "turbocharts_convert",
         "open_hfss_project", "close_hfss_project", "launch_aedt", "get_hfss_project_info",
+        "start_hfss_analysis_async", "get_hfss_analysis_status",
     ]
     for name in required:
         assert name in tools, f"missing tool: {name}"

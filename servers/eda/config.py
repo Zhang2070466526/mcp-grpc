@@ -28,14 +28,19 @@ EDI_PATH = os.getenv("EDI_PATH")
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT")
 
 
+def validate_file(path: str, extensions: tuple[str, ...] = ()) -> str:
+    """校验文件存在，可选限制扩展名，返回规范化绝对路径。"""
+    p = Path(path).expanduser()
+    if not p.is_file():
+        raise FileNotFoundError(f"文件不存在: {p}")
+    if extensions and p.suffix.lower() not in extensions:
+        raise ValueError(f"文件扩展名必须是 {extensions}: {p}")
+    return str(p.resolve())
+
+
 def validate_project_path(project_path: str) -> str:
-    """校验工程路径，返回规范化后的绝对路径。"""
-    path = Path(project_path).expanduser()
-    if path.suffix.lower() != ".epp":
-        raise ValueError("project_path 必须指向 .epp 工程文件")
-    if not path.is_file():
-        raise FileNotFoundError(f"工程文件不存在: {path}")
-    return str(path.resolve())
+    """校验 .epp 工程路径，返回规范化后的绝对路径。"""
+    return validate_file(project_path, (".epp",))
 
 
 # === S-expression parser & project reader ===

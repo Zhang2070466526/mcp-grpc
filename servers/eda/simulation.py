@@ -21,12 +21,11 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from pathlib import Path
 from typing import Any
 
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
-from servers.eda.config import validate_project_path
+from servers.eda.config import validate_file, validate_project_path
 from servers.mcp_instance import mcp
 
 # -- 异步仿真任务注册表 --
@@ -159,12 +158,10 @@ def simulate_netlist_with_ads(
         ads_path: ADS 安装路径，为空则自动判断。
         timeout_seconds: 最长等待时间，默认 120 秒。
     """
-    netlist = Path(netlist_path).expanduser()
-    if not netlist.is_file():
-        raise FileNotFoundError(f"网表文件不存在: {netlist}")
+    resolved_netlist = validate_file(netlist_path)
     return call_grpc(
         ecserver_pb2.CALL_SIMULATION_CONTROLLER,
-        {"netlist_path": str(netlist.resolve()), "ads_path": ads_path},
+        {"netlist_path": resolved_netlist, "ads_path": ads_path},
         timeout_seconds,
         max_timeout_seconds=3600,
     )

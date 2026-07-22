@@ -34,28 +34,13 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from servers.eda.config import validate_file
 from servers.turbocharts.config import run_turbocharts
 from servers.mcp_instance import mcp
 
 load_dotenv()
 
 TURBOCHARTS_PATH = os.getenv("TURBOCHARTS_PATH")
-
-# ---------------------------------------------------------------------------
-# 内部工具函数
-# ---------------------------------------------------------------------------
-
-def _validate_file(path: str, description: str) -> str:
-    """校验文件存在，返回规范化路径。"""
-    p = Path(path).expanduser()
-    if not p.is_file():
-        raise FileNotFoundError(f"{description} 不存在: {p}")
-    return str(p.resolve())
-
-
-# ---------------------------------------------------------------------------
-# MCP 工具
-# ---------------------------------------------------------------------------
 
 @mcp.tool()
 def turbocharts_convert(
@@ -113,8 +98,8 @@ def turbocharts_convert(
     Returns:
         包含 success / return_code / output_paths / img_generated / csv_generated 的结果字典。
     """
-    _validate_file(raw_path, "RAW 文件")
-    _validate_file(TURBOCHARTS_PATH, "RawConverter")
+    validate_file(raw_path)
+    validate_file(TURBOCHARTS_PATH)
 
     # 校验输出图片扩展名
     img_ext = Path(img_path).suffix.lower()

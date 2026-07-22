@@ -87,7 +87,7 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     print("=" * 50)
     print(f"  EDA MCP v0.1.0")
     print(f"  UI:  http://{host}:{port}/ui")
-    print(f"  MCP: http://{host}:{port}/sse")
+    print(f"  MCP: http://{host}:{port}/mcp")
     print(f"  Tools: {len(tools)} loaded")
     print(f"  Close window to stop")
     print("=" * 50)

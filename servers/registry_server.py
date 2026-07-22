@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（共 21 个）：
+  已注册工具（共 23 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -33,6 +33,8 @@
     close_hfss_project            关闭 HFSS 项目
     launch_aedt                   启动 AEDT
     get_hfss_project_info         获取 HFSS 项目信息
+    start_hfss_analysis_async     异步启动 HFSS 仿真
+    get_hfss_analysis_status      查询 HFSS 仿真状态
 
   图表：
     compare_simulation_results    多 RAW 结果对比叠图
@@ -52,7 +54,8 @@ import servers.eda.model_replace         # noqa: F401
 import servers.eda.edi_launcher          # noqa: F401
 import servers.turbocharts.compare_results  # noqa: F401
 import servers.turbocharts.convert_raw   # noqa: F401
-import servers.ansys.hfss_tools          # noqa: F401
+import servers.ansys.project_manage       # noqa: F401
+import servers.ansys.run_analysis         # noqa: F401
 
 # Web 路由
 from servers.web_routes import ui_page, health_check, chat_endpoint  # noqa: E402
