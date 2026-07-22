@@ -28,8 +28,9 @@ load_dotenv()
 
 # -- 配置 --
 DEFAULT_TRANSPORT = os.getenv("MCP_TRANSPORT")
-DEFAULT_HOST = os.getenv("MCP_HOST")    # 就是 FastMCP 暴露的配置接口，底层用的 uvicorn.run(host="0.0.0.0")，0.0.0.0 = 监听本机所有网卡的所有 IP。
-DEFAULT_PORT = int(os.getenv("MCP_PORT"))
+# FastMCP 暴露的配置接口，底层用的 uvicorn.run(host="0.0.0.0")，0.0.0.0 = 这样就会监听本机所有网卡的所有 IP。
+DEFAULT_HOST = os.getenv("MCP_HOST","127.0.0.1")
+DEFAULT_PORT = int(os.getenv("MCP_PORT", "8026"))
 
 from servers.registry_server import mcp  # noqa: E402
 
@@ -105,8 +106,7 @@ if __name__ == "__main__":
         default=DEFAULT_PORT,
         help=f"streamable-http 模式端口（默认: {DEFAULT_PORT}）",
     )
-    args = parser.parse_args()# 执行参数解析，作用是将用户在命令行输入的实际参数转换为 Python 对象，供程序后续使用。
-
+    args = parser.parse_args()  # 执行参数解析，作用是将用户在命令行输入的实际参数转换为 Python 对象，供程序后续使用。
 
     if args.transport in ("sse", "streamable-http"):
         _setup_logging()
