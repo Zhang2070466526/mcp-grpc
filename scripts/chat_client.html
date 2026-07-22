@@ -484,11 +484,11 @@
             b.textContent = text
         } else if (role === "toolcall") {
             av.textContent = "T";
-            b.innerHTML = text
+            b.textContent = text
         } else {
             av.textContent = "AI";
             if (html) {
-                b.innerHTML = text
+                b.innerHTML = text  // 仅用于自己生成的 JSON pre 格式
             } else {
                 b.textContent = text
             }

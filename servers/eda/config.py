@@ -86,6 +86,8 @@ class ProjectReader:
         return names
 
     def read_schematic(self, name: str = "main") -> str | None:
+        if ".." in name or "/" in name or "\\" in name:
+            return None
         return self.read_text(f"schematics/{name}/schematic.ep")
 
     def read_netlist(self) -> str | None:

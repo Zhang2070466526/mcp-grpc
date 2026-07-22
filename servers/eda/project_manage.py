@@ -36,14 +36,13 @@ from servers.eda.config import ProjectReader, parse_components, validate_project
 
 def list_epp_projects(folder_path: str) -> dict[str, Any]:
     """扫描指定文件夹，列出其中所有 .epp 工程文件（最多 1000 个）。"""
+    from itertools import islice
     root = Path(folder_path).expanduser()
     if not root.is_dir():
         raise FileNotFoundError(f"文件夹不存在: {folder_path}")
 
     projects = []
-    for epp in sorted(root.rglob("*.epp")):
-        if len(projects) >= 1000:
-            break
+    for epp in sorted(islice(root.rglob("*.epp"), 1000)):
         projects.append({
             "name": epp.stem,
             "path": str(epp.resolve()),
@@ -117,7 +116,8 @@ def list_project_components(
         offset: 分页偏移。
         limit: 每页数量上限，默认 100，最大 500。
     """
-    limit = min(limit, 500)
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
     reader = ProjectReader(project_path)
     raw = reader.read_schematic(schematic_name)
     if not raw:

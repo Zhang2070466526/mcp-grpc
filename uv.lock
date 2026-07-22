@@ -427,6 +427,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "grpcio" },
+    { name = "httpx" },
     { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "mcp" },
@@ -446,6 +447,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "grpcio", specifier = ">=1.81.0" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "matplotlib", specifier = ">=3.10" },
     { name = "mcp", specifier = ">=1.0.0" },
     { name = "numpy", specifier = ">=2.0" },

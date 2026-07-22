@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def test_timeout_range_valid():
-    from servers.turbocharts.runner import run_turbocharts
+    from servers.turbocharts.config import run_turbocharts
     import subprocess
     # 用 echo 代替真实 turbocharts，只测参数校验
     try:
@@ -17,7 +17,7 @@ def test_timeout_range_valid():
 
 
 def test_timeout_range_too_low():
-    from servers.turbocharts.runner import run_turbocharts
+    from servers.turbocharts.config import run_turbocharts
     try:
         run_turbocharts(["echo"], timeout_seconds=0)
         assert False, "should have raised"
@@ -26,7 +26,7 @@ def test_timeout_range_too_low():
 
 
 def test_timeout_range_too_high():
-    from servers.turbocharts.runner import run_turbocharts
+    from servers.turbocharts.config import run_turbocharts
     try:
         run_turbocharts(["echo"], timeout_seconds=601)
         assert False, "should have raised"
