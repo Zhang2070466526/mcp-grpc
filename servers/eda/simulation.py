@@ -27,6 +27,7 @@ from typing import Any
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
 from servers.eda.config import validate_project_path
+from servers.mcp_instance import mcp
 
 # -- 异步仿真任务注册表 --
 _sim_tasks: dict[str, dict] = {}
@@ -55,6 +56,7 @@ def _run_sim_task(task_id: str, project_path: str, log_source: str, timeout_seco
             _sim_tasks[task_id]["finished_at"] = time.time()
 
 
+@mcp.tool()
 def start_simulation_async(
     project_path: str,
     log_source: str = "mcp_client",
@@ -89,6 +91,7 @@ def start_simulation_async(
     return {"task_id": task_id, "status": "QUEUED"}
 
 
+@mcp.tool()
 def get_simulation_async_status(task_id: str) -> dict[str, Any]:
     """查询异步仿真任务状态。"""
     with _sim_lock:
@@ -104,6 +107,7 @@ def get_simulation_async_status(task_id: str) -> dict[str, Any]:
     }
 
 
+@mcp.tool()
 def get_simulation_async_result(task_id: str) -> dict[str, Any]:
     """获取已完成的异步仿真结果。"""
     with _sim_lock:
@@ -120,6 +124,7 @@ def get_simulation_async_result(task_id: str) -> dict[str, Any]:
     }
 
 
+@mcp.tool()
 def simulate_project(
     project_path: str,
     log_source: str = "mcp_client",
@@ -141,6 +146,7 @@ def simulate_project(
     )
 
 
+@mcp.tool()
 def simulate_netlist_with_ads(
     netlist_path: str,
     ads_path: str = "",

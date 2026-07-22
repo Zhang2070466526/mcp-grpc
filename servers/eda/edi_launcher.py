@@ -23,8 +23,10 @@ from pathlib import Path
 from typing import Any
 
 from servers.eda.config import EDA_GRPC_SERVER, EDI_PATH
+from servers.mcp_instance import mcp
 
 
+@mcp.tool()
 def launch_edi(
     edi_path: str = "",
     wait_for_grpc: bool = True,

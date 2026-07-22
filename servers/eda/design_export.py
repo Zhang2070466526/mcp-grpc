@@ -21,8 +21,10 @@ from typing import Any
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
 from servers.eda.config import validate_project_path
+from servers.mcp_instance import mcp
 
 
+@mcp.tool()
 def export_project_netlist(
     project_path: str,
     timeout_seconds: int = 60,
@@ -42,6 +44,7 @@ def export_project_netlist(
     )
 
 
+@mcp.tool()
 def capture_schematic(
     project_path: str,
     img_path: str,

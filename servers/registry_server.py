@@ -1,7 +1,7 @@
-"""MCP 工具注册中心 — 集中管理所有工具的注册。
+"""MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（共 17 个）：
+  已注册工具（共 21 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -28,6 +28,12 @@
   启动：
     launch_edi                    启动 EDI 客户端
 
+  ANSYS：
+    open_hfss_project             打开 .aedt HFSS 项目
+    close_hfss_project            关闭 HFSS 项目
+    launch_aedt                   启动 AEDT
+    get_hfss_project_info         获取 HFSS 项目信息
+
   图表：
     compare_simulation_results    多 RAW 结果对比叠图
     turbocharts_convert           ADS RAW → 曲线图 + CSV
@@ -35,60 +41,20 @@
 """
 
 from __future__ import annotations
-from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP(
-    "EDA MCP",
-    instructions=(
-        "EDA 工程操作工具集："
-        "扫描工程、打开工程、网表查看、仿真执行、截图原理图、"
-        "模型替换、关闭工程、ADS 仿真控制、启动 EDI、RAW 图表生成。"
-    ),
-)
+from servers.mcp_instance import mcp  # noqa: E402 — 全局 MCP 实例
 
-# -- EDA gRPC 工具 --
-from servers.eda import (  # noqa: E402
-    capture_schematic,
-    close_eda_project,
-    export_project_netlist,
-    get_component_parameters,
-    get_project_summary,
-    get_simulation_async_result,
-    get_simulation_async_status,
-    launch_edi,
-    list_epp_projects,
-    list_project_components,
-    open_eda_project,
-    replace_models_from_csv,
-    simulate_netlist_with_ads,
-    simulate_project,
-    start_simulation_async,
-)
-from servers.turbocharts import compare_simulation_results  # noqa: E402
-mcp.tool()(list_epp_projects)
-mcp.tool()(open_eda_project)
-mcp.tool()(close_eda_project)
-mcp.tool()(simulate_project)
-mcp.tool()(simulate_netlist_with_ads)
-mcp.tool()(start_simulation_async)
-mcp.tool()(get_simulation_async_status)
-mcp.tool()(get_simulation_async_result)
-mcp.tool()(export_project_netlist)
-mcp.tool()(capture_schematic)
-mcp.tool()(replace_models_from_csv)
-mcp.tool()(launch_edi)
-mcp.tool()(list_project_components)
-mcp.tool()(get_component_parameters)
-mcp.tool()(get_project_summary)
-mcp.tool()(compare_simulation_results)
+# 导入工具模块即可触发 @mcp.tool() 装饰器注册
+import servers.eda.project_manage       # noqa: F401
+import servers.eda.simulation            # noqa: F401
+import servers.eda.design_export         # noqa: F401
+import servers.eda.model_replace         # noqa: F401
+import servers.eda.edi_launcher          # noqa: F401
+import servers.turbocharts.compare_results  # noqa: F401
+import servers.turbocharts.convert_raw   # noqa: F401
+import servers.ansys.hfss_tools          # noqa: F401
 
-# -- RawConverter 工具 --
-from servers.turbocharts.convert_raw import (  # noqa: E402
-    turbocharts_convert,
-)
-mcp.tool()(turbocharts_convert)
-
-# -- Web 路由 --
+# Web 路由
 from servers.web_routes import ui_page, health_check, chat_endpoint  # noqa: E402
 
 mcp.custom_route("/", methods=["GET"])(ui_page)

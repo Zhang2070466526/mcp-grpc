@@ -15,10 +15,12 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from servers.turbocharts.config import run_turbocharts
+from servers.mcp_instance import mcp
 
 matplotlib.use("Agg")
 
 
+@mcp.tool()
 def compare_simulation_results(
     result_paths: list[str],
     curve: str,

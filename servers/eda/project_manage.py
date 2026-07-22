@@ -33,8 +33,10 @@ from typing import Any
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
 from servers.eda.config import ProjectReader, parse_components, validate_project_path
+from servers.mcp_instance import mcp
 
 
+@mcp.tool()
 def list_epp_projects(folder_path: str) -> dict[str, Any]:
     """扫描指定文件夹，列出其中所有 .epp 工程文件（最多 1000 个）。"""
     root = Path(folder_path).expanduser()
@@ -57,6 +59,7 @@ def list_epp_projects(folder_path: str) -> dict[str, Any]:
     }
 
 
+@mcp.tool()
 def open_eda_project(
         project_path: str,
         timeout_seconds: int = 60,
@@ -77,6 +80,7 @@ def open_eda_project(
     )
 
 
+@mcp.tool()
 def close_eda_project(
         project_path: str,
         need_save: bool = False,
@@ -98,6 +102,7 @@ def close_eda_project(
     )
 
 
+@mcp.tool()
 def list_project_components(
     project_path: str,
     schematic_name: str = "main",
@@ -154,6 +159,7 @@ def list_project_components(
     }
 
 
+@mcp.tool()
 def get_component_parameters(
     project_path: str,
     component_id: str,
@@ -213,6 +219,7 @@ def get_component_parameters(
     return {"success": False, "message": f"未找到元件 {component_id}"}
 
 
+@mcp.tool()
 def get_project_summary(
     project_path: str,
     include_component_types: bool = True,

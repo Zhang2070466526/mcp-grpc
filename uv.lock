@@ -436,6 +436,7 @@ dependencies = [
     { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "protobuf" },
     { name = "python-dotenv" },
+    { name = "pywin32" },
 ]
 
 [package.dev-dependencies]
@@ -453,6 +454,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.0" },
     { name = "protobuf", specifier = ">=6.33.5" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "pywin32", specifier = ">=306" },
 ]
 
 [package.metadata.requires-dev]

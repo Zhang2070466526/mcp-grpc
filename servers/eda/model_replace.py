@@ -24,8 +24,10 @@ from typing import Any
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
 from servers.eda.config import validate_project_path
+from servers.mcp_instance import mcp
 
 
+@mcp.tool()
 def replace_models_from_csv(
     project_path: str,
     csv_path: str,

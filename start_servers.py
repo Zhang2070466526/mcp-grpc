@@ -36,7 +36,8 @@ DEFAULT_TRANSPORT = os.getenv("MCP_TRANSPORT","sse")
 DEFAULT_HOST = os.getenv("MCP_HOST","127.0.0.1")
 DEFAULT_PORT = int(os.getenv("MCP_PORT", "8026"))
 
-from servers.registry_server import mcp  # noqa: E402
+from servers.mcp_instance import mcp
+import servers.registry_server  #  — 触发工具注册
 
 
 def _setup_logging() -> None:

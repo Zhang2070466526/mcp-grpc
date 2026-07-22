@@ -34,23 +34,12 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
 from servers.turbocharts.config import run_turbocharts
+from servers.mcp_instance import mcp
 
 load_dotenv()
 
 TURBOCHARTS_PATH = os.getenv("TURBOCHARTS_PATH")
-MCP_TRANSPORT = os.getenv("MCP_TRANSPORT")
-
-# ---------------------------------------------------------------------------
-# MCP 实例
-# ---------------------------------------------------------------------------
-
-mcp = FastMCP(
-    "RawConverter",
-    instructions="使用 RawConverter 将 ADS RAW 仿真结果转换为曲线图和 CSV 数据。",
-)
-
 
 # ---------------------------------------------------------------------------
 # 内部工具函数
@@ -160,9 +149,3 @@ def turbocharts_convert(
     }
 
 
-# ---------------------------------------------------------------------------
-# 入口
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    mcp.run(transport=MCP_TRANSPORT)
