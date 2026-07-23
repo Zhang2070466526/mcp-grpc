@@ -58,9 +58,10 @@ import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
 
 # Web 路由
-from servers.web_routes import ui_page, health_check, chat_endpoint  # noqa: E402
+from servers.web_routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
 
 mcp.custom_route("/", methods=["GET"])(ui_page)
 mcp.custom_route("/ui", methods=["GET"])(ui_page)
 mcp.custom_route("/health", methods=["GET"])(health_check)
 mcp.custom_route("/chat", methods=["POST"])(chat_endpoint)
+mcp.custom_route("/tools/list", methods=["GET"])(tool_list)

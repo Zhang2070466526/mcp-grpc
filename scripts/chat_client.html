@@ -414,62 +414,53 @@
 <script>
     const URL = location.origin + "/chat", HLTH = location.origin + "/health";
 
-    // Tool definitions with categories and dependencies
-    const TOOLS = [
-        {cat: "工程管理", deps: "gRPC", name: "list_epp_projects", desc: "扫描 .epp 工程"},
-        {cat: "工程管理", deps: "gRPC", name: "open_eda_project", desc: "打开工程"},
-        {cat: "工程管理", deps: "gRPC", name: "close_eda_project", desc: "关闭工程"},
-        {cat: "工程管理", deps: "file", name: "list_project_components", desc: "列出元件"},
-        {cat: "工程管理", deps: "file", name: "get_component_parameters", desc: "查询元件参数"},
-        {cat: "工程管理", deps: "file", name: "get_project_summary", desc: "工程概览"},
-        {cat: "仿真", deps: "gRPC", name: "simulate_project", desc: "执行仿真"},
-        {cat: "仿真", deps: "gRPC", name: "simulate_netlist_with_ads", desc: "ADS 仿真控制器"},
-        {cat: "仿真", deps: "tc", name: "compare_simulation_results", desc: "多结果对比叠图"},
-        {cat: "分析", deps: "gRPC", name: "export_project_netlist", desc: "导出网表"},
-        {cat: "分析", deps: "gRPC", name: "capture_schematic", desc: "截图原理图"},
-        {cat: "模型", deps: "gRPC", name: "replace_models_from_csv", desc: "CSV 模型替换"},
-        {cat: "启动", deps: "local", name: "launch_edi", desc: "启动 EDI 客户端"},
-        {cat: "图表", deps: "tc", name: "turbocharts_convert", desc: "RAW 转曲线图"},
-    ];
+    let tools = [], edaReady = false, tcReady = false;
 
-    let edaReady = false, tcReady = false;
+function catFor(name) {
+    if (name.startsWith("list_") || name.startsWith("get_")) return "查询";
+    if (name.startsWith("open_") || name.startsWith("close_")) return "工程";
+    if (name.startsWith("simulate_") || name.includes("simulation")) return "仿真";
+    if (name.startsWith("start_")) return "仿真";
+    if (name.startsWith("export_") || name.startsWith("capture_")) return "分析";
+    if (name.startsWith("replace_")) return "模型";
+    if (name.startsWith("launch_")) return "启动";
+    if (name.startsWith("compare_") || name.startsWith("turbocharts_")) return "图表";
+    if (name.includes("hfss") || name.includes("aedt")) return "ANSYS";
+    return "其他";
+}
 
-    function renderTools() {
-        let h = TOOLS.reduce((a, t) => {
-            if (!a[t.cat]) {
-                a[t.cat] = []
-            }
-            a[t.cat].push(t);
-            return a;
-        }, {});
-        let el = document.getElementById("toolsList"), html = "";
-        for (let cat of Object.keys(h)) {
-            html += `<div class="cat-label">${cat}</div>`;
-            for (let t of h[cat]) {
-                let cls = "off";
-                if (t.deps === "file" || t.deps === "local") cls = "file";
-                else if (t.deps === "gRPC" && edaReady) cls = "on";
-                else if (t.deps === "tc" && tcReady) cls = "on";
-                html += `<div class="tool-item"><span class="dot ${cls}"></span><span class="name" title="${t.name}">${t.name}</span></div>`;
-            }
+async function loadTools() {
+    try {
+        let r = await fetch(location.origin+"/tools/list",{});
+        let data = await r.json(); tools = Array.isArray(data) ? data : (data.result?.tools || []);
+        document.getElementById("status").textContent = tools.length + " tools";
+    } catch(e) { document.getElementById("status").textContent = "offline"; }
+    renderTools();
+}
+
+function renderTools() {
+    let h = {};
+    for (let t of tools) { let c = catFor(t.name); if (!h[c]) h[c] = []; h[c].push(t); }
+    let el = document.getElementById("toolsList"), html = "";
+    for (let cat of Object.keys(h).sort()) {
+        html += '<div class="cat-label">' + cat + '</div>';
+        for (let t of h[cat]) {
+            let cls = edaReady || tcReady ? "on" : "off";
+            if (t.name.startsWith("list_") || t.name.startsWith("get_")) cls = "file";
+            html += '<div class="tool-item"><span class="dot ' + cls + '"></span><span class="name" title="' + (t.description||'') + '">' + t.name + '</span></div>';
         }
-        el.innerHTML = html;
     }
+    el.innerHTML = html;
+}
 
-    async function checkHealth() {
-        try {
-            let r = await fetch(HLTH), d = await r.json();
-            edaReady = d.eda_grpc_ready;
-            tcReady = d.turbocharts_ready;
-            document.getElementById("status").textContent =
-                "gRPC:" + (edaReady ? "ON" : "OFF") + " TC:" + (tcReady ? "ON" : "OFF");
-        } catch (e) {
-            document.getElementById("status").textContent = "server offline"
-        }
-        renderTools();
-    }
-
-    function togglePanel() {
+async function checkHealth() {
+    try {
+        let r = await fetch(location.origin+"/health"), d = await r.json();
+        edaReady = d.eda_grpc_ready; tcReady = d.turbocharts_ready;
+    } catch(e) {}
+    renderTools();
+}
+function togglePanel() {
         document.getElementById("panel").classList.toggle("collapsed");
     }
 
@@ -568,7 +559,7 @@
         this.style.height = Math.min(this.scrollHeight, 100) + "px";
     });
 
-    checkHealth();
+    loadTools();
     setInterval(checkHealth, 30000);
 </script>
 </body>

@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Any
 
 import pythoncom
-from win32com.client import GetActiveObject
 
 from servers.ansys.config import (
-    aedt_is_running, get_setup_module, query_desktop_state, logger,
+    aedt_is_running, get_setup_module, query_desktop_state,
+    _attach_aedt, logger,
 )
 from servers.eda.config import validate_file
 from servers.mcp_instance import mcp
@@ -54,8 +54,7 @@ def _run_hfss_analysis_task(task_id: str) -> None:
         with _HFSS_TASKS_LOCK:
             _HFSS_TASKS[task_id]["status"] = "STARTING"
 
-        app = GetActiveObject("Ansoft.ElectronicsDesktop")
-        desktop = app.GetAppDesktop()
+        _, desktop = _attach_aedt()
         project = desktop.SetActiveProject(task.get("project_name", ""))
         design = project.SetActiveDesign(task.get("design_name", ""))
         module, _ = get_setup_module(design)
@@ -100,8 +99,7 @@ def _run_hfss_analysis_task(task_id: str) -> None:
 def _validate_setups(project_path: str, design_name: str) -> dict:
     pythoncom.CoInitialize()
     try:
-        app = GetActiveObject("Ansoft.ElectronicsDesktop")
-        desktop = app.GetAppDesktop()
+        _, desktop = _attach_aedt()
         project_name = Path(project_path).stem
         projects = list(desktop.GetProjectList())
 
@@ -223,8 +221,7 @@ def get_hfss_analysis_status(
     if refresh_from_aedt:
         try:
             pythoncom.CoInitialize()
-            app = GetActiveObject("Ansoft.ElectronicsDesktop")
-            desktop = app.GetAppDesktop()
+            _, desktop = _attach_aedt()
             result["aedt_refresh_succeeded"] = True
             result["aedt_simulations_running"] = desktop.AreThereSimulationsRunning(True)
         except Exception as exc:

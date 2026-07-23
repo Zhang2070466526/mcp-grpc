@@ -84,11 +84,21 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
         )
 
     tools = [t.name for t in mcp._tool_manager._tools.values()]
+
+    # 检测 50055 状态
+    from servers.eda.config import EDA_GRPC_SERVER as _grpc_addr
+    _grpc_host, _grpc_port = _grpc_addr.rsplit(":", 1)
+    _test = socket.socket()
+    _test.settimeout(1)
+    _grpc_ok = _test.connect_ex((_grpc_host, int(_grpc_port))) == 0
+    _test.close()
+
     print("=" * 50)
     print(f"  EDA MCP v0.1.0")
-    print(f"  UI:  http://{host}:{port}/ui")
-    print(f"  MCP: http://{host}:{port}/mcp")
+    print(f"  UI:   http://{host}:{port}/ui")
+    print(f"  MCP:  http://{host}:{port}/sse")
     print(f"  Tools: {len(tools)} loaded")
+    print(f"  gRPC: {_grpc_addr} [{chr(10003) if _grpc_ok else 'OFFLINE'}]")
     print(f"  Close window to stop")
     print("=" * 50)
 

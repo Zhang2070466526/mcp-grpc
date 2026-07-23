@@ -8,23 +8,24 @@ from pathlib import Path
 from typing import Any
 
 import pythoncom
-from win32com.client import GetActiveObject
 
 from servers.ansys.config import (
     AEDT_PATH, _AEDT_LOCK, _LAST_PID,
     aedt_is_running, get_aedt_pids, query_desktop_state,
-    logger,
+    cleanup_stale_project_lock, get_project_lock_path,
+    _attach_aedt, logger,
 )
 from servers.eda.config import validate_file
 from servers.mcp_instance import mcp
+
+_OPEN_PROJECT_PATHS: dict[str, str] = {}  # project_name -> project_path
 
 
 def _com_open_project(project_path: str) -> dict[str, Any]:
     """在现有 AEDT 中通过 COM 打开工程。"""
     pythoncom.CoInitialize()
     try:
-        app = GetActiveObject("Ansoft.ElectronicsDesktop")
-        desktop = app.GetAppDesktop()
+        _, desktop = _attach_aedt()
         project_name = Path(project_path).stem
 
         if project_name in list(desktop.GetProjectList()):
@@ -76,6 +77,16 @@ def open_hfss_project(
     project_name = Path(resolved).stem
     global _LAST_PID
 
+    # 检查工程锁
+    lock_result = cleanup_stale_project_lock(resolved)
+    if not lock_result["removed"] and lock_result.get("lock_pid"):
+        if lock_result.get("status") == "lock_active":
+            return {
+                "success": False, "status": "project_locked",
+                "lock_pid": lock_result["lock_pid"],
+                "message": f"工程正在 AEDT PID={lock_result['lock_pid']} 中使用",
+            }
+
     with _AEDT_LOCK:
         aedt_was_running = aedt_is_running()
 
@@ -92,22 +103,26 @@ def open_hfss_project(
             if project_name in state["projects"]:
                 pythoncom.CoInitialize()
                 try:
-                    app = GetActiveObject("Ansoft.ElectronicsDesktop")
-                    app.GetAppDesktop().SetActiveProject(project_name)
+                    _, dtop = _attach_aedt()
+                    dtop.SetActiveProject(project_name)
                 except Exception:
                     pass
                 finally:
                     pythoncom.CoUninitialize()
+                _OPEN_PROJECT_PATHS[project_name] = resolved
+                rc = cleanup_stale_project_lock(resolved) if lock_result["removed"] else {}
                 return {
                     "success": True, "status": "already_open",
                     "aedt_running": True, "project_opened": True, "verified": True,
                     "project_name": project_name, "project_path": resolved,
                     "method": "com", "duration_s": round(time.monotonic() - t0, 1),
                     "message": f"工程已打开并激活: {project_name}",
+                    **({"stale_lock_removed": True} if rc.get("removed") else {}),
                 }
 
             result = _com_open_project(resolved)
             if result["status"] in ("opened", "already_open"):
+                _OPEN_PROJECT_PATHS[project_name] = resolved
                 return {
                     "success": True, "status": result["status"],
                     "aedt_running": True, "project_opened": True, "verified": True,
@@ -144,6 +159,7 @@ def open_hfss_project(
                 }
             state = query_desktop_state()
             if state["connected"] and project_name in state["projects"]:
+                _OPEN_PROJECT_PATHS[project_name] = resolved
                 return {
                     "success": True, "status": "opened",
                     "aedt_running": True, "project_opened": True, "verified": True,
@@ -168,11 +184,22 @@ def open_hfss_project(
 @mcp.tool()
 def close_hfss_project(
     project_name: str = "",
+    project_path: str = "",
     save_before_close: bool = False,
     force: bool = False,
 ) -> dict[str, Any]:
-    """关闭 AEDT 项目（COM 优先，force 仅结束 MCP 最后启动的 PID）。"""
+    """关闭 AEDT 项目（COM 优先，force 仅结束 MCP 最后启动的 PID）。
+
+    Args:
+        project_name: 项目名，为空关闭活动项目。
+        project_path: 项目路径，用于清理锁文件。
+        save_before_close: 关闭前保存。
+        force: 仅结束 MCP 最后启动的 PID。
+    """
     global _LAST_PID
+
+    # 确定 lock 清理路径
+    lock_path = project_path or _OPEN_PROJECT_PATHS.get(project_name, "")
 
     if force and _LAST_PID is not None:
         try:
@@ -180,7 +207,28 @@ def close_hfss_project(
                            capture_output=True, timeout=10)
             pid = _LAST_PID
             _LAST_PID = None
-            return {"success": True, "method": "taskkill", "message": f"已终止 PID {pid}"}
+
+            # 等待进程退出后清理锁
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                if pid not in get_aedt_pids():
+                    break
+                time.sleep(1)
+
+            lock_cleanup = {}
+            if lock_path and pid not in get_aedt_pids():
+                result = cleanup_stale_project_lock(lock_path)
+                if result["removed"]:
+                    lock_cleanup = {"lock_cleanup": result}
+
+            if project_name in _OPEN_PROJECT_PATHS:
+                del _OPEN_PROJECT_PATHS[project_name]
+
+            return {
+                "success": True, "method": "taskkill",
+                "message": f"已终止 PID {pid}",
+                **lock_cleanup,
+            }
         except Exception as exc:
             return {"success": False, "message": str(exc)}
 
@@ -189,8 +237,7 @@ def close_hfss_project(
 
     pythoncom.CoInitialize()
     try:
-        app = GetActiveObject("Ansoft.ElectronicsDesktop")
-        desktop = app.GetAppDesktop()
+        _, desktop = _attach_aedt()
         names = list(desktop.GetProjectList())
 
         target = project_name.strip() if project_name else (names[0] if names else "")
@@ -208,9 +255,23 @@ def close_hfss_project(
         desktop.CloseProject(target)
         names_after = list(desktop.GetProjectList())
         closed = target not in names_after
+
+        # 清理锁 — 等待 AEDT 自己先删，再检查残余
+        lock_cleanup = {}
+        if closed and lock_path:
+            time.sleep(2)
+            if get_project_lock_path(lock_path).is_file():
+                result = cleanup_stale_project_lock(lock_path)
+                if result["removed"]:
+                    lock_cleanup = {"lock_cleanup": result}
+
+        if target in _OPEN_PROJECT_PATHS:
+            del _OPEN_PROJECT_PATHS[target]
+
         return {
             "success": closed, "method": "com", "project_closed": closed,
             "message": f"已关闭: {target}" if closed else f"未能确认关闭: {target}",
+            **lock_cleanup,
         }
     except Exception as exc:
         logger.exception("COM close failed")

@@ -1,7 +1,7 @@
 # eda_mcp_server 打包脚本
 $ErrorActionPreference = "Stop"
 Write-Host "=== EDA MCP Build ===" -ForegroundColor Cyan
-Write-Host "[1/4] Cleaning..." -ForegroundColor Yellow
+Write-Host "[1/5] Cleaning..." -ForegroundColor Yellow
 Remove-Item -Recurse -Force dist, build -ErrorAction SilentlyContinue
 Write-Host "[2/5] Running tests..." -ForegroundColor Yellow
 uv run pytest -q -p no:cacheprovider

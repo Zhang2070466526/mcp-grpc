@@ -52,6 +52,13 @@ async def ui_page(request: Request):
     return HTMLResponse("<h2>chat_client.html not found</h2>", status_code=404)
 
 
+async def tool_list(request: Request):
+    from servers.mcp_instance import mcp
+    tools = [{"name": t.name, "description": t.description or ""}
+             for t in mcp._tool_manager._tools.values()]
+    return JSONResponse(tools)
+
+
 async def health_check(request: Request):
     eda_ready = await _check_tcp(EDA_GRPC_SERVER)
     tc_path = _os.getenv("TURBOCHARTS_PATH", "")

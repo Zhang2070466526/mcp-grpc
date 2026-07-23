@@ -71,12 +71,25 @@ def aedt_is_running() -> bool:
 
 
 # -- COM --
+_COM_PROGIDS = ("AnsoftHfss.HfssScriptInterface", "Ansoft.ElectronicsDesktop")
+
+
+def _attach_aedt():
+    """附着现有 AEDT 实例，返回 (app, desktop)，失败抛异常。"""
+    for pid in _COM_PROGIDS:
+        try:
+            app = GetActiveObject(pid)
+            return app, app.GetAppDesktop()
+        except Exception:
+            continue
+    raise RuntimeError(f"GetActiveObject failed for: {_COM_PROGIDS}")
+
+
 def query_desktop_state() -> dict[str, Any]:
     """附着现有 AEDT，返回纯字典。绝不创建新实例。"""
     pythoncom.CoInitialize()
     try:
-        app = GetActiveObject("Ansoft.ElectronicsDesktop")
-        desktop = app.GetAppDesktop()
+        _, desktop = _attach_aedt()
         projects = list(desktop.GetProjectList())
         active = desktop.GetActiveProject()
         active_name = active.GetName() if active is not None else ""
@@ -108,3 +121,53 @@ def get_setup_module(design):
         except Exception:
             continue
     raise RuntimeError("No AnalysisSetup or SolveSetups module found")
+
+
+# -- 工程锁文件 --
+def get_project_lock_path(project_path: str) -> Path:
+    """C:/demo.aedt -> C:/demo.aedt.lock"""
+    return Path(project_path).with_suffix(".aedt.lock")
+
+
+def read_project_lock_pid(lock_path: Path) -> int | None:
+    """读取 .aedt.lock 文件中的 DesktopProcessID。"""
+    if not lock_path.is_file():
+        return None
+    try:
+        for line in lock_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            if line.startswith("DesktopProcessID="):
+                return int(line.split("=", 1)[1].strip())
+    except Exception:
+        pass
+    return None
+
+
+def cleanup_stale_project_lock(project_path: str) -> dict:
+    """只清理已失效的工程锁。PID 活跃时绝不删除。"""
+    lock = get_project_lock_path(project_path)
+    result = {"removed": False, "lock_path": str(lock), "lock_pid": None}
+
+    if not lock.is_file():
+        return result
+
+    pid = read_project_lock_pid(lock)
+    result["lock_pid"] = pid
+
+    if pid is None:
+        result["status"] = "lock_unknown_format"
+        return result
+
+    if pid in get_aedt_pids():
+        result["status"] = "lock_active"
+        return result
+
+    # PID 已不存在，安全删除
+    try:
+        lock.unlink()
+        result["removed"] = True
+        result["status"] = "stale_lock_removed"
+    except OSError as exc:
+        result["status"] = "lock_remove_failed"
+        result["error"] = str(exc)
+
+    return result
