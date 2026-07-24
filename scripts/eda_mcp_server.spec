@@ -44,6 +44,9 @@ a = Analysis(
         'servers.ansys.project_manage',
         'servers.ansys.run_analysis',
 
+        # 图片工具
+        'servers.image_tools',
+
         # Proto / gRPC
         'proto',
         'proto.ecserver_pb2',

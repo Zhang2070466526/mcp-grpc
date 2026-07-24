@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（共 23 个）：
+  已注册工具（共 24 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -36,6 +36,9 @@
     start_hfss_analysis_async     异步启动 HFSS 仿真
     get_hfss_analysis_status      查询 HFSS 仿真状态
 
+  图片：
+    show_image                    读取本地图片，返回 MCP ImageContent
+
   图表：
     compare_simulation_results    多 RAW 结果对比叠图
     turbocharts_convert           ADS RAW → 曲线图 + CSV
@@ -56,12 +59,15 @@ import servers.turbocharts.compare_results  # noqa: F401
 import servers.turbocharts.convert_raw   # noqa: F401
 import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
+import servers.image_tools                # noqa: F401
 
 # Web 路由
 from servers.web_routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
+from servers.image_tools import serve_image  # noqa: E402
 
 mcp.custom_route("/", methods=["GET"])(ui_page)
 mcp.custom_route("/ui", methods=["GET"])(ui_page)
 mcp.custom_route("/health", methods=["GET"])(health_check)
 mcp.custom_route("/chat", methods=["POST"])(chat_endpoint)
 mcp.custom_route("/tools/list", methods=["GET"])(tool_list)
+mcp.custom_route("/images/{token}", methods=["GET"])(serve_image)

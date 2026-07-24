@@ -98,7 +98,7 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     print(f"  UI:   http://{host}:{port}/ui")
     print(f"  MCP:  http://{host}:{port}/sse")
     print(f"  Tools: {len(tools)} loaded")
-    print(f"  gRPC: {_grpc_addr} [{chr(10003) if _grpc_ok else 'OFFLINE'}]")
+    print(f"  gRPC: {_grpc_addr} [{'ONLINE' if _grpc_ok else 'OFFLINE'}]")
     print(f"  Close window to stop")
     print("=" * 50)
 
