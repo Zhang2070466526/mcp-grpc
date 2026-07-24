@@ -17,46 +17,93 @@ a = Analysis(
         (str(root / 'scripts' / 'chat_client.html'), 'scripts'),
     ],
     hiddenimports=[
-        'servers', 'servers.eda', 'servers.turbocharts',
-        'servers.eda.config', 'servers.eda.grpc_client',
-        'servers.eda.project_manage', 'servers.eda.simulation',
-        'servers.eda.design_export', 'servers.eda.model_replace',
-        'servers.turbocharts.compare_results', 'servers.eda.edi_launcher',
-        'servers.registry_server', 'servers.turbocharts.convert_raw', 'servers.turbocharts.compare_results',
+        # MCP 核心
+        'servers.mcp_instance',
+        'servers.registry_server',
+        'servers.web_routes',
+
+        # EDA 工具
+        'servers.eda',
+        'servers.eda.config',
+        'servers.eda.grpc_client',
+        'servers.eda.project_manage',
+        'servers.eda.simulation',
+        'servers.eda.design_export',
+        'servers.eda.model_replace',
+        'servers.eda.edi_launcher',
+
+        # TurboCharts 工具
+        'servers.turbocharts',
         'servers.turbocharts.config',
-        'proto', 'proto.ecserver_pb2', 'proto.ecserver_pb2_grpc',
-        'grpc', 'grpc._cython',
-        'matplotlib', 'matplotlib.backends.backend_agg',
-        'numpy', 'numpy.core._methods',
+        'servers.turbocharts.convert_raw',
+        'servers.turbocharts.compare_results',
+
+        # ANSYS 工具
+        'servers.ansys',
+        'servers.ansys.config',
+        'servers.ansys.project_manage',
+        'servers.ansys.run_analysis',
+
+        # Proto / gRPC
+        'proto',
+        'proto.ecserver_pb2',
+        'proto.ecserver_pb2_grpc',
+        'grpc',
+        'grpc._cython',
+
+        # 绘图（Agg 后端）
+        'matplotlib',
+        'matplotlib.backends.backend_agg',
+        'numpy',
+        'numpy.core._methods',
+
+        # 依赖
         'dotenv',
-        'starlette', 'uvicorn', 'uvicorn.loops', 'uvicorn.protocols',
+        'starlette',
+        'uvicorn',
+        'uvicorn.loops',
+        'uvicorn.protocols',
+
+        # Windows COM（ANSYS 依赖）
+        'pythoncom',
+        'pywintypes',
+        'win32com',
+        'win32com.client',
     ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[
-        'tkinter', 'IPython', 'jupyter', 'notebook',
-        'matplotlib.tests', 'numpy.tests',
+        'tkinter',
+        'PyQt5', 'PyQt6',
+        'PySide2', 'PySide6',
+        'wx',
+        'IPython', 'jupyter', 'notebook',
+        'matplotlib.tests',
+        'numpy.tests',
     ],
+    hooksconfig={
+        'matplotlib': {
+            'backends': ['Agg'],
+        },
+    },
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='eda_mcp_server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=True,
     disable_windowed_traceback=False,
 )
@@ -64,10 +111,8 @@ exe = EXE(
 coll = COLLECT(
     exe,
     a.binaries,
-    a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
-    upx_exclude=[],
+    upx=False,
     name='eda-mcp',
 )

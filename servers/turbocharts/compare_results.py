@@ -12,12 +12,11 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from servers.turbocharts.config import run_turbocharts
 from servers.mcp_instance import mcp
-
-matplotlib.use("Agg")
 
 
 @mcp.tool()
