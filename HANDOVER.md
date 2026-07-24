@@ -29,6 +29,7 @@ servers/
   turbocharts/
     config.py            # 公共函数（run_turbocharts）
     convert_raw.py       # RAW 转图（1 工具）
+  chat_service.py         # 聊天服务（会话/LLM/工具闭环）
   image_tools.py          # 图片工具（1 工具）
   web_routes.py          # Web 路由（/health, /chat, /ui）
 start_servers.py         # 一键启动入口
@@ -47,7 +48,7 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 
 ## MCP 工具清单（24 个）
 
-**工程管理**：list_epp_projects, open_eda_project, close_eda_project, list_project_components, get_component_parameters, get_project_summary
+**工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary
 
 **仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist_with_ads, compare_simulation_results
 

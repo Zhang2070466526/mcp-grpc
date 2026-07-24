@@ -18,6 +18,7 @@
             --yellow: #e0af68;
             --border: #3b4261;
             --shadow: rgba(0, 0, 0, .3);
+            --radius: 6px;
         }
 
         @media (prefers-color-scheme: light) {
@@ -37,11 +38,7 @@
             }
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box }
 
         body {
             font-family: system-ui, -apple-system, Segoe UI, sans-serif;
@@ -52,7 +49,7 @@
             overflow: hidden
         }
 
-        /* sidebar tools */
+        /* ── Sidebar ── */
         .panel {
             width: 260px;
             background: var(--surface);
@@ -62,11 +59,7 @@
             overflow: hidden;
             transition: width .3s
         }
-
-        .panel.collapsed {
-            width: 0
-        }
-
+        .panel.collapsed { width: 0 }
         .panel-head {
             padding: 14px 16px;
             border-bottom: 1px solid var(--border);
@@ -74,313 +67,147 @@
             align-items: center;
             justify-content: space-between
         }
-
-        .panel-head h2 {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--subtext)
-        }
-
-        .panel-head button {
-            background: none;
-            border: none;
-            color: var(--muted);
-            cursor: pointer;
-            font-size: 16px
-        }
-
-        .tools-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px
-        }
-
+        .panel-head h2 { font-size: 13px; font-weight: 600; color: var(--subtext) }
+        .panel-head button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px }
+        .tools-list { flex: 1; overflow-y: auto; padding: 8px }
         .tool-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 11px;
-            color: var(--text);
-            cursor: default
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px; border-radius: var(--radius);
+            font-size: 11px; color: var(--text); cursor: default
         }
-
-        .tool-item:hover {
-            background: var(--overlay)
-        }
-
-        .tool-item .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            flex-shrink: 0
-        }
-
-        .tool-item .dot.on {
-            background: var(--green)
-        }
-
-        .tool-item .dot.off {
-            background: var(--red)
-        }
-
-        .tool-item .dot.file {
-            background: var(--blue)
-        }
-
-        .tool-item .name {
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap
-        }
-
+        .tool-item:hover { background: var(--overlay) }
+        .tool-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0 }
+        .tool-item .dot.on { background: var(--green) }
+        .tool-item .dot.off { background: var(--red) }
+        .tool-item .dot.file { background: var(--blue) }
+        .tool-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
         .cat-label {
-            font-size: 10px;
-            color: var(--muted);
-            font-weight: 600;
-            padding: 10px 10px 4px;
-            text-transform: uppercase;
-            letter-spacing: .5px
+            font-size: 10px; color: var(--muted); font-weight: 600;
+            padding: 10px 10px 4px; text-transform: uppercase; letter-spacing: .5px
         }
 
-        /* main chat */
-        .main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden
-        }
+        /* ── Main ── */
+        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden }
 
+        /* ── Top bar ── */
         .top {
             background: var(--surface);
-            padding: 12px 20px;
+            padding: 10px 20px;
             border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 10px
+            display: flex; align-items: center; gap: 10px
         }
-
-        .hamburger {
-            background: none;
-            border: none;
-            color: var(--text);
-            cursor: pointer;
-            font-size: 18px
-        }
-
+        .hamburger { background: none; border: none; color: var(--text); cursor: pointer; font-size: 18px }
         .top .logo {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
+            width: 28px; height: 28px; border-radius: var(--radius);
             background: linear-gradient(135deg, var(--blue), #bb9af7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            font-weight: 700;
-            color: #fff
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 700; color: #fff
         }
-
-        .top .title {
-            font-size: 14px;
-            font-weight: 600
+        .top .title { font-size: 14px; font-weight: 600 }
+        .top .context-bar {
+            margin-left: auto;
+            display: flex; align-items: center; gap: 10px;
+            font-size: 11px; color: var(--subtext)
         }
-
-        .top .sub {
-            font-size: 10px;
-            color: var(--muted);
-            margin-left: auto
+        .top .context-bar .dot { width: 6px; height: 6px; border-radius: 50% }
+        .top .context-bar .dot.online { background: var(--green) }
+        .top .context-bar .dot.offline { background: var(--red) }
+        .btn-new {
+            background: var(--overlay); border: 1px solid var(--border);
+            color: var(--text); font-size: 11px; padding: 3px 10px;
+            border-radius: var(--radius); cursor: pointer
         }
+        .btn-new:hover { background: var(--muted); color: #fff }
 
+        /* ── Messages ── */
         .msgs {
-            flex: 1;
-            overflow-y: auto;
+            flex: 1; overflow-y: auto;
             padding: 16px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
+            display: flex; flex-direction: column; gap: 14px;
             scroll-behavior: smooth
         }
-
-        .msg {
-            display: flex;
-            gap: 8px;
-            max-width: 85%;
-            animation: in .2s ease-out
-        }
-
-        @keyframes in {
-            from {
-                opacity: 0;
-                transform: translateY(6px)
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0)
-            }
-        }
-
-        .msg.user {
-            align-self: flex-end;
-            flex-direction: row-reverse
-        }
-
-        .msg.assistant {
-            align-self: flex-start
-        }
-
+        .msg { display: flex; gap: 8px; max-width: 85%; animation: in .2s ease-out }
+        @keyframes in { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
+        .msg.user { align-self: flex-end; flex-direction: row-reverse }
+        .msg.assistant { align-self: flex-start }
         .msg .avatar {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 700
+            width: 28px; height: 28px; border-radius: var(--radius);
+            flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 700
         }
-
-        .msg.user .avatar {
-            background: var(--blue);
-            color: #fff
-        }
-
-        .msg.assistant .avatar {
-            background: var(--overlay);
-            color: var(--blue)
-        }
-
+        .msg.user .avatar { background: var(--blue); color: #fff }
+        .msg.assistant .avatar { background: var(--overlay); color: var(--blue) }
         .bubble {
-            padding: 9px 12px;
-            border-radius: 10px;
-            font-size: 13px;
-            line-height: 1.5;
-            white-space: pre-wrap;
-            word-break: break-word
+            padding: 9px 12px; border-radius: 10px;
+            font-size: 13px; line-height: 1.5;
+            white-space: pre-wrap; word-break: break-word
         }
-
-        .msg.user .bubble {
-            background: var(--blue);
-            color: #fff;
-            border-bottom-right-radius: 3px
-        }
-
+        .msg.user .bubble { background: var(--blue); color: #fff; border-bottom-right-radius: 3px }
         .msg.assistant .bubble {
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: var(--surface); border: 1px solid var(--border);
             border-bottom-left-radius: 3px
         }
 
-        .msg.toolcall .bubble {
-            background: var(--bg);
-            border: 1px dashed var(--yellow);
-            font-size: 11px;
-            color: var(--yellow)
+        /* ── Activities ── */
+        .activities { margin-top: 6px }
+        .activity {
+            font-size: 11px; border-radius: var(--radius);
+            background: var(--bg); border: 1px solid var(--border);
+            margin-bottom: 4px; overflow: hidden
         }
-
-        .bubble pre {
-            background: var(--bg);
-            padding: 8px 10px;
-            border-radius: 6px;
-            overflow-x: auto;
-            font-size: 11px;
-            margin: 4px 0;
-            border: 1px solid var(--border)
+        .activity-header {
+            display: flex; align-items: center; gap: 6px;
+            padding: 5px 10px; cursor: pointer; user-select: none
         }
-
-        .typing {
-            display: flex;
-            gap: 3px;
-            padding: 4px 0;
-            align-self: flex-start
+        .activity-header:hover { background: var(--overlay) }
+        .activity-header .status-icon { font-size: 12px }
+        .activity-header .status-icon.ok { color: var(--green) }
+        .activity-header .status-icon.err { color: var(--red) }
+        .activity-header .tool-label { flex: 1; font-weight: 500 }
+        .activity-header .duration { color: var(--muted); font-size: 10px }
+        .activity-header .expand { color: var(--muted); font-size: 10px }
+        .activity-body { display: none; padding: 6px 10px 10px 28px; border-top: 1px solid var(--border) }
+        .activity-body.open { display: block }
+        .activity-body pre {
+            background: var(--surface); padding: 6px 8px; border-radius: 4px;
+            overflow-x: auto; font-size: 10px; margin: 4px 0;
+            border: 1px solid var(--border); max-height: 120px
         }
+        .activity-body .label { font-size: 10px; color: var(--muted); margin-top: 4px }
+        .activity-body .error-text { color: var(--red); font-size: 10px }
 
-        .typing span {
-            width: 6px;
-            height: 6px;
-            background: var(--muted);
-            border-radius: 50%;
-            animation: wave 1.4s infinite
-        }
+        /* ── Typing ── */
+        .typing { display: flex; gap: 3px; padding: 4px 0; align-self: flex-start }
+        .typing span { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; animation: wave 1.4s infinite }
+        .typing span:nth-child(2) { animation-delay: .2s }
+        .typing span:nth-child(3) { animation-delay: .4s }
+        @keyframes wave { 0%,60%,100%{opacity:.3} 30%{opacity:1} }
 
-        .typing span:nth-child(2) {
-            animation-delay: .2s
-        }
-
-        .typing span:nth-child(3) {
-            animation-delay: .4s
-        }
-
-        @keyframes wave {
-            0%, 60%, 100% {
-                opacity: .3
-            }
-            30% {
-                opacity: 1
-            }
-        }
-
-        .input-wrap {
-            padding: 10px 20px 14px;
-            background: var(--surface);
-            border-top: 1px solid var(--border)
-        }
-
+        /* ── Input ── */
+        .input-wrap { padding: 10px 20px 14px; background: var(--surface); border-top: 1px solid var(--border) }
         .input-row {
-            display: flex;
-            gap: 6px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 4px;
+            display: flex; gap: 6px; background: var(--bg);
+            border: 1px solid var(--border); border-radius: 10px; padding: 4px;
             transition: border-color .2s
         }
-
-        .input-row:focus-within {
-            border-color: var(--blue)
-        }
-
+        .input-row:focus-within { border-color: var(--blue) }
         .input-row textarea {
-            flex: 1;
-            background: none;
-            border: none;
-            color: var(--text);
-            font-size: 13px;
-            font-family: inherit;
-            resize: none;
-            outline: none;
-            padding: 6px;
-            min-height: 18px;
-            max-height: 100px
+            flex: 1; background: none; border: none; color: var(--text);
+            font-size: 13px; font-family: inherit; resize: none; outline: none;
+            padding: 6px; min-height: 18px; max-height: 100px
         }
-
         .input-row button {
-            background: var(--blue);
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            padding: 6px 16px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 600;
-            align-self: flex-end
+            background: var(--blue); color: #fff; border: none;
+            border-radius: var(--radius); padding: 6px 16px;
+            cursor: pointer; font-size: 13px; font-weight: 600; align-self: flex-end
         }
-
-        .input-row button:hover {
-            opacity: .85
-        }
-
-        .input-row button:disabled {
-            opacity: .4
-        }
+        .input-row button:hover { opacity: .85 }
+        .input-row button:disabled { opacity: .4 }
     </style>
 </head>
 <body>
 
-<!-- tools panel -->
+<!-- ── sidebar ── -->
 <div class="panel" id="panel">
     <div class="panel-head"><h2>TOOLS</h2>
         <button onclick="togglePanel()" title="collapse">&times;</button>
@@ -388,13 +215,16 @@
     <div class="tools-list" id="toolsList"></div>
 </div>
 
-<!-- chat area -->
+<!-- ── main ── -->
 <div class="main">
     <div class="top">
         <button class="hamburger" onclick="togglePanel()">&#9776;</button>
         <div class="logo">E</div>
         <div class="title">EDA Chat</div>
-        <div class="sub" id="status">loading...</div>
+        <div class="context-bar">
+            <span id="ctxStatus"></span>
+            <button class="btn-new" onclick="newSession()" title="开始新对话">新对话</button>
+        </div>
     </div>
     <div class="msgs" id="msgs">
         <div class="msg assistant">
@@ -405,17 +235,50 @@
     <div class="input-wrap">
         <div class="input-row">
             <textarea id="q" rows="1" placeholder="输入消息..."
-                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
             <button id="sendBtn" onclick="send()">&#10148;</button>
         </div>
     </div>
 </div>
 
 <script>
-    const URL = location.origin + "/chat", HLTH = location.origin + "/health";
+const CHAT_URL = location.origin + "/chat";
+const HLTH_URL = location.origin + "/health";
+const TOOLS_URL = location.origin + "/tools/list";
 
-    let tools = [], edaReady = false, tcReady = false;
+let tools = [], edaReady = false, tcReady = false;
 
+// ── Session ──
+let sessionId = localStorage.getItem("eda_chat_session_id");
+if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem("eda_chat_session_id", sessionId);
+}
+
+function newSession() {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem("eda_chat_session_id", sessionId);
+    let msgs = document.getElementById("msgs");
+    msgs.innerHTML = '';
+    addMsg("assistant", "新对话已开始。当前工程等信息已清空。");
+    updateContext({});
+}
+
+// ── Context bar ──
+function updateContext(ctx) {
+    let el = document.getElementById("ctxStatus");
+    let parts = [];
+    let online = edaReady;
+    parts.push(online ? "EDA 在线" : "EDA 离线");
+    if (ctx && ctx.current_project_name) {
+        parts.push("当前工程：" + ctx.current_project_name);
+    } else {
+        parts.push("未选择工程");
+    }
+    el.textContent = parts.join(" · ");
+}
+
+// ── Tool panel ──
 function catFor(name) {
     if (name.startsWith("list_") || name.startsWith("get_")) return "查询";
     if (name.startsWith("open_") || name.startsWith("close_")) return "工程";
@@ -425,16 +288,17 @@ function catFor(name) {
     if (name.startsWith("replace_")) return "模型";
     if (name.startsWith("launch_")) return "启动";
     if (name.startsWith("compare_") || name.startsWith("turbocharts_")) return "图表";
+    if (name.startsWith("show_")) return "图片";
     if (name.includes("hfss") || name.includes("aedt")) return "ANSYS";
     return "其他";
 }
 
 async function loadTools() {
     try {
-        let r = await fetch(location.origin+"/tools/list",{});
-        let data = await r.json(); tools = Array.isArray(data) ? data : (data.result?.tools || []);
-        document.getElementById("status").textContent = tools.length + " tools";
-    } catch(e) { document.getElementById("status").textContent = "offline"; }
+        let r = await fetch(TOOLS_URL);
+        let data = await r.json();
+        tools = Array.isArray(data) ? data : (data.result?.tools || []);
+    } catch(e) {}
     renderTools();
 }
 
@@ -447,7 +311,9 @@ function renderTools() {
         for (let t of h[cat]) {
             let cls = edaReady || tcReady ? "on" : "off";
             if (t.name.startsWith("list_") || t.name.startsWith("get_")) cls = "file";
-            html += '<div class="tool-item"><span class="dot ' + cls + '"></span><span class="name" title="' + (t.description||'') + '">' + t.name + '</span></div>';
+            let escapedName = t.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            let escapedDesc = (t.description||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            html += '<div class="tool-item"><span class="dot ' + cls + '"></span><span class="name" title="' + escapedDesc + '">' + escapedName + '</span></div>';
         }
     }
     el.innerHTML = html;
@@ -455,112 +321,146 @@ function renderTools() {
 
 async function checkHealth() {
     try {
-        let r = await fetch(location.origin+"/health"), d = await r.json();
+        let r = await fetch(HLTH_URL), d = await r.json();
         edaReady = d.eda_grpc_ready; tcReady = d.turbocharts_ready;
     } catch(e) {}
     renderTools();
 }
+
 function togglePanel() {
-        document.getElementById("panel").classList.toggle("collapsed");
-    }
+    document.getElementById("panel").classList.toggle("collapsed");
+}
 
-    // Chat functions
-    function add(role, text, html = false) {
-        let d = document.createElement("div"), av = document.createElement("div"), b = document.createElement("div");
-        d.className = "msg " + role;
-        av.className = "avatar";
-        b.className = "bubble";
-        if (role === "user") {
-            av.textContent = "U";
-            b.textContent = text
-        } else if (role === "toolcall") {
-            av.textContent = "T";
-            b.textContent = text
+// ── Chat ──
+function addMsg(role, text) {
+    let div = document.createElement("div"), av = document.createElement("div"), bub = document.createElement("div");
+    div.className = "msg " + role;
+    av.className = "avatar";
+    av.textContent = role === "user" ? "U" : "AI";
+    bub.className = "bubble";
+    bub.textContent = text;
+    div.append(av, bub);
+    document.getElementById("msgs").appendChild(div);
+    scrollDown();
+    return div;
+}
+
+function addActivityBubble(activities) {
+    let div = document.createElement("div"), av = document.createElement("div"), wrap = document.createElement("div");
+    div.className = "msg assistant";
+    av.className = "avatar";
+    av.textContent = "AI";
+    wrap.className = "bubble";
+    wrap.style.fontSize = "11px";
+
+    let header = document.createElement("div");
+    header.textContent = "工具执行详情：";
+    header.style.marginBottom = "4px";
+    header.style.color = "var(--subtext)";
+    wrap.appendChild(header);
+
+    let list = document.createElement("div");
+    list.className = "activities";
+
+    for (let a of activities) {
+        let item = document.createElement("div");
+        item.className = "activity";
+
+        let hdr = document.createElement("div");
+        hdr.className = "activity-header";
+        let ok = a.status === "success";
+        hdr.innerHTML = '<span class="status-icon ' + (ok ? 'ok' : 'err') + '">' + (ok ? '&#10003;' : '&#10007;') + '</span>' +
+            '<span class="tool-label">' + (a.label || a.tool) + '</span>' +
+            (a.duration_ms ? '<span class="duration">' + a.duration_ms + 'ms</span>' : '') +
+            '<span class="expand">&#9660;</span>';
+
+        let body = document.createElement("div");
+        body.className = "activity-body";
+        let bodyHtml = '';
+        if (a.tool) bodyHtml += '<div class="label">工具</div><div>' + a.tool.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
+        if (a.args && Object.keys(a.args).length) bodyHtml += '<div class="label">参数</div><pre>' + JSON.stringify(a.args, null, 2).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</pre>';
+        if (a.summary) bodyHtml += '<div class="label">摘要</div><div>' + a.summary.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
+        if (a.error) bodyHtml += '<div class="label">错误</div><div class="error-text">' + a.error.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
+        body.innerHTML = bodyHtml;
+
+        hdr.onclick = function() {
+            body.classList.toggle("open");
+            let arrow = hdr.querySelector(".expand");
+            arrow.textContent = body.classList.contains("open") ? "▲" : "▼";
+        };
+
+        item.append(hdr, body);
+        list.appendChild(item);
+    }
+    wrap.appendChild(list);
+    div.append(av, wrap);
+    document.getElementById("msgs").appendChild(div);
+    scrollDown();
+}
+
+function scrollDown() {
+    let m = document.getElementById("msgs");
+    m.scrollTo({top: m.scrollHeight, behavior: "smooth"});
+}
+
+function showTyping() {
+    let d = document.createElement("div");
+    d.className = "typing"; d.id = "typing";
+    for (let i = 0; i < 3; i++) { let s = document.createElement("span"); d.appendChild(s) }
+    document.getElementById("msgs").appendChild(d);
+    scrollDown();
+}
+
+function hideTyping() { document.getElementById("typing")?.remove(); }
+
+async function send() {
+    let q = document.getElementById("q"), m = q.value.trim();
+    if (!m) return;
+    q.value = ""; q.style.height = "auto";
+    addMsg("user", m);
+    showTyping();
+    document.getElementById("sendBtn").disabled = true;
+    try {
+        let r = await fetch(CHAT_URL, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({session_id: sessionId, message: m})
+        });
+        let d = await r.json();
+        hideTyping();
+
+        // 活动列表（折叠）
+        if (d.activities && d.activities.length) {
+            addActivityBubble(d.activities);
+        }
+
+        // 上下文更新
+        updateContext(d.context || {});
+
+        // 模型回复
+        if (d.reply) {
+            addMsg("assistant", d.reply);
+        } else if (d.error) {
+            addMsg("assistant", "错误: " + d.error);
         } else {
-            av.textContent = "AI";
-            if (html) {
-                b.innerHTML = text  // 仅用于自己生成的 JSON pre 格式
-            } else {
-                b.textContent = text
-            }
+            addMsg("assistant", "已完成。");
         }
-        d.append(av, b);
-        document.getElementById("msgs").appendChild(d);
-        scrollDown();
+    } catch (e) {
+        hideTyping();
+        addMsg("assistant", "请求失败: " + e.message);
     }
+    document.getElementById("sendBtn").disabled = false;
+}
 
-    function scrollDown() {
-        let m = document.getElementById("msgs");
-        m.scrollTo({top: m.scrollHeight, behavior: "smooth"});
-    }
+// ── Init ──
+document.getElementById("q").addEventListener("input", function () {
+    this.style.height = "auto";
+    this.style.height = Math.min(this.scrollHeight, 100) + "px";
+});
 
-    function showTyping() {
-        let d = document.createElement("div");
-        d.className = "typing";
-        d.id = "typing";
-        for (let i = 0; i < 3; i++) {
-            let s = document.createElement("span");
-            d.appendChild(s)
-        }
-        document.getElementById("msgs").appendChild(d);
-        scrollDown();
-    }
-
-    function hideTyping() {
-        document.getElementById("typing")?.remove();
-    }
-
-    async function send() {
-        let q = document.getElementById("q"), m = q.value.trim();
-        if (!m) return;
-        q.value = "";
-        q.style.height = "auto";
-        add("user", m);
-        showTyping();
-        document.getElementById("sendBtn").disabled = true;
-        try {
-            let r = await fetch(URL, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({message: m})
-            });
-            let d = await r.json();
-            hideTyping();
-            if (d.tool_call) {
-                let args = JSON.stringify(d.tool_args, null, 2);
-                add("toolcall", "Tool: <b>" + d.tool_call + "</b><br><pre>" + args.replace(/</g, "&lt;") + "</pre>");
-            }
-            if (d.reply) {
-                let formatted = d.reply;
-                try {
-                    let obj = JSON.parse(d.reply);
-                    if (typeof obj === "object") {
-                        formatted = "<pre>" + JSON.stringify(obj, null, 2).replace(/</g, "&lt;") + "</pre>";
-                        add("assistant", formatted, true);
-                        return
-                    }
-                } catch (e) {
-                }
-                add("assistant", formatted);
-            } else if (d.error) {
-                add("assistant", "Error: " + d.error)
-            } else {
-                add("assistant", "Done.")
-            }
-        } catch (e) {
-            hideTyping();
-            add("assistant", "Error: " + e.message)
-        }
-        document.getElementById("sendBtn").disabled = false;
-    }
-
-    document.getElementById("q").addEventListener("input", function () {
-        this.style.height = "auto";
-        this.style.height = Math.min(this.scrollHeight, 100) + "px";
-    });
-
-    loadTools();
-    setInterval(checkHealth, 30000);
+loadTools();
+checkHealth();
+setInterval(checkHealth, 30000);
 </script>
 </body>
 </html>

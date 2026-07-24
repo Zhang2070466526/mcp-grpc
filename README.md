@@ -47,7 +47,7 @@ uv run python start_servers.py
 输出示例：
 ```
 MCP 服务启动 [transport=sse, port=8026]
-已加载 24 个工具: list_epp_projects, open_eda_project, ...
+已加载 24 个工具: list_epp_projects, open_edi_project, ...
 地址: http://127.0.0.1:8026/sse
 INFO:     Uvicorn running on http://127.0.0.1:8026
 ```
@@ -109,8 +109,8 @@ uv run python start_servers.py --port 9000
 | 工具 | 说明 | 参数 |
 |---|---|---|
 | `list_epp_projects` | 扫描文件夹中的 .epp 工程 | `folder_path` |
-| `open_eda_project` | 打开 .epp 工程 | `project_path`, `timeout_seconds`（默认 60） |
-| `close_eda_project` | 关闭工程 | `project_path`, `need_save`（默认 false） |
+| `open_edi_project` | 打开 .epp 工程 | `project_path`, `timeout_seconds`（默认 60） |
+| `close_edi_project` | 关闭工程 | `project_path`, `need_save`（默认 false） |
 | `list_project_components` | 列出工程中所有元件 | `project_path`, `schematic_name`, `component_type`, `name_contains` |
 | `get_component_parameters` | 查询单个元件的全部参数 | `project_path`, `component_id`, `schematic_name`, `include_hidden` |
 | `get_project_summary` | 工程概览（元数据/原理图/仿真） | `project_path`, `include_component_types`, `include_latest_result` |
@@ -205,7 +205,10 @@ uv run python start_servers.py --port 9000
 │   └── ecserver_pb2_grpc.py
 ├── servers/
 │   ├── mcp_instance.py          # 全局 MCP 实例（装饰器注册）
-│   ├── registry_server.py       # 工具导入入口
+│   ├── registry_server.py       # 工具导入入口 + Web 路由注册
+│   ├── chat_service.py          # 聊天服务（会话管理/LLM 多轮调用/工具闭环）
+│   ├── web_routes.py            # Web 路由（/health /chat /ui /tools/list）
+│   ├── image_tools.py           # 图片工具 — show_image（1 工具）
 │   ├── eda/
 │   │   ├── config.py            # 配置 + validate_file + ProjectReader + S-expression
 │   │   ├── grpc_client.py       # gRPC 通信（带 EDA 全局锁）
@@ -214,16 +217,14 @@ uv run python start_servers.py --port 9000
 │   │   ├── design_export.py     # 网表/截图（2 工具）
 │   │   ├── model_replace.py     # 模型替换（1 工具）
 │   │   └── edi_launcher.py      # 启动 EDI（1 工具）
-│   └── turbocharts/
-│       ├── config.py             # 公共函数（run_turbocharts）
-│       ├── convert_raw.py        # RAW 转图（1 工具）
-│       └── compare_results.py    # 仿真对比（1 工具）
-│   └── image_tools.py            # 图片工具（1 工具）
-│   ├── web_routes.py            # Web 路由
-│   ├── ansys/                     # ANSYS 工具（6 个）
-│   │   ├── config.py              # 公共工具
-│   │   ├── project_manage.py      # 工程管理 + 信息查询
-│   │   └── run_analysis.py        # 异步仿真
+│   ├── turbocharts/
+│   │   ├── config.py             # 公共函数（run_turbocharts）
+│   │   ├── convert_raw.py        # RAW 转图（1 工具）
+│   │   └── compare_results.py    # 仿真对比（1 工具）
+│   └── ansys/                     # ANSYS 工具（6 个）
+│       ├── config.py              # 公共工具（进程检测/COM附着/锁文件）
+│       ├── project_manage.py      # 工程管理 + 信息查询
+│       └── run_analysis.py        # 异步仿真
 ├── start_servers.py              # 入口
 ├── tests/                       # 测试套件
 ├── scripts/

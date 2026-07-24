@@ -21,6 +21,7 @@ a = Analysis(
         'servers.mcp_instance',
         'servers.registry_server',
         'servers.web_routes',
+        'servers.chat_service',
 
         # EDA 工具
         'servers.eda',

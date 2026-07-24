@@ -1,8 +1,8 @@
 r"""EDA 工程管理工具。
 
 list_epp_projects             扫描文件夹中的所有 .epp 工程文件
-open_eda_project              打开 .epp 工程，等待返回成功或失败
-close_eda_project             关闭已打开的工程，可选择是否保存
+open_edi_project              打开 .epp 工程，等待返回成功或失败
+close_edi_project             关闭已打开的工程，可选择是否保存
 list_project_components       列出工程中的元件（不含完整参数）
 get_component_parameters      查询单个元件的完整参数列表
 get_project_summary           工程概览（元数据、原理图、仿真配置）
@@ -21,7 +21,7 @@ get_project_summary           工程概览（元数据、原理图、仿真配�
   component_id     元件 UUID（get_component_parameters）
   schematic_name   原理图名称，默认 main
   timeout_seconds  最长等待秒数，默认 60 秒
-  need_save        关闭前是否保存工程（close_eda_project），默认 False
+  need_save        关闭前是否保存工程（close_edi_project），默认 False
 """
 
 from __future__ import annotations
@@ -39,6 +39,8 @@ from servers.mcp_instance import mcp
 @mcp.tool()
 def list_epp_projects(folder_path: str) -> dict[str, Any]:
     """扫描指定文件夹，列出其中所有 .epp 工程文件（最多 1000 个）。"""
+    if not folder_path or not folder_path.strip():
+        raise ValueError("folder_path 不能为空，请提供要扫描的目录")
     root = Path(folder_path).expanduser()
     if not root.is_dir():
         raise FileNotFoundError(f"文件夹不存在: {folder_path}")
@@ -60,7 +62,7 @@ def list_epp_projects(folder_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def open_eda_project(
+def open_edi_project(
         project_path: str,
         timeout_seconds: int = 60,
 ) -> dict[str, Any]:
@@ -81,7 +83,7 @@ def open_eda_project(
 
 
 @mcp.tool()
-def close_eda_project(
+def close_edi_project(
         project_path: str,
         need_save: bool = False,
         timeout_seconds: int = 60,

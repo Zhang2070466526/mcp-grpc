@@ -10,7 +10,7 @@ def test_all_tools_registered():
     tools = list(mcp._tool_manager._tools.keys())
     assert len(tools) == 24, f"expected 24 tools, got {len(tools)}"
     required = [
-        "list_epp_projects", "open_eda_project", "close_eda_project",
+        "list_epp_projects", "open_edi_project", "close_edi_project",
         "list_project_components", "get_component_parameters", "get_project_summary",
         "simulate_project", "simulate_netlist_with_ads", "compare_simulation_results",
         "start_simulation_async", "get_simulation_async_status", "get_simulation_async_result",
