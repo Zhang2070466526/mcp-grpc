@@ -1,4 +1,6 @@
-# EDA MCP 服务
+# EDI MCP 服务
+
+[![PyPI](https://img.shields.io/pypi/v/edi-mcp?label=PyPI)](https://pypi.org/project/edi-mcp/)
 
 每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 26 个 MCP 工具，
 支持 **SSE** 和 **stdio** 两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
@@ -9,11 +11,23 @@
 
 ### 1. 安装
 
+**方式 A：PyPI（推荐）**
+
 ```powershell
+pip install edi-mcp
+```
+
+**方式 B：源码**
+
+```powershell
+git clone <repo-url>
+cd mcp-grpc
 uv sync
 ```
 
 ### 2. 配置 `.env`
+
+在项目根目录（或运行目录）创建 `.env` 文件：
 
 ```ini
 EDA_GRPC_SERVER=127.0.0.1:50055
@@ -40,16 +54,24 @@ LLM_MODEL=deepseek-chat
 **HTTP 模式（推荐）** — 多个本地客户端共享一个进程：
 
 ```powershell
+# PyPI 安装
+edi-mcp --transport sse
+
+# 源码运行
 cd D:\GitLabCode\mcp-grpc
 uv run python start_servers.py
 ```
 
 输出示例：
 ```
-MCP 服务启动 [transport=sse, port=8026]
-已加载 26 个工具: list_epp_projects, open_edi_project, ...
-地址: http://127.0.0.1:8026/sse
-INFO:     Uvicorn running on http://127.0.0.1:8026
+==================================================
+  EDI MCP v0.1.0
+  UI:   http://127.0.0.1:8026/ui
+  MCP:  http://127.0.0.1:8026/sse
+  Tools: 26 loaded
+  gRPC: 127.0.0.1:50055 [ONLINE]
+  Close window to stop
+==================================================
 ```
 
 启动后自动监听 `127.0.0.1:8026`：
@@ -64,6 +86,10 @@ INFO:     Uvicorn running on http://127.0.0.1:8026
 **stdio 模式** — 由 MCP 客户端管理进程生命周期，适合单客户端调试：
 
 ```powershell
+# PyPI 安装
+edi-mcp --transport stdio
+
+# 源码运行
 uv run python start_servers.py --transport stdio
 ```
 
@@ -71,7 +97,7 @@ uv run python start_servers.py --transport stdio
 
 **自定义端口**：
 ```powershell
-uv run python start_servers.py --port 9000
+edi-mcp --port 9000
 ```
 
 ---
@@ -287,11 +313,36 @@ uv run python tests/test_health.py
 uv run python tests/test_tool_registry.py
 ```
 
-### 打包
+### 运行完整测试套件
+
+```powershell
+uv run pytest -q -p no:cacheprovider
+```
+
+### 打包发布
+
+**PyPI 发布**（源码包）：
+
+首次需要创建 `.pypirc` 配置 PyPI 凭证（已加入 `.gitignore`，不会提交）：
+
+```ini
+[pypi]
+repository = https://upload.pypi.org/legacy/
+username = __token__
+password = pypi-xxxxxxxxxxxx
+```
+
+之后发布只需：
+```powershell
+uv build
+uv publish
+```
+
+**PyInstaller 打包**（免安装二进制包）：
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/edi-mcp/（含 edi_mcp_server.exe + start_server.bat + .env，约 137 MB）
+# 输出: dist/edi-mcp/（含 edi_mcp_server.exe + start_server.bat + .env，约 90 MB）
 ```
 
 ### 添加新工具

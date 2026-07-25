@@ -6,6 +6,7 @@ __pycache__/
 .claude/
 
 .env
+.pypirc
 logs/
 *.log
 dist/

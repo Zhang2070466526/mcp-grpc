@@ -37,7 +37,8 @@ tests/                   # 测试套件（5 个文件）
 scripts/                 # 打包脚本 + PyInstaller 配置
 .mcp.json                # Claude Code 配置
 .env                     # 环境变量（不提交 Git）
-pyproject.toml           # uv 项目配置
+pyproject.toml           # uv 项目配置 + PyPI 元数据
+LICENSE                  # MIT 许可证
 README.md                # 项目主文档
 HANDOVER.md              # 本文档
 ```
@@ -45,6 +46,8 @@ HANDOVER.md              # 本文档
 ## 技术栈
 
 Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protobuf >= 6.33.5 / python-dotenv
+
+PyPI: https://pypi.org/project/edi-mcp/
 
 ## MCP 工具清单（26 个）
 
@@ -108,9 +111,25 @@ uv run python tests/test_tool_registry.py
 
 ## 打包
 
+### PyPI（源码包）
+
+```powershell
+uv build
+uv publish
+```
+
+首次使用需创建 `.pypirc` 配置 PyPI 令牌（已加入 `.gitignore`）。
+
+发布后用户通过 `pip install edi-mcp` 安装，通过 `edi-mcp` 命令启动。
+
+### PyInstaller（免安装二进制包）
+
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/edi-mcp/（含 edi_mcp_server.exe + start_server.bat + .env，约 137 MB）
+# 输出: dist/edi-mcp/（含 edi_mcp_server.exe + start_server.bat + .env，约 90 MB）
+```
+
+目录型打包，复制 `dist/edi-mcp/` 到目标电脑后创建 `.env` 即可运行。
 ```
 
 ## 工具注册机制
@@ -165,6 +184,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 29. 仿真 task_id 和 client_uuid 由 MCP 侧生成，贯穿 FetchEvent → PerformAction → 状态/结果查询
 30. FetchEvent 必须在 PerformAction 之前建立（文档要求），否则 EDI 返回 external handler not ready
 31. `create_blank_epp` 纯本地文件操作，不依赖 gRPC。生成的 .epp 文件内容为 "EDI-PROJECT"
+32. PyPI 包 (`edi-mcp`) 仅含 Python 源码，不含 PyInstaller 二进制；Windows 专属（pywin32/COM）
 
 ## 维护人
 
