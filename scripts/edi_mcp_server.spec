@@ -14,14 +14,17 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(root / 'proto'), 'proto'),
-        (str(root / 'scripts' / 'chat_client.html'), 'scripts'),
+        (str(root / 'servers' / 'chat' / 'index.html'), 'servers/chat'),
     ],
     hiddenimports=[
         # MCP 核心
         'servers.mcp_instance',
         'servers.registry_server',
-        'servers.web_routes',
-        'servers.chat_service',
+
+        # Chat 模块
+        'servers.chat',
+        'servers.chat.service',
+        'servers.chat.routes',
 
         # EDA 工具
         'servers.eda',

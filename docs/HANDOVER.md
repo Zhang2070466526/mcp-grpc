@@ -15,32 +15,39 @@ D:\GitLabCode\mcp-grpc
 ```
 proto/                  # protobuf 协议文件
 servers/
-  registry_server.py    # 工具注册中心 + /health
-  eda/                  # EDA 工具（13 个）
-    __init__.py          # 公共 API + 工具清单
-    config.py            # 配置 + validate_file + ProjectReader + S-expression
-    grpc_client.py       # gRPC 通信层（带 EDA 全局锁）
-    project_manage.py    # 工程管理（7 工具）
-    simulation.py        # 仿真（2 工具）
-    design_export.py     # 网表/截图（2 工具）
-    model_replace.py     # 模型替换（1 工具）
-    edi_launcher.py      # 启动 EDI（1 工具）
-    compare_results.py   # 仿真对比（1 工具）
+  mcp_instance.py        # 全局 FastMCP 实例
+  registry_server.py     # 工具注册 + Web 路由注册
+  image_tools.py         # 图片工具（show_image）
+  eda/                   # EDI 工程工具（17 个）
+    __init__.py           # 公共 API + 工具清单
+    config.py             # 配置 + ProjectReader + S-expression
+    grpc_client.py        # gRPC 通信层（FetchEvent → PerformAction）
+    project_manage.py     # 工程管理（7 工具）
+    simulation.py         # 仿真（6 工具）
+    design_export.py      # 网表/截图（2 工具）
+    model_replace.py      # 模型替换（1 工具）
+    edi_launcher.py       # 启动 EDI（1 工具）
   turbocharts/
-    config.py            # 公共函数（run_turbocharts）
-    convert_raw.py       # RAW 转图（1 工具）
-  chat_service.py         # 聊天服务（会话/LLM/工具闭环）
-  image_tools.py          # 图片工具（1 工具）
-  web_routes.py          # Web 路由（/health, /chat, /ui）
+    config.py             # run_turbocharts（信号量串行）
+    convert_raw.py        # RAW 转图（1 工具）
+    compare_results.py    # 仿真对比（1 工具）
+  ansys/                  # ANSYS HFSS 工具（6 个）
+    config.py             # 进程检测/COM 附着/锁文件
+    project_manage.py     # 工程打开/关闭/启动/信息
+    run_analysis.py       # 异步仿真
+  chat/                   # 聊天模块
+    service.py            # 聊天服务（会话/LLM/工具闭环）
+    routes.py             # Web 路由（/health /chat /ui /tools/list）
+    index.html            # 聊天前端页面
 start_servers.py         # 一键启动入口
-tests/                   # 测试套件（5 个文件）
-scripts/                 # 打包脚本 + PyInstaller 配置
+tests/                   # 测试套件
+scripts/                 # 打包脚本 + PyInstaller 配置 + 启动脚本
+docs/                    # 文档（API 参考/交接/gRPC 协议）
 .mcp.json                # Claude Code 配置
 .env                     # 环境变量（不提交 Git）
 pyproject.toml           # uv 项目配置 + PyPI 元数据
 LICENSE                  # MIT 许可证
 README.md                # 项目主文档
-HANDOVER.md              # 本文档
 ```
 
 ## 技术栈

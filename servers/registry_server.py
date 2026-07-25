@@ -64,7 +64,7 @@ import servers.ansys.run_analysis         # noqa: F401
 import servers.image_tools                # noqa: F401
 
 # Web 路由
-from servers.web_routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
+from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
 from servers.image_tools import serve_image  # noqa: E402
 
 mcp.custom_route("/", methods=["GET"])(ui_page)

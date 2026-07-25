@@ -140,7 +140,7 @@ class TestPruneTasks:
 
 class TestChatSimContext:
     def test_last_task_id_saved(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s = svc._get_or_create("session-sim-ctx")
         svc._update_context(s, "start_simulation_async",
@@ -150,7 +150,7 @@ class TestChatSimContext:
         assert "sim-001" in s.simulation_task_ids
 
     def test_task_id_auto_fill(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s = svc._get_or_create("session-sim-fill")
         s.last_simulation_task_id = "sim-002"
@@ -159,7 +159,7 @@ class TestChatSimContext:
         assert args["task_id"] == "sim-002"
 
     def test_sim_ids_capped_at_20(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s = svc._get_or_create("session-sim-cap")
         for i in range(25):

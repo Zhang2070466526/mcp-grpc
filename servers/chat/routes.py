@@ -20,9 +20,9 @@ from servers.eda.config import EDA_GRPC_SERVER
 
 import sys as _sys
 if getattr(_sys, "frozen", False):
-    _CLIENT_HTML_PATH = Path(_sys._MEIPASS) / "scripts" / "chat_client.html"
+    _CLIENT_HTML_PATH = Path(_sys._MEIPASS) / "servers" / "chat" / "index.html"
 else:
-    _CLIENT_HTML_PATH = Path(__file__).resolve().parent.parent / "scripts" / "chat_client.html"
+    _CLIENT_HTML_PATH = Path(__file__).resolve().parent / "index.html"
 
 
 async def _check_tcp(endpoint: str) -> bool:
@@ -87,6 +87,6 @@ async def chat_endpoint(request: Request):
     if not message:
         return JSONResponse({"error": "message required"}, status_code=400)
 
-    from servers.chat_service import ChatService
+    from servers.chat.service import ChatService
     response = await ChatService.instance().chat(session_id, message)
     return JSONResponse(response.to_dict())

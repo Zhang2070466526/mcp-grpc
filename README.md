@@ -81,7 +81,7 @@ uv run python start_servers.py
 - `/health` 健康检查 — 返回 EDA gRPC 和 Turbocharts 状态
 - `/ui` 聊天客户端 — 自然语言驱动 26 个工具，带工具面板和系统主题
 - `/chat` 聊天 API — POST `{"message":"..."}` 返回 LLM + 工具执行结果
-- 聊天客户端文件：`scripts/chat_client.html`（独立 HTML，可单独分发）
+- 聊天客户端文件：`servers/chat/index.html`（与路由同目录）
 
 **stdio 模式** — 由 MCP 客户端管理进程生命周期，适合单客户端调试：
 
@@ -269,8 +269,10 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 ├── servers/
 │   ├── mcp_instance.py          # 全局 MCP 实例（装饰器注册）
 │   ├── registry_server.py       # 工具导入入口 + Web 路由注册
-│   ├── chat_service.py          # 聊天服务（会话管理/LLM 多轮调用/工具闭环）
-│   ├── web_routes.py            # Web 路由（/health /chat /ui /tools/list）
+│   ├── chat/                     # 聊天模块
+│   │   ├── service.py            # 聊天服务（会话/LLM/工具闭环）
+│   │   ├── routes.py             # Web 路由（/health /chat /ui /tools/list）
+│   │   └── index.html            # 聊天前端页面
 │   ├── image_tools.py           # 图片工具 — show_image（1 工具）
 │   ├── eda/
 │   │   ├── config.py            # 配置 + validate_file + ProjectReader + S-expression
@@ -288,13 +290,20 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 │       ├── config.py              # 公共工具（进程检测/COM附着/锁文件）
 │       ├── project_manage.py      # 工程管理 + 信息查询
 │       └── run_analysis.py        # 异步仿真
+├── docs/                         # 文档
+│   ├── API_REFERENCE.md           # API 参考
+│   ├── HANDOVER.md                # 交接文档
+│   ├── grpc接口调用.md             # gRPC 协议说明
+│   └── EDI系统接口与外部调用汇总.md  # EDI 接口汇总
 ├── start_servers.py              # 入口
 ├── tests/                       # 测试套件
 ├── scripts/
 │   ├── build.ps1                 # 打包脚本
+│   ├── run.bat                   # Windows 启动脚本
 │   └── edi_mcp_server.spec       # PyInstaller 配置
 ├── .mcp.json                    # Claude Code 配置
 ├── .env                         # 配置文件（不提交 Git）
+├── LICENSE                      # MIT 许可证
 └── pyproject.toml
 ```
 
@@ -394,5 +403,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 
 ### 相关文档
 
-- [交接文档](./HANDOVER.md) — 架构、技术栈、通信流程
-- [接口汇总](./EDI系统接口与外部调用汇总.md) — EDI 全量接口文档
+- [API 参考](./docs/API_REFERENCE.md) — 全部 26 个函数的参数、返回值、使用示例
+- [交接文档](./docs/HANDOVER.md) — 架构、技术栈、通信流程
+- [接口汇总](./docs/EDI系统接口与外部调用汇总.md) — EDI 全量接口文档
+- [gRPC 协议](./docs/grpc接口调用.md) — 底层 gRPC 调用说明

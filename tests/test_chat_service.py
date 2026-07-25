@@ -37,7 +37,7 @@ class TestSessionIsolation:
     """会话隔离测试。"""
 
     def test_different_sessions_have_separate_context(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s1 = svc._get_or_create("session-a")
         s2 = svc._get_or_create("session-b")
@@ -46,7 +46,7 @@ class TestSessionIsolation:
         assert s1.current_project_path != s2.current_project_path
 
     def test_reopen_same_session_keeps_context(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s1 = svc._get_or_create("session-keep")
         s1.current_project_path = "C:/keep.epp"
@@ -54,7 +54,7 @@ class TestSessionIsolation:
         assert s2.current_project_path == "C:/keep.epp"
 
     def test_open_close_clears_project(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s = svc._get_or_create("session-close")
         s.current_project_path = "C:/proj.epp"
@@ -71,22 +71,22 @@ class TestToolWhitelist:
     """工具白名单测试。"""
 
     def test_simulate_project_not_in_chat(self):
-        from servers.chat_service import CHAT_TOOL_MAP
+        from servers.chat.service import CHAT_TOOL_MAP
         assert "simulate_project" not in CHAT_TOOL_MAP, \
             "同步仿真不应出现在聊天工具中"
 
     def test_async_simulation_in_chat(self):
-        from servers.chat_service import CHAT_TOOL_MAP
+        from servers.chat.service import CHAT_TOOL_MAP
         assert "start_simulation_async" in CHAT_TOOL_MAP
         assert "get_simulation_async_status" in CHAT_TOOL_MAP
         assert "get_simulation_async_result" in CHAT_TOOL_MAP
 
     def test_show_image_in_chat(self):
-        from servers.chat_service import CHAT_TOOL_MAP
+        from servers.chat.service import CHAT_TOOL_MAP
         assert "show_image" in CHAT_TOOL_MAP
 
     def test_tool_map_and_schema_count_match(self):
-        from servers.chat_service import CHAT_TOOL_MAP, CHAT_TOOLS_SCHEMA
+        from servers.chat.service import CHAT_TOOL_MAP, CHAT_TOOLS_SCHEMA
         assert len(CHAT_TOOL_MAP) == len(CHAT_TOOLS_SCHEMA), \
             f"map={len(CHAT_TOOL_MAP)}, schema={len(CHAT_TOOLS_SCHEMA)}"
 
@@ -107,7 +107,7 @@ class TestContextUpdate:
     """上下文更新测试。"""
 
     def test_list_epp_projects_updates_last_projects(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s = svc._get_or_create("session-ctx-list")
         svc._update_context(s, "list_epp_projects",
@@ -117,7 +117,7 @@ class TestContextUpdate:
         assert len(s.last_projects) == 1
 
     def test_start_simulation_saves_task_id(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s = svc._get_or_create("session-ctx-sim")
         svc._update_context(s, "start_simulation_async",
@@ -126,7 +126,7 @@ class TestContextUpdate:
         assert s.last_simulation_task_id == "task-123"
 
     def test_no_current_project_prevents_simulation(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s = svc._get_or_create("session-no-proj")
         s.current_project_path = None
@@ -139,7 +139,7 @@ class TestSessionPrune:
     """会话清理测试。"""
 
     def test_expired_sessions_cleaned(self):
-        from servers.chat_service import ChatService
+        from servers.chat.service import ChatService
         svc = ChatService.instance()
         s = svc._get_or_create("session-old")
         s.updated_at = 0  # force expired
