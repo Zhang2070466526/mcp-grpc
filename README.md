@@ -102,6 +102,41 @@ edi-mcp --port 9000
 
 ---
 
+## 使用方式
+
+### 方式一：命令行启动服务
+
+```powershell
+edi-mcp --transport sse --port 8026
+```
+
+启动后访问 `http://127.0.0.1:8026/ui` 使用聊天界面，或连接 MCP 客户端。
+
+### 方式二：Python 调用工具函数
+
+```python
+from servers.eda.project_manage import list_epp_projects, create_blank_epp
+from servers.eda.simulation import simulate_project, start_simulation_async
+
+# 扫描工程
+r1 = list_epp_projects("C:/Users/JGL/Desktop")
+# r1: {"success": True, "count": 3, "projects": [...]}
+
+# 创建空白工程
+r2 = create_blank_epp("C:/Projects", "test")
+# r2: {"success": True, "project_path": "C:/Projects/test/test.epp"}
+
+# 启动异步仿真
+r3 = start_simulation_async("C:/Projects/test/test.epp")
+# r3: {"success": True, "task_id": "abc123...", "status": "QUEUED"}
+```
+
+### 方式三：MCP 客户端接入
+
+Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 26 个工具。无需写代码。
+
+---
+
 ## 客户端配置
 
 每台电脑的 `127.0.0.1` 都指向自己，服务和文件都在本机。
