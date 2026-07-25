@@ -35,7 +35,8 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 from servers.eda.project_manage import (  # noqa: E402
     open_edi_project, close_edi_project,
-    list_epp_projects, list_project_components,
+    list_epp_projects, create_blank_epp,
+    list_project_components,
     get_component_parameters, get_project_summary,
 )
 from servers.eda.simulation import (  # noqa: E402
@@ -64,6 +65,7 @@ _PRUNE_INTERVAL = 300    # 清理间隔 5 分钟
 # ---------------------------------------------------------------------------
 CHAT_TOOL_MAP: dict[str, Any] = {
     "list_epp_projects":              list_epp_projects,
+    "create_blank_epp":               create_blank_epp,
     "open_edi_project":               open_edi_project,
     "close_edi_project":              close_edi_project,
     "list_project_components":        list_project_components,
@@ -107,14 +109,15 @@ def _build_tools_schema() -> list[dict]:
     """构建聊天工具 schema，与 CHAT_TOOL_MAP 保持一致。"""
     return [
         _rtool("list_epp_projects", "扫描文件夹中的 .epp 工程文件", {"folder_path": "string"}),
+        _rtool("create_blank_epp", "创建空白的 .epp 工程", {"folder_path": "string", "project_name": "string"}),
         _rtool("open_edi_project", "打开 .epp 工程", {"project_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("close_edi_project", "关闭 EDA 工程", {"project_path": "string"}, {"need_save": "boolean"}),
         _rtool("list_project_components", "列出工程原理图中的元件", {"project_path": "string"}, {"schematic_name": "string", "component_type": "string", "name_contains": "string", "offset": "integer", "limit": "integer"}),
         _rtool("get_component_parameters", "查询单个元件的完整参数", {"project_path": "string", "component_id": "string"}, {"schematic_name": "string", "include_hidden": "boolean"}),
         _rtool("get_project_summary", "获取 .epp 工程完整概览", {"project_path": "string"}, {"include_component_types": "boolean", "include_latest_result": "boolean"}),
         _rtool("start_simulation_async", "异步启动 EDA 工程仿真，立即返回 task_id", {"project_path": "string"}, {"log_source": "string", "timeout_seconds": "integer"}),
-        _rtool("get_simulation_async_status", "查询异步仿真任务状态", {"task_id": "string"}),
-        _rtool("get_simulation_async_result", "获取已完成的异步仿真结果", {"task_id": "string"}),
+        _rtool("get_simulation_async_status", "查询仿真状态及已实时接收的 ads_output 日志", {"task_id": "string"}),
+        _rtool("get_simulation_async_result", "获取仿真结果；运行中返回当前日志，完成后返回完整 ads_output", {"task_id": "string"}),
         _rtool("capture_schematic", "截取原理图为图片", {"project_path": "string", "img_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("export_project_netlist", "查看/导出工程网表", {"project_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("replace_models_from_csv", "按 CSV 批量替换元件模型", {"project_path": "string", "csv_path": "string"}, {"timeout_seconds": "integer"}),
@@ -154,6 +157,7 @@ class ChatSession:
     last_folder_path: str | None = None
     last_projects: list[dict] = field(default_factory=list)
     last_simulation_task_id: str | None = None
+    simulation_task_ids: list[str] = field(default_factory=list)
     updated_at: float = field(default_factory=time.time)
     _last_fingerprint: str | None = field(default=None, repr=False)
 
@@ -188,7 +192,9 @@ _SYSTEM_PROMPT = (
     "1. 不得虚构文件路径、工程名称、元件或仿真结果。\n"
     "2. 工具必填参数缺失时，先询问用户，不要使用空字符串或猜测的路径调用。\n"
     "3. 如果提供了当前工程，\"当前工程\"\"这个工程\"均指该路径。\n"
-    "4. 执行仿真时优先调用 start_simulation_async，不要使用同步长时间等待工具。\n"
+    "4. 执行仿真时优先调用 start_simulation_async。仿真日志通过 FetchEvent 长连接增量推送，"\
+    "用户询问\"当前日志\"\"仿真输出\"\"失败原因\"时，使用最近一次 task_id 调用 "\
+    "get_simulation_async_result 获取 ads_output 分析。不得调用 LOG_EVENT，不得为查询日志重新启动仿真。\n"
     "5. 工具执行成功后，用自然语言概括结果，不要直接输出原始 JSON。\n"
     "6. 工具失败时说明失败原因和下一步，不要反复使用相同参数调用。\n"
     "7. 用户说\"第一个\"\"第二个\"时，根据最近一次工程列表解析。\n"
@@ -494,7 +500,7 @@ class ChatService:
                                               f"{key} 不能为空，请提供正确的 {key}")
 
         # 自动补齐 project_path
-        if tool_name not in ("list_epp_projects", "launch_edi", "compare_simulation_results",
+        if tool_name not in ("list_epp_projects", "create_blank_epp", "launch_edi", "compare_simulation_results",
                               "turbocharts_convert", "show_image", "simulate_netlist_with_ads",
                               "get_simulation_async_status", "get_simulation_async_result"):
             if not args.get("project_path"):
@@ -537,22 +543,32 @@ class ChatService:
             session.current_project_name = None
 
         elif tool_name == "start_simulation_async":
-            session.last_simulation_task_id = result.get("task_id")
+            task_id = result.get("task_id")
+            if task_id:
+                session.last_simulation_task_id = task_id
+                session.simulation_task_ids.append(task_id)
+                session.simulation_task_ids = session.simulation_task_ids[-20:]
 
     # ── 上下文导出 ──
 
     def _build_context(self, session: ChatSession) -> dict:
         sim_status = None
+        sim_ads_output = ""
+        sim_log_complete = False
         if session.last_simulation_task_id:
             try:
                 status_result = get_simulation_async_status(session.last_simulation_task_id)
                 sim_status = status_result.get("status")
+                sim_ads_output = status_result.get("ads_output", "")
+                sim_log_complete = status_result.get("log_complete", False)
             except Exception:
                 pass
         return {
             "current_project_name": session.current_project_name,
             "simulation_task_id": session.last_simulation_task_id,
             "simulation_status": sim_status,
+            "simulation_ads_output_tail": sim_ads_output[-2000:] if sim_ads_output else "",
+            "simulation_log_complete": sim_log_complete,
         }
 
     # ── 消息裁剪 ──
@@ -579,6 +595,7 @@ def _safe_json(raw: str) -> dict:
 
 _TOOL_LABELS: dict[str, str] = {
     "list_epp_projects": "扫描工程",
+    "create_blank_epp": "创建工程",
     "open_edi_project": "打开工程",
     "close_edi_project": "关闭工程",
     "list_project_components": "列出元件",

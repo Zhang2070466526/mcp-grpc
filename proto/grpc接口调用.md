@@ -48,6 +48,7 @@ enum EventType {
   CAPTURE_SCHEMATIC = 7;
   CLOSE_PROJECT = 8;
   CALL_SIMULATION_CONTROLLER = 9;
+  SIMULATE_NETLIST = 10;
 }
 ```
 
@@ -59,7 +60,8 @@ enum EventType {
 - `MODEL_REPLACE`：按 CSV 执行模型替换。
 - `CAPTURE_SCHEMATIC`：截图保存原理图图片。
 - `CLOSE_PROJECT`：关闭工程，可选择是否保存工程。
-- 'CALL_SIMULATION_CONTROLLER':调用仿真
+- `CALL_SIMULATION_CONTROLLER`：直接调用 ADS 仿真器。
+- `SIMULATE_NETLIST`：仿真指定的 `netlist.log`，返回 RAW 结果和仿真器输出日志。
 
 ## 4. payload_json 示例
 
@@ -81,6 +83,16 @@ enum EventType {
 ```
 
 `log_source` 用于标识调用方日志来源。
+
+### SIMULATE_NETLIST
+
+```json
+{
+  "netlist_path": "C:/path/to/netlist.log"
+}
+```
+
+`netlist_path` 必须指向一个已经存在的文件。服务端会将网表复制到独立任务目录后再执行仿真，不会修改传入的原始网表。
 
 ### VIEW_PROJECT_NETLIST
 
@@ -119,12 +131,12 @@ enum EventType {
 
 `need_save` 表示关闭工程前是否保存。
 
-### SIMULATE
+### CALL_SIMULATION_CONTROLLER
 
 ```json
 {
   "netlist_path": "C:/path/to/netlist.log",
-  "ads_path": "C:/path/to/ADS2020"
+  "ads_path": "C:/Keysight/ADS"
 }
 ```
 
@@ -196,14 +208,97 @@ enum ResultStatus {
 事件中的 `payload_json` 也是 JSON 字符串。字段如下：
 
 - `OPEN_PROJECT`：`project_path`
-- `SIMULATE_PROJECT`：`project_path`、`result_path`
+- `SIMULATE_PROJECT`：`project_path`、`result_path`、`ads_output`
 - `VIEW_PROJECT_NETLIST`：`project_path`、`netlist_path`
 - `MODEL_REPLACE`：`project_path`
 - `CAPTURE_SCHEMATIC`：`project_path`、`img_path`
 - `CLOSE_PROJECT`：`project_path`、`need_save`
 - `LOG_EVENT`：`level`、`source`、`text`
+- `CALL_SIMULATION_CONTROLLER`：`netlist_path`、`ads_path`
+- `SIMULATE_NETLIST`：`netlist_path`、`result_path`、`ads_output`
 
-## 8. 注意事项
+## 8. SIMULATE_NETLIST 完整调用示例
+
+建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction` 提交任务。两次调用的 `client_uuid` 必须一致。
+
+### 8.1 PerformAction 请求
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-netlist-001",
+  "type": "SIMULATE_NETLIST",
+  "payload_json": "{\"netlist_path\":\"C:/test/netlist.log\"}"
+}
+```
+`PerformAction` 受理成功时返回：
+
+```json
+{
+  "code": 0,
+  "message": "task accepted",
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-netlist-001",
+  "event_type": "SIMULATE_NETLIST"
+}
+```
+
+### 8.2 FetchEvent 运行事件
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-netlist-001",
+  "event_type": "SIMULATE_NETLIST",
+  "status": "RESULT_STATUS_RUNNING",
+  "message": "task accepted",
+  "payload_json": "{\"netlist_path\":\"C:/test/netlist.log\"}"
+}
+```
+
+### 8.3 FetchEvent 成功事件
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-netlist-001",
+  "event_type": "SIMULATE_NETLIST",
+  "status": "RESULT_STATUS_SUCCESS",
+  "message": "netlist simulation finished",
+  "payload_json": "{\"netlist_path\":\"C:/test/netlist.log\",\"result_path\":\"C:/test/history/result.raw\",\"ads_output\":\"ADS simulator output...\"}"
+}
+```
+
+`payload_json` 解析后的业务对象为：
+
+```json
+{
+  "netlist_path": "C:/test/netlist.log",
+  "result_path": "C:/test/history/result.raw",
+  "ads_output": "ADS simulator output..."
+}
+```
+
+字段说明：
+
+- `netlist_path`：客户端传入的原始网表绝对路径。
+- `result_path`：复制完成后的 RAW 文件绝对路径，固定放在原网表同级的 `history/result.raw`。
+- `ads_output`：本次 ADS 仿真进程的标准输出和标准错误输出。日志只在最终成功或失败事件中统一返回。
+
+### 8.4 服务端文件处理流程
+
+假设程序目录为 `C:/Program Files/EDI`，请求中的 `task_id` 为 `postman-netlist-001`：
+
+1. 创建临时目录 `C:/Program Files/EDI/simulation/postman-netlist-001/`。
+2. 将传入的网表复制为该目录下的 `netlist.log`。
+3. 在临时目录执行 ADS 仿真并生成 `result.raw`。
+4. 将结果复制到原网表目录的 `history/result.raw`，存在旧文件时覆盖。
+5. 将复制后的 `history/result.raw` 绝对路径写入最终事件的 `result_path`。
+6. 删除临时目录 `simulation/postman-netlist-001/`。
+
+如果仿真、RAW 复制或临时目录清理失败，最终状态为 `RESULT_STATUS_FAILED`。失败事件仍包含已经收集到的 `ads_output`；未成功归档 RAW 时，`result_path` 为空字符串。
+
+## 9. 注意事项
 
 - `client_uuid`、`task_id`、`type` 必须填写。
 - `payload_json` 必须是合法 JSON 对象字符串。
@@ -212,4 +307,7 @@ enum ResultStatus {
 - `CAPTURE_SCHEMATIC` 必须提供图片输出路径。
 - `CLOSE_PROJECT` 使用 `project_path` 和 `need_save` 关闭工程。
 - 同一客户端会话内，提交任务和拉取事件应使用同一个 `client_uuid`。
-- 日志LOG_EVENT暂未支持。
+- `SIMULATE_NETLIST` 的 `netlist_path` 必须是已经存在的文件。
+- `SIMULATE_NETLIST` 的 `task_id` 只能包含英文字母、数字、下划线、点和连字符，且不能是 `.` 或 `..`。
+- `simulation/<task_id>` 已存在时任务会失败；每次调用应使用新的 `task_id`。
+- 独立的 `LOG_EVENT` 暂未支持；仿真器日志通过最终事件的 `ads_output` 返回。

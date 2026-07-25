@@ -58,7 +58,7 @@ def _setup_logging() -> None:
     root = logging.getLogger()
     root.addHandler(handler)
     root.setLevel(logging.INFO)
-    root.info("EDA MCP v0.1.0 starting")
+    root.info("EDI MCP v0.1.0 starting")
 
 
 def _run_http_server(port: int, transport: str = "streamable-http") -> None:
@@ -94,7 +94,7 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     _test.close()
 
     print("=" * 50)
-    print(f"  EDA MCP v0.1.0")
+    print(f"  EDI MCP v0.1.0")
     print(f"  UI:   http://{host}:{port}/ui")
     print(f"  MCP:  http://{host}:{port}/sse")
     print(f"  Tools: {len(tools)} loaded")

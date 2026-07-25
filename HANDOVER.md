@@ -20,7 +20,7 @@ servers/
     __init__.py          # 公共 API + 工具清单
     config.py            # 配置 + validate_file + ProjectReader + S-expression
     grpc_client.py       # gRPC 通信层（带 EDA 全局锁）
-    project_manage.py    # 工程管理（6 工具）
+    project_manage.py    # 工程管理（7 工具）
     simulation.py        # 仿真（2 工具）
     design_export.py     # 网表/截图（2 工具）
     model_replace.py     # 模型替换（1 工具）
@@ -46,11 +46,11 @@ HANDOVER.md              # 本文档
 
 Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protobuf >= 6.33.5 / python-dotenv
 
-## MCP 工具清单（24 个）
+## MCP 工具清单（26 个）
 
-**工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary
+**工程管理**：list_epp_projects, create_blank_epp, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary
 
-**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist_with_ads, compare_simulation_results
+**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist, simulate_netlist_with_ads, compare_simulation_results
 
 **ANSYS**：open_hfss_project（GetActiveObject附着/单启动）, close_hfss_project（COM优先+PID记录）, launch_aedt, get_hfss_project_info（纯查询不启动）
 
@@ -110,7 +110,7 @@ uv run python tests/test_tool_registry.py
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/eda-mcp/（含 eda_mcp_server.exe + start_server.bat + .env，约 137 MB）
+# 输出: dist/edi-mcp/（含 edi_mcp_server.exe + start_server.bat + .env，约 137 MB）
 ```
 
 ## 工具注册机制
@@ -148,7 +148,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 12. Windows HTTP 使用 SelectorEventLoop 避免 WinError 64
 13. `/health` 端点可区分 MCP 故障与 EDI 离线
 14. `compare_simulation_results` 使用 Matplotlib + numpy 做叠图插值
-15. 打包为目录型，复制 dist/eda-mcp/ 到目标电脑后创建 .env 即可运行
+15. 打包为目录型，复制 dist/edi-mcp/ 到目标电脑后创建 .env 即可运行
 16. 使用 SSE 传输模式（支持 /ui /health /chat /tools/list 自定义路由）
 17. 控制台启动时显示 gRPC 50055 端口状态
 18. 打包时自动过滤 LLM_API_KEY 等敏感配置，强制 MCP_TRANSPORT=sse
@@ -161,6 +161,10 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 25. 构建脚本增加体积阈值检查：目录 > 105 MB 或 ZIP > 80 MB 视为失败，EXE > 15 MB 告警重复打包
 26. Pillow AVIF/WebP 编码器已排除（节省约 7~8 MB），需通过 .spec excludes 控制，不可手动删除文件
 27. `show_image` 通过 MCP ImageContent 返回图片，客户端无需访问本地路径；仅限制格式/大小/UNC
+28. SIMULATE_PROJECT 的 ads_output 通过 FetchEvent 长连接增量推送，每个事件追加原样片段；最终 SUCCESS/FAILED 事件的片段同样追加；不 strip、不覆写
+29. 仿真 task_id 和 client_uuid 由 MCP 侧生成，贯穿 FetchEvent → PerformAction → 状态/结果查询
+30. FetchEvent 必须在 PerformAction 之前建立（文档要求），否则 EDI 返回 external handler not ready
+31. `create_blank_epp` 纯本地文件操作，不依赖 gRPC。生成的 .epp 文件内容为 "EDI-PROJECT"
 
 ## 维护人
 

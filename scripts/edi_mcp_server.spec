@@ -103,7 +103,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='eda_mcp_server',
+    name='edi_mcp_server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -118,5 +118,5 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name='eda-mcp',
+    name='edi-mcp',
 )

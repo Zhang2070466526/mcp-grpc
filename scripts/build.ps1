@@ -1,4 +1,4 @@
-# eda_mcp_server 打包脚本
+# edi_mcp_server 打包脚本
 $ErrorActionPreference = "Stop"
 Push-Location $PSScriptRoot\..
 $root = Get-Location
@@ -21,13 +21,13 @@ if ($LASTEXITCODE -ne 0) { Write-Host "TESTS FAILED" -ForegroundColor Red; Pop-L
 
 # ── [3/7] 构建 ──
 Write-Host "[3/7] Building with PyInstaller..." -ForegroundColor Yellow
-uv run pyinstaller --clean --noconfirm scripts/eda_mcp_server.spec
+uv run pyinstaller --clean --noconfirm scripts/edi_mcp_server.spec
 
 # ── [4/7] 验证产物 ──
 Write-Host "[4/7] Verifying artifacts..." -ForegroundColor Yellow
-$distDir = "$root\dist\eda-mcp"
-$exePath = "$distDir\eda_mcp_server.exe"
-$zipPath = "$root\dist\eda-mcp.zip"
+$distDir = "$root\dist\edi-mcp"
+$exePath = "$distDir\edi_mcp_server.exe"
+$zipPath = "$root\dist\edi-mcp.zip"
 
 if (-not (Test-Path $exePath)) {
     Write-Host "FAIL: $exePath not found" -ForegroundColor Red
@@ -64,7 +64,7 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 )
 Copy-Item -Force scripts/run.bat "$distDir\start_server.bat"
 Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
-Remove-Item -Force "$root\dist\eda_mcp_server.exe" -ErrorAction SilentlyContinue
+Remove-Item -Force "$root\dist\edi_mcp_server.exe" -ErrorAction SilentlyContinue
 
 # ── [7/7] 打包 ZIP ──
 Write-Host "[7/7] Creating archive..." -ForegroundColor Yellow
@@ -83,7 +83,7 @@ Write-Host ("EXE:        {0,7} MB" -f $exeSize)
 Write-Host ("Directory:  {0,7} MB" -f $dirSize)
 Write-Host ("ZIP:        {0,7} MB" -f $zipSize)
 Write-Host ("Files:      {0,7}"    -f $fileCount)
-Write-Host ("Tools:            23")
+Write-Host ("Tools:            26")
 Write-Host "--------------------------------" -ForegroundColor DarkGray
 
 if ($topFiles) {
@@ -111,5 +111,5 @@ if ($errors -gt 0) {
     Pop-Location; exit 1
 }
 
-Write-Host "Done. Output: dist/eda-mcp/ + dist/eda-mcp.zip" -ForegroundColor Green
+Write-Host "Done. Output: dist/edi-mcp/ + dist/edi-mcp.zip" -ForegroundColor Green
 Pop-Location

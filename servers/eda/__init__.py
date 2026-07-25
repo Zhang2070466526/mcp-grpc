@@ -1,7 +1,8 @@
 r"""EDI gRPC MCP 工具包 -- 通过 ExternalCall gRPC 操作 EDI 工程。
 
-project_manage.py  工程管理（6 个工具）
+project_manage.py  工程管理（7 个工具）
     list_epp_projects             扫描文件夹中的所有 .epp 工程文件
+    create_blank_epp              创建空白的 .epp 工程
     open_edi_project              打开 .epp 工程
     close_edi_project             关闭已打开的工程
     list_project_components       列出工程中的元件
@@ -9,10 +10,11 @@ project_manage.py  工程管理（6 个工具）
     get_project_summary           工程概览（元数据/原理图/仿真）
     help: 帮我看看有哪些 .epp 工程 / 打开工程 / 查看元件 / 获取概览
 
-simulation.py  仿真（2 个工具）
+simulation.py  仿真（3 个工具）
     simulate_project            对工程执行仿真
+    simulate_netlist            仿真网表文件，自动返回 RAW 结果
     simulate_netlist_with_ads   基于网表文件调用 ADS 仿真控制器
-    help: 帮我对工程执行仿真 / 帮我对 netlist.log 执行 ADS 仿真
+    help: 帮我对工程执行仿真 / 帮我对 netlist.log 执行仿真
 
 design_export.py  分析（2 个工具）
     export_project_netlist  查看/导出工程网表文件
@@ -31,6 +33,7 @@ edi_launcher.py  启动 EDI（1 个工具）
 # -- 工程管理 --
 from servers.eda.project_manage import (  # noqa: F401
     list_epp_projects,
+    create_blank_epp,
     open_edi_project,
     close_edi_project,
     list_project_components,
@@ -41,6 +44,7 @@ from servers.eda.project_manage import (  # noqa: F401
 # -- 仿真 --
 from servers.eda.simulation import (  # noqa: F401
     simulate_project,
+    simulate_netlist,
     simulate_netlist_with_ads,
     start_simulation_async,
     get_simulation_async_status,

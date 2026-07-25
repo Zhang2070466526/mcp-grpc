@@ -1,6 +1,6 @@
 # EDA MCP 服务
 
-每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 24 个 MCP 工具，
+每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 26 个 MCP 工具，
 支持 **SSE** 和 **stdio** 两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
 
 ---
@@ -47,7 +47,7 @@ uv run python start_servers.py
 输出示例：
 ```
 MCP 服务启动 [transport=sse, port=8026]
-已加载 24 个工具: list_epp_projects, open_edi_project, ...
+已加载 26 个工具: list_epp_projects, open_edi_project, ...
 地址: http://127.0.0.1:8026/sse
 INFO:     Uvicorn running on http://127.0.0.1:8026
 ```
@@ -57,7 +57,7 @@ INFO:     Uvicorn running on http://127.0.0.1:8026
 - EDI gRPC 操作由全局锁保证串行
 - Turbocharts 由信号量保证同一时间一个进程
 - `/health` 健康检查 — 返回 EDA gRPC 和 Turbocharts 状态
-- `/ui` 聊天客户端 — 自然语言驱动 24 个工具，带工具面板和系统主题
+- `/ui` 聊天客户端 — 自然语言驱动 26 个工具，带工具面板和系统主题
 - `/chat` 聊天 API — POST `{"message":"..."}` 返回 LLM + 工具执行结果
 - 聊天客户端文件：`scripts/chat_client.html`（独立 HTML，可单独分发）
 
@@ -102,13 +102,14 @@ uv run python start_servers.py --port 9000
 
 ---
 
-## 工具参考（24 个）
+## 工具参考（26 个）
 
 ### 工程管理
 
 | 工具 | 说明 | 参数 |
 |---|---|---|
 | `list_epp_projects` | 扫描文件夹中的 .epp 工程 | `folder_path` |
+| `create_blank_epp` | 创建空白 .epp 工程（文件夹+结构） | `folder_path`, `project_name` |
 | `open_edi_project` | 打开 .epp 工程 | `project_path`, `timeout_seconds`（默认 60） |
 | `close_edi_project` | 关闭工程 | `project_path`, `need_save`（默认 false） |
 | `list_project_components` | 列出工程中所有元件 | `project_path`, `schematic_name`, `component_type`, `name_contains` |
@@ -123,6 +124,7 @@ uv run python start_servers.py --port 9000
 | `start_simulation_async` | 启动异步仿真 | `project_path` | `log_source`、`timeout_seconds` |
 | `get_simulation_async_status` | 查询异步仿真状态 | `task_id` | - |
 | `get_simulation_async_result` | 获取异步仿真结果 | `task_id` | - |
+| `simulate_netlist` | 仿真网表，返回 RAW 结果 | `netlist_path` | `timeout_seconds`（默认 600） |
 | `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path` | `ads_path`、`timeout_seconds`（默认 120） |
 
 ### 导出与分析
@@ -212,8 +214,8 @@ uv run python start_servers.py --port 9000
 │   ├── eda/
 │   │   ├── config.py            # 配置 + validate_file + ProjectReader + S-expression
 │   │   ├── grpc_client.py       # gRPC 通信（带 EDA 全局锁）
-│   │   ├── project_manage.py    # 工程管理（6 工具）
-│   │   ├── simulation.py        # 仿真（5 工具）
+│   │   ├── project_manage.py    # 工程管理（7 工具）
+│   │   ├── simulation.py        # 仿真（6 工具）
 │   │   ├── design_export.py     # 网表/截图（2 工具）
 │   │   ├── model_replace.py     # 模型替换（1 工具）
 │   │   └── edi_launcher.py      # 启动 EDI（1 工具）
@@ -229,7 +231,7 @@ uv run python start_servers.py --port 9000
 ├── tests/                       # 测试套件
 ├── scripts/
 │   ├── build.ps1                 # 打包脚本
-│   └── eda_mcp_server.spec       # PyInstaller 配置
+│   └── edi_mcp_server.spec       # PyInstaller 配置
 ├── .mcp.json                    # Claude Code 配置
 ├── .env                         # 配置文件（不提交 Git）
 └── pyproject.toml
@@ -289,7 +291,7 @@ uv run python tests/test_tool_registry.py
 
 ```powershell
 powershell -File scripts/build.ps1
-# 输出: dist/eda-mcp/（含 eda_mcp_server.exe + start_server.bat + .env，约 137 MB）
+# 输出: dist/edi-mcp/（含 edi_mcp_server.exe + start_server.bat + .env，约 137 MB）
 ```
 
 ### 添加新工具
