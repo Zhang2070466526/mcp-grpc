@@ -34,13 +34,9 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from servers.eda.config import validate_file
+from servers.eda.config import validate_file, TURBOCHARTS_PATH
 from servers.turbocharts.config import run_turbocharts
 from servers.mcp_instance import mcp
-
-load_dotenv()
-
-TURBOCHARTS_PATH = os.getenv("TURBOCHARTS_PATH")
 
 @mcp.tool()
 def turbocharts_convert(

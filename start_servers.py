@@ -34,19 +34,22 @@ load_dotenv()
 DEFAULT_TRANSPORT = os.getenv("MCP_TRANSPORT","sse")
 # FastMCP 暴露的配置接口，底层用的 uvicorn.run(host="0.0.0.0")，0.0.0.0 = 这样就会监听本机所有网卡的所有 IP。
 DEFAULT_HOST = os.getenv("MCP_HOST","127.0.0.1")
-DEFAULT_PORT = int(os.getenv("MCP_PORT", "8026"))
+DEFAULT_PORT = int(os.getenv("MCP_PORT", "50026"))
 
 from servers.mcp_instance import mcp
 import servers.registry_server  #  — 触发工具注册
 
 
 def _setup_logging() -> None:
-    """按大小轮转的文件日志，写入 logs/mcp.log。"""
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
+    """按大小轮转的文件日志，写入 %TEMP%/edi/data/log/。"""
+    import tempfile as _tmp
+    from datetime import datetime as _dt
+    log_dir = Path(_tmp.gettempdir()) / "edi" / "data" / "log"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = f"edi_mcp_{_dt.now().strftime('%Y%m')}.log"
 
     handler = RotatingFileHandler(
-        log_dir / "mcp.log",
+        log_dir / log_file,
         maxBytes=10 * 1024 * 1024,
         backupCount=5,
         encoding="utf-8",
@@ -63,6 +66,11 @@ def _setup_logging() -> None:
 
 def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     """SSE / streamable-http 模式入口。"""
+    # 冻结模式无控制台时，重定向 stdout/stderr 避免 uvicorn 日志报错
+    if getattr(sys, "frozen", False) and sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+        sys.stderr = open(os.devnull, "w")
+
     host = DEFAULT_HOST or "127.0.0.1"
     if host != "127.0.0.1":
         print(f"WARNING: MCP_HOST={host} ignored, forcing 127.0.0.1 (local mode)")

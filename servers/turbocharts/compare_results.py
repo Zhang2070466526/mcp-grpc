@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from servers.eda.config import TURBOCHARTS_PATH
 from servers.turbocharts.config import run_turbocharts
 from servers.mcp_instance import mcp
 
@@ -47,11 +48,10 @@ def compare_simulation_results(
         alignment: 对齐方式，"intersection"(交集) 或 "interpolation"(插值)。
         reference_index: interpolation 模式下的参考文件索引。
     """
-    turbocharts_path = os.getenv("TURBOCHARTS_PATH")
-    if not Path(turbocharts_path).is_file():
+    if not Path(TURBOCHARTS_PATH).is_file():
         return {
             "success": False,
-            "message": f"turbocharts_app.exe 不存在: {turbocharts_path}",
+            "message": f"turbocharts_app.exe 不存在: {TURBOCHARTS_PATH}",
         }
 
     n = len(result_paths)
@@ -75,7 +75,7 @@ def compare_simulation_results(
         for i, rp in enumerate(result_paths):
             tmp_csv = os.path.join(tmpdir, f"tmp_{i}.csv")
             cmd = [
-                turbocharts_path,
+                TURBOCHARTS_PATH,
                 "--raw", rp,
                 "--csv", tmp_csv,
                 "--type", chart_type,

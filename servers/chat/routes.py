@@ -9,14 +9,12 @@ r"""Web 路由 — /health, /chat, /ui, /tools/list, /。
 from __future__ import annotations
 
 import asyncio
-import json as _json
-import os as _os
 from pathlib import Path
 
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 
-from servers.eda.config import EDA_GRPC_SERVER
+from servers.eda.config import EDA_GRPC_SERVER, TURBOCHARTS_PATH
 
 import sys as _sys
 if getattr(_sys, "frozen", False):
@@ -60,8 +58,7 @@ async def tool_list(request: Request):
 
 async def health_check(request: Request):
     eda_ready = await _check_tcp(EDA_GRPC_SERVER)
-    tc_path = _os.getenv("TURBOCHARTS_PATH", "")
-    turbocharts_ready = bool(tc_path) and Path(tc_path).is_file()
+    turbocharts_ready = bool(TURBOCHARTS_PATH) and Path(TURBOCHARTS_PATH).is_file()
     return JSONResponse({
         "status": "ok" if eda_ready else "degraded",
         "version": "0.1.0",

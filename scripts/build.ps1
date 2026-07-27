@@ -49,11 +49,13 @@ Write-Host "[6/7] Generating config + launcher..." -ForegroundColor Yellow
 $envContent = @"
 # EDA MCP configuration - edit paths for this computer
 EDA_GRPC_SERVER=127.0.0.1:50055
-EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe
-TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
+# EDI 可执行文件：留空自动检测（优先级 EDI.exe > EDA-PMDS.exe > CAIS.exe）
+EDI_PATH=
+# TurboCharts：留空自动检测（优先级 turbocharts_app.exe > TurboCharts.exe）
+TURBOCHARTS_PATH=
 MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
-MCP_PORT=8026
+MCP_PORT=50026
 "@
 $envPath = Join-Path $distDir ".env"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)

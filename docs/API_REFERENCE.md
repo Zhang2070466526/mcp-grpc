@@ -581,7 +581,7 @@ show_image(image_path: str) -> list
 
 返回 `[TextContent, ImageContent]`，其中 TextContent 包含可直接渲染的 Markdown：
 ```
-![image.png](http://127.0.0.1:8026/images/token)
+![image.png](http://127.0.0.1:50026/images/token)
 ```
 
 > 需要 MCP 服务在运行中才能访问 `/images/{token}` 路由。

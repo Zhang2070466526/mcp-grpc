@@ -24,8 +24,34 @@ from dotenv import load_dotenv
 load_dotenv()
 
 EDA_GRPC_SERVER = os.getenv("EDA_GRPC_SERVER")
-EDI_PATH = os.getenv("EDI_PATH")
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT")
+
+# ── 应用根目录检测 ──
+import sys as _sys
+
+if getattr(_sys, "frozen", False):
+    _APP_ROOT = Path(_sys.executable).parent.resolve()
+else:
+    _APP_ROOT = Path(__file__).resolve().parent.parent.parent  # servers/eda/ → servers/ → 项目根
+
+# ── EDI / TurboCharts 路径：优先 .env，否则自动检测 ──
+_PARENT = _APP_ROOT.parent
+
+_EDI_CANDIDATES = ["EDI.exe", "EDA-PMDS.exe", "CAIS.exe"]
+_TC_CANDIDATES = ["turbocharts_app.exe", "turbocharts.exe", "TurboCharts.exe"]
+
+
+def _find_first(*candidates: str) -> str:
+    """返回第一个存在的文件路径，都不存在则返回第一个候选名。"""
+    for name in candidates:
+        p = _PARENT / name
+        if p.is_file():
+            return str(p)
+    return str(_PARENT / candidates[0])
+
+
+EDI_PATH = os.getenv("EDI_PATH") or _find_first(*_EDI_CANDIDATES)
+TURBOCHARTS_PATH = os.getenv("TURBOCHARTS_PATH") or _find_first(*_TC_CANDIDATES)
 
 
 def validate_file(path: str, extensions: tuple[str, ...] = ()) -> str:

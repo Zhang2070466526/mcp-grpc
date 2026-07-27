@@ -41,7 +41,7 @@ _IMAGE_TOKENS: dict[str, dict[str, Any]] = {}
 
 def _base_url() -> str:
     host = os.getenv("MCP_HOST", "127.0.0.1")
-    port = os.getenv("MCP_PORT", "8026")
+    port = os.getenv("MCP_PORT", "50026")
     return f"http://{host}:{port}"
 
 

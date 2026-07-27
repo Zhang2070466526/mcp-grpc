@@ -78,11 +78,11 @@ PyPI: https://pypi.org/project/edi-mcp/
 
 ```
 EDA_GRPC_SERVER=127.0.0.1:50055
-EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe
-TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
+EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe    # 留空自动检测
+TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe  # 留空自动检测
 MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
-MCP_PORT=8026
+MCP_PORT=50026
 ```
 
 ## 启动方式

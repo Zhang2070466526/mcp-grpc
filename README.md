@@ -31,11 +31,12 @@ uv sync
 
 ```ini
 EDA_GRPC_SERVER=127.0.0.1:50055
+# EDI/TurboCharts 路径：留空自动检测 ../ 目录下的 EDI.exe/EDA-PMDS.exe/CAIS.exe
 EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe
 TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
 MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
-MCP_PORT=8026
+MCP_PORT=50026
 
 # 以下可选，用于聊天客户端 AI 对话
 LLM_API_KEY=sk-xxx
@@ -66,16 +67,16 @@ uv run python start_servers.py
 ```
 ==================================================
   EDI MCP v0.1.0
-  UI:   http://127.0.0.1:8026/ui
-  MCP:  http://127.0.0.1:8026/sse
+  UI:   http://127.0.0.1:50026/ui
+  MCP:  http://127.0.0.1:50026/sse
   Tools: 26 loaded
   gRPC: 127.0.0.1:50055 [ONLINE]
   Close window to stop
 ==================================================
 ```
 
-启动后自动监听 `127.0.0.1:8026`：
-- 所有本机客户端通过 `http://127.0.0.1:8026/sse` 连接
+启动后自动监听 `127.0.0.1:50026`：
+- 所有本机客户端通过 `http://127.0.0.1:50026/sse` 连接
 - EDI gRPC 操作由全局锁保证串行
 - Turbocharts 由信号量保证同一时间一个进程
 - `/health` 健康检查 — 返回 EDA gRPC 和 Turbocharts 状态
@@ -107,10 +108,10 @@ edi-mcp --port 9000
 ### 方式一：命令行启动服务
 
 ```powershell
-edi-mcp --transport sse --port 8026
+edi-mcp --transport sse --port 50026
 ```
 
-启动后访问 `http://127.0.0.1:8026/ui` 使用聊天界面，或连接 MCP 客户端。
+启动后访问 `http://127.0.0.1:50026/ui` 使用聊天界面，或连接 MCP 客户端。
 
 ### 方式二：Python 调用工具函数
 
@@ -144,7 +145,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 | 客户端 | 配置 |
 |---|---|
 | Claude Code | `.mcp.json` 已配置，`/mcp` 重载 |
-| OpenClaw / Web | 名称 `eda`，Streamable HTTP，`http://127.0.0.1:8026/sse` |
+| OpenClaw / Web | 名称 `eda`，Streamable HTTP，`http://127.0.0.1:50026/sse` |
 | 其他 stdio 客户端 | `uv --directory D:/GitLabCode/mcp-grpc run python start_servers.py --transport stdio` |
 
 其他 MCP 客户端通用配置：
@@ -313,7 +314,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 
 **端口被占用**
 ```powershell
-netstat -ano | findstr 8026          # 查看占用
+netstat -ano | findstr 50026          # 查看占用
 taskkill -f -pid <PID>               # 关闭进程
 ```
 
@@ -324,13 +325,13 @@ tasklist | findstr EDI.exe           # EDI 进程
 ```
 
 **启动失败**
-- 确认 `.env` 中 `EDA_GRPC_SERVER`、`EDI_PATH`、`TURBOCHARTS_PATH` 配置正确
+- 确认 `.env` 中 `EDA_GRPC_SERVER` 配置正确（`EDI_PATH`/`TURBOCHARTS_PATH` 留空则自动检测）
 - `uv sync` 确认依赖已安装
 - 确认 EDA gRPC 服务已启动
 
 **健康检查**
 ```
-curl http://127.0.0.1:8026/health
+curl http://127.0.0.1:50026/health
 # → {"status":"ok", "mcp_ready":true, "eda_grpc_ready":true}
 ```
 
@@ -403,6 +404,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 
 ### 相关文档
 
+- [部署指南](./docs/DEPLOY.md) — 打包产物使用 & 智能体 Claude Code / OpenClaw 配置
 - [API 参考](./docs/API_REFERENCE.md) — 全部 26 个函数的参数、返回值、使用示例
 - [交接文档](./docs/HANDOVER.md) — 架构、技术栈、通信流程
 - [接口汇总](./docs/EDI系统接口与外部调用汇总.md) — EDI 全量接口文档
