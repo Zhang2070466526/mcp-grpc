@@ -58,11 +58,35 @@ def _prune_tasks() -> None:
             del _sim_tasks[tid]
 
 
+def _task_completed(task: dict[str, Any]) -> bool:
+    """任务是否已结束（以 finished_at 为唯一依据）。"""
+    return task.get("finished_at") is not None
+
+
+def _task_log_complete(task: dict[str, Any]) -> bool:
+    """日志是否已完整接收。"""
+    result = task.get("result")
+    return bool(isinstance(result, dict) and result.get("log_complete", False))
+
+
 def _current_ads_output(task: dict) -> str:
     """获取当前日志：优先已完成的完整 result，否则拼接实时 chunk。"""
     if task.get("result") and isinstance(task["result"], dict):
         return task["result"].get("ads_output", "")
     return "".join(task.get("log_chunks", []))
+
+
+def _get_task_snapshot(task_id: str) -> dict[str, Any] | None:
+    """获取任务快照，避免并发修改问题。"""
+    with _sim_lock:
+        task = _sim_tasks.get(task_id)
+        if task is None:
+            return None
+        snapshot = dict(task)
+        snapshot["log_chunks"] = list(task.get("log_chunks", []))
+        result = task.get("result")
+        snapshot["result"] = dict(result) if isinstance(result, dict) else result
+        return snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +157,8 @@ def _run_sim_task(
             task["result"] = result
             task["error"] = None if result.get("success") else result.get("message")
             task["finished_at"] = time.time()
+            result["completed"] = True
+            result["task_success"] = result.get("status") == "SUCCEEDED"
             # 最终 result 已含完整拼接日志，清 chunk 避免双份
             task["log_chunks"] = []
 
@@ -148,7 +174,8 @@ def _run_sim_task(
             task["finished_at"] = time.time()
             task["result"] = {
                 "success": False,
-                "completed": False,
+                "completed": True,
+                "task_success": False,
                 "task_id": task_id,
                 "client_uuid": client_uuid,
                 "status": "FAILED",
@@ -228,25 +255,26 @@ def get_simulation_async_status(task_id: str) -> dict[str, Any]:
     运行中即可查询到实时日志。
     """
     _prune_tasks()
-
-    with _sim_lock:
-        task = _sim_tasks.get(task_id)
+    task = _get_task_snapshot(task_id)
 
     if task is None:
         return {
             "success": False,
+            "completed": True,
+            "task_success": False,
             "task_id": task_id,
             "status": "UNKNOWN",
-            "message": "仿真任务不存在或服务已经重启",
+            "message": "仿真任务不存在、已经过期或服务已经重启",
             "ads_output": "",
             "log_complete": False,
         }
 
-    completed = task["status"] in ("SUCCEEDED", "FAILED")
+    completed = _task_completed(task)
 
     return {
         "success": True,
         "completed": completed,
+        "task_success": task["status"] == "SUCCEEDED" if completed else None,
         "task_id": task_id,
         "client_uuid": task["client_uuid"],
         "status": task["status"],
@@ -254,7 +282,7 @@ def get_simulation_async_status(task_id: str) -> dict[str, Any]:
         "project_path": task["project_path"],
         "result_path": task["result_path"],
         "ads_output": _current_ads_output(task),
-        "log_complete": completed,
+        "log_complete": _task_log_complete(task),
         "created_at": task["created_at"],
         "started_at": task["started_at"],
         "finished_at": task["finished_at"],
@@ -269,20 +297,21 @@ def get_simulation_async_result(task_id: str) -> dict[str, Any]:
     完成后返回完整的仿真结果和日志。
     """
     _prune_tasks()
-
-    with _sim_lock:
-        task = _sim_tasks.get(task_id)
+    task = _get_task_snapshot(task_id)
 
     if task is None:
         return {
             "success": False,
-            "completed": False,
+            "completed": True,
+            "task_success": False,
             "task_id": task_id,
             "status": "UNKNOWN",
-            "message": "仿真任务不存在或服务已经重启",
+            "message": "仿真任务不存在、已经过期或服务已经重启",
             "ads_output": "",
             "log_complete": False,
         }
+
+    completed = _task_completed(task)
 
     # 已完成 — 返回完整 result
     if task["result"] is not None:
@@ -291,7 +320,8 @@ def get_simulation_async_result(task_id: str) -> dict[str, Any]:
     # 运行中 — 返回当前状态和部分日志
     return {
         "success": True,
-        "completed": False,
+        "completed": completed,
+        "task_success": None,
         "task_id": task_id,
         "client_uuid": task["client_uuid"],
         "status": task["status"],

@@ -59,9 +59,10 @@ async def tool_list(request: Request):
 async def health_check(request: Request):
     eda_ready = await _check_tcp(EDA_GRPC_SERVER)
     turbocharts_ready = bool(TURBOCHARTS_PATH) and Path(TURBOCHARTS_PATH).is_file()
+    from servers import __version__ as _ver
     return JSONResponse({
         "status": "ok" if eda_ready else "degraded",
-        "version": "0.1.0",
+        "version": _ver,
         "mcp_ready": True,
         "eda_grpc_ready": eda_ready,
         "turbocharts_ready": turbocharts_ready,

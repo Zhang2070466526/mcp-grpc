@@ -85,7 +85,7 @@ Write-Host ("EXE:        {0,7} MB" -f $exeSize)
 Write-Host ("Directory:  {0,7} MB" -f $dirSize)
 Write-Host ("ZIP:        {0,7} MB" -f $zipSize)
 Write-Host ("Files:      {0,7}"    -f $fileCount)
-Write-Host ("Tools:            26")
+Write-Host ("Tools:            25")
 Write-Host "--------------------------------" -ForegroundColor DarkGray
 
 if ($topFiles) {

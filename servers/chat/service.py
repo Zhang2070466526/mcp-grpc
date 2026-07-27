@@ -157,7 +157,6 @@ class ChatSession:
     last_simulation_task_id: str | None = None
     simulation_task_ids: list[str] = field(default_factory=list)
     updated_at: float = field(default_factory=time.time)
-    _last_fingerprint: str | None = field(default=None, repr=False)
 
 
 @dataclass
@@ -309,6 +308,7 @@ class ChatService:
         request_id = uuid.uuid4().hex[:12]
         session = self._get_or_create(session_id)
         activities: list[Activity] = []
+        called_fingerprints: set[str] = set()
         t_start = time.time()
 
         _logger.info("request=%s session=%s chat started msg_len=%d",
@@ -411,14 +411,12 @@ class ChatService:
                             act.result = validation_result
                             tool_result = validation_result
                         else:
-                            # 重复调用保护（在执行前检查，避免浪费资源）
-                            fingerprint = f"{tool_name}:{_json.dumps(validation_result, sort_keys=True, ensure_ascii=False)}"
-                            if fingerprint == session._last_fingerprint:
+                            # 重复调用保护 — 仅限本轮，下一条用户消息重置
+                            if _is_duplicate_tool_call(called_fingerprints, tool_name, validation_result):
                                 act.status = "error"
-                                act.error = "相同参数重复调用"
+                                act.error = "本轮对话中相同参数重复调用"
                                 tool_result = _tool_error("DUPLICATE_TOOL_CALL")
                             else:
-                                session._last_fingerprint = fingerprint
                                 try:
                                     func = CHAT_TOOL_MAP[tool_name]
                                     result = await asyncio.to_thread(func, **validation_result)
@@ -572,16 +570,41 @@ class ChatService:
     # ── 消息裁剪 ──
 
     def _trim_messages(self, session: ChatSession) -> None:
-        if len(session.messages) > _MAX_MESSAGES:
-            # 保留 system prompt + 最近的消息
-            system_msgs = [m for m in session.messages if m.get("role") == "system"]
-            rest = [m for m in session.messages if m.get("role") != "system"]
-            session.messages = system_msgs + rest[-(_MAX_MESSAGES - len(system_msgs)):]
+        """按完整轮次裁剪，不从 tool_calls 中间切断。"""
+        messages = session.messages
+        if len(messages) <= _MAX_MESSAGES:
+            return
+
+        system_msgs = [m for m in messages if m.get("role") == "system"]
+        conversation = [m for m in messages if m.get("role") != "system"]
+
+        # 从截断点向前查找最近的 user 消息边界
+        start = max(0, len(conversation) - _MAX_MESSAGES)
+        while start > 0 and conversation[start].get("role") != "user":
+            start -= 1
+
+        session.messages = system_msgs + conversation[start:]
 
 
 # ---------------------------------------------------------------------------
 # 辅助函数
 # ---------------------------------------------------------------------------
+
+def _is_duplicate_tool_call(
+    called: set[str],
+    tool_name: str,
+    arguments: dict[str, Any],
+) -> bool:
+    """检查本轮是否已用相同参数调用过该工具。"""
+    fingerprint = (
+        f"{tool_name}:"
+        f"{_json.dumps(arguments, sort_keys=True, ensure_ascii=False)}"
+    )
+    if fingerprint in called:
+        return True
+    called.add(fingerprint)
+    return False
+
 
 def _safe_json(raw: str) -> dict:
     try:

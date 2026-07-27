@@ -170,6 +170,35 @@ class TestChatSimContext:
         assert s.last_simulation_task_id == "sim-024"
 
 
+class TestCompletedSemantics:
+    """Bug 修复：completed 以 finished_at 为准。"""
+
+    def test_running_not_completed(self):
+        from servers.eda.simulation import _task_completed
+        task = {"status": "RUNNING", "finished_at": None}
+        assert not _task_completed(task)
+
+    def test_succeeded_is_completed(self):
+        from servers.eda.simulation import _task_completed
+        task = {"status": "SUCCEEDED", "finished_at": 100.0}
+        assert _task_completed(task)
+
+    def test_timeout_is_completed(self):
+        from servers.eda.simulation import _task_completed
+        task = {"status": "TIMEOUT", "finished_at": 100.0}
+        assert _task_completed(task)
+
+    def test_timeout_log_incomplete(self):
+        from servers.eda.simulation import _task_log_complete
+        task = {"result": {"log_complete": False}}
+        assert not _task_log_complete(task)
+
+    def test_succeeded_log_complete(self):
+        from servers.eda.simulation import _task_log_complete
+        task = {"result": {"log_complete": True}}
+        assert _task_log_complete(task)
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v", "-p", "no:cacheprovider"])

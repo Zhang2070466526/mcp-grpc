@@ -39,7 +39,7 @@ def run_turbocharts(
                 check=False,
             )
             if sys.platform == "win32":
-                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW  #	不显示命令行窗口（静默运行）
             return subprocess.run(list(command), **kwargs)
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError(

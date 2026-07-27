@@ -66,10 +66,10 @@ uv run python start_servers.py
 输出示例：
 ```
 ==================================================
-  EDI MCP v0.1.0
+  EDI MCP v0.1.2
   UI:   http://127.0.0.1:50026/ui
   MCP:  http://127.0.0.1:50026/sse
-  Tools: 26 loaded
+  Tools: 25 loaded
   gRPC: 127.0.0.1:50055 [ONLINE]
   Close window to stop
 ==================================================
@@ -116,20 +116,16 @@ edi-mcp --transport sse --port 50026
 ### 方式二：Python 调用工具函数
 
 ```python
-from servers.eda.project_manage import list_epp_projects, create_blank_epp
+from servers.eda.project_manage import list_epp_projects
 from servers.eda.simulation import simulate_project, start_simulation_async
 
 # 扫描工程
 r1 = list_epp_projects("C:/Users/JGL/Desktop")
 # r1: {"success": True, "count": 3, "projects": [...]}
 
-# 创建空白工程
-r2 = create_blank_epp("C:/Projects", "test")
-# r2: {"success": True, "project_path": "C:/Projects/test/test.epp"}
-
 # 启动异步仿真
-r3 = start_simulation_async("C:/Projects/test/test.epp")
-# r3: {"success": True, "task_id": "abc123...", "status": "QUEUED"}
+r2 = start_simulation_async("C:/Projects/test/test.epp")
+# r2: {"success": True, "task_id": "abc123...", "status": "QUEUED"}
 ```
 
 ### 方式三：MCP 客户端接入
@@ -145,7 +141,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 | 客户端 | 配置 |
 |---|---|
 | Claude Code | `.mcp.json` 已配置，`/mcp` 重载 |
-| OpenClaw / Web | 名称 `eda`，Streamable HTTP，`http://127.0.0.1:50026/sse` |
+| OpenClaw / Web | 名称 `eda`，SSE，`http://127.0.0.1:50026/sse` |
 | 其他 stdio 客户端 | `uv --directory D:/GitLabCode/mcp-grpc run python start_servers.py --transport stdio` |
 
 其他 MCP 客户端通用配置：
@@ -407,4 +403,4 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 - [API 参考](./docs/API_REFERENCE.md) — 全部 25 个函数的参数、返回值、使用示例
 - [交接文档](./docs/HANDOVER.md) — 架构、技术栈、通信流程
 - [接口汇总](./docs/EDI系统接口与外部调用汇总.md) — EDI 全量接口文档
-- [gRPC 协议](./docs/grpc接口调用.md) — 底层 gRPC 调用说明
+- [gRPC 协议](proto/grpc接口调用.md) — 底层 gRPC 调用说明

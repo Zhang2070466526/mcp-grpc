@@ -20,7 +20,6 @@ classifiers = [
 ]
 dependencies = [
     "grpcio>=1.81.0",
-    "grpcio-tools>=1.82.1",
     "httpx>=0.28",
     "matplotlib>=3.10",
     "mcp>=1.0.0",
@@ -46,6 +45,7 @@ package = true
 
 [dependency-groups]
 dev = [
+    "grpcio-tools>=1.82.1",
     "pyinstaller>=6.21.0",
     "pytest>=8.0",
 ]

@@ -42,42 +42,6 @@ list_epp_projects(folder_path: str) -> dict
 
 ---
 
-### `create_blank_epp`
-
-```python
-from servers.eda.project_manage import create_blank_epp
-
-create_blank_epp(folder_path: str, project_name: str) -> dict
-```
-
-创建空白 `.epp` 工程（纯本地文件操作，不依赖 gRPC）。
-
-| 参数 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `folder_path` | str | 是 | 目标父文件夹绝对路径 |
-| `project_name` | str | 是 | 工程名称（不含 `.epp` 后缀） |
-
-返回：
-```python
-{
-    "success": True,
-    "project_path": "C:/Projects/test/test.epp",
-    "project_name": "test"
-}
-```
-
-生成结构：
-```
-test/
-  test.epp          # 内容为 "EDI-PROJECT"
-  history/
-  project/
-  schematics/
-    main/
-```
-
----
-
 ### `open_edi_project`
 
 ```python
@@ -624,4 +588,4 @@ response = await svc.chat(session_id="abc123", message="打开第一个工程")
 }
 ```
 
-纯本地工具（`list_epp_projects`、`create_blank_epp`）使用各自的简化结构。
+纯本地工具（如 `list_epp_projects`）使用各自的简化结构。

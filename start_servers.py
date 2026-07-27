@@ -61,7 +61,8 @@ def _setup_logging() -> None:
     root = logging.getLogger()
     root.addHandler(handler)
     root.setLevel(logging.INFO)
-    root.info("EDI MCP v0.1.0 starting")
+    from servers import __version__ as _ver
+    root.info("EDI MCP v%s starting", _ver)
 
 
 def _run_http_server(port: int, transport: str = "streamable-http") -> None:
@@ -102,9 +103,11 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     _test.close()
 
     print("=" * 50)
-    print(f"  EDI MCP v0.1.0")
+    from servers import __version__ as _ver
+    print(f"  EDI MCP v{_ver}")
     print(f"  UI:   http://{host}:{port}/ui")
-    print(f"  MCP:  http://{host}:{port}/sse")
+    endpoint = "/mcp" if transport == "streamable-http" else "/sse"
+    print(f"  MCP:  http://{host}:{port}{endpoint}")
     print(f"  Tools: {len(tools)} loaded")
     print(f"  gRPC: {_grpc_addr} [{'ONLINE' if _grpc_ok else 'OFFLINE'}]")
     print(f"  Close window to stop")
@@ -128,7 +131,7 @@ def main() -> None:
         "--port",
         type=int,
         default=DEFAULT_PORT,
-        help=f"streamable-http 模式端口（默认: {DEFAULT_PORT}）",
+        help=f"HTTP 服务端口（默认: {DEFAULT_PORT}）",
     )
     args = parser.parse_args()
 

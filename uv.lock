@@ -427,7 +427,6 @@ version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "grpcio" },
-    { name = "grpcio-tools" },
     { name = "httpx" },
     { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -443,6 +442,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "grpcio-tools" },
     { name = "pyinstaller" },
     { name = "pytest" },
 ]
@@ -450,7 +450,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "grpcio", specifier = ">=1.81.0" },
-    { name = "grpcio-tools", specifier = ">=1.82.1" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "matplotlib", specifier = ">=3.10" },
     { name = "mcp", specifier = ">=1.0.0" },
@@ -463,6 +462,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "grpcio-tools", specifier = ">=1.82.1" },
     { name = "pyinstaller", specifier = ">=6.21.0" },
     { name = "pytest", specifier = ">=8.0" },
 ]

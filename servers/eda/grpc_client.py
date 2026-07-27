@@ -102,35 +102,6 @@ def _terminal_result(
     }
 
 
-def _non_terminal_result(
-    success: bool,
-    status: str,
-    message: str,
-    client_uuid: str,
-    task_id: str,
-    task_type_name: str,
-    project_path: str,
-    result_path: str,
-    ads_output: str,
-    log_complete: bool,
-    latest_details: dict[str, Any],
-) -> dict[str, Any]:
-    return {
-        "success": success,
-        "completed": False,
-        "client_uuid": client_uuid,
-        "task_id": task_id,
-        "task_type": task_type_name,
-        "status": status,
-        "message": message,
-        "project_path": project_path,
-        "result_path": result_path,
-        "ads_output": ads_output,
-        "log_complete": log_complete,
-        "details": latest_details,
-    }
-
-
 # ---------------------------------------------------------------------------
 # 公共接口
 # ---------------------------------------------------------------------------
@@ -168,13 +139,39 @@ def call_grpc(
     actual_task_id = task_id or str(uuid.uuid4())
     actual_client_uuid = client_uuid or str(uuid.uuid4())
 
-    with _EDA_LOCK:
+    deadline = time.monotonic() + timeout_seconds
+
+    acquired = _EDA_LOCK.acquire(timeout=timeout_seconds)
+    if not acquired:
+        return _terminal_result(
+            success=False, status="QUEUE_TIMEOUT",
+            message=f"等待 EDA 执行槽位超时（{timeout_seconds:.0f}s）",
+            client_uuid=actual_client_uuid, task_id=actual_task_id,
+            task_type_name=ecserver_pb2.EventType.Name(task_type),
+            project_path=payload.get("project_path", ""),
+            result_path="", ads_output="", log_complete=False,
+            latest_details={},
+        )
+    if time.monotonic() >= deadline:
+        _EDA_LOCK.release()
+        return _terminal_result(
+            success=False, status="QUEUE_TIMEOUT",
+            message=f"等待 EDA 执行槽位超时（{timeout_seconds:.0f}s）",
+            client_uuid=actual_client_uuid, task_id=actual_task_id,
+            task_type_name=ecserver_pb2.EventType.Name(task_type),
+            project_path=payload.get("project_path", ""),
+            result_path="", ads_output="", log_complete=False,
+            latest_details={},
+        )
+    try:
         return _call_grpc_unlocked(
-            task_type, payload, timeout_seconds,
+            task_type, payload, deadline,
             task_id=actual_task_id,
             client_uuid=actual_client_uuid,
             on_event=on_event,
         )
+    finally:
+        _EDA_LOCK.release()
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +181,7 @@ def call_grpc(
 def _call_grpc_unlocked(
     task_type: int,
     payload: dict[str, Any],
-    timeout_seconds: int,
+    deadline: float,
     *,
     task_id: str,
     client_uuid: str,
@@ -199,8 +196,9 @@ def _call_grpc_unlocked(
         payload_json=json.dumps(payload, ensure_ascii=False),
     )
 
-    deadline = time.monotonic() + timeout_seconds
+    started_at = time.monotonic()
     ads_output_chunks: list[str] = []
+    _given_timeout = max(0.0, deadline - started_at)
     latest_details: dict[str, Any] = {}
     event_stream = None
 
@@ -347,7 +345,7 @@ def _call_grpc_unlocked(
                 if event.status == ecserver_pb2.RESULT_STATUS_SUCCESS:
                     ads_output = "".join(ads_output_chunks)
                     _logger.info("task=%s phase=COMPLETED status=SUCCEEDED duration=%.1fs chunks=%d",
-                                 task_id[:12], time.monotonic() - (deadline - timeout_seconds), chunk_count)
+                                 task_id[:12], time.monotonic() - started_at, chunk_count)
                     return _terminal_result(
                         success=True, status="SUCCEEDED",
                         message=event.message or "simulation finished",
@@ -361,7 +359,7 @@ def _call_grpc_unlocked(
                 if event.status == ecserver_pb2.RESULT_STATUS_FAILED:
                     ads_output = "".join(ads_output_chunks)
                     _logger.info("task=%s phase=COMPLETED status=FAILED duration=%.1fs chunks=%d",
-                                 task_id[:12], time.monotonic() - (deadline - timeout_seconds), chunk_count)
+                                 task_id[:12], time.monotonic() - started_at, chunk_count)
                     return _terminal_result(
                         success=False, status="FAILED",
                         message=event.message or "simulation failed",
@@ -373,9 +371,9 @@ def _call_grpc_unlocked(
                     )
 
             # ── 流结束但无终态 ──
-            return _non_terminal_result(
+            return _terminal_result(
                 success=False, status="TIMEOUT",
-                message="等待最终事件超时",
+                message="MCP 已停止等待，EDI 端任务状态未知",
                 client_uuid=client_uuid, task_id=task_id,
                 task_type_name=task_type_name,
                 project_path=latest_details.get("project_path", payload.get("project_path", "")),
@@ -389,9 +387,9 @@ def _call_grpc_unlocked(
         code_enum = exc.code()
         if code_enum == grpc.StatusCode.DEADLINE_EXCEEDED:
             _logger.warning("task=%s phase=TIMEOUT", task_id[:12])
-            return _non_terminal_result(
+            return _terminal_result(
                 success=False, status="TIMEOUT",
-                message=f"仿真超时（{timeout_seconds}s）",
+                message=f"MCP 已停止等待（{_given_timeout:.0f}s），EDI 端任务状态未知",
                 client_uuid=client_uuid, task_id=task_id,
                 task_type_name=task_type_name,
                 project_path=latest_details.get("project_path", payload.get("project_path", "")),
@@ -402,7 +400,7 @@ def _call_grpc_unlocked(
         # 已有事件流时保留已收日志，返回 STREAM_DISCONNECTED
         if event_stream is not None:
             _logger.error("task=%s phase=STREAM_DISCONNECTED code=%s", task_id[:12], code)
-            return _non_terminal_result(
+            return _terminal_result(
                 success=False, status="STREAM_DISCONNECTED",
                 message=f"FetchEvent 长连接中断 ({code}): {exc.details() or exc}",
                 client_uuid=client_uuid, task_id=task_id,

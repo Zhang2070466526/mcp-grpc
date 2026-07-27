@@ -190,7 +190,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 28. SIMULATE_PROJECT 的 ads_output 通过 FetchEvent 长连接增量推送，每个事件追加原样片段；最终 SUCCESS/FAILED 事件的片段同样追加；不 strip、不覆写
 29. 仿真 task_id 和 client_uuid 由 MCP 侧生成，贯穿 FetchEvent → PerformAction → 状态/结果查询
 30. FetchEvent 必须在 PerformAction 之前建立（文档要求），否则 EDI 返回 external handler not ready
-31. `create_blank_epp` 纯本地文件操作，不依赖 gRPC。生成的 .epp 文件内容为 "EDI-PROJECT"
+31. `create_blank_epp` 暂不可用（已取消注册），函数代码保留，取消注释 @mcp.tool() 即可恢复
 32. PyPI 包 (`edi-mcp`) 仅含 Python 源码，不含 PyInstaller 二进制；Windows 专属（pywin32/COM）
 
 ## 维护人

@@ -1,6 +1,7 @@
 """测试聊天服务 — 参数校验、会话隔离、循环保护、工具白名单。"""
 import sys, time
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -147,6 +148,69 @@ class TestSessionPrune:
         svc._prune()
         s2 = svc._get_or_create("session-old")
         assert s2.updated_at > 0  # new session created
+
+
+class TestRepeatDetection:
+    """Bug 修复：重复调用仅限本轮。"""
+
+    def test_same_round_blocks(self):
+        from servers.chat.service import _is_duplicate_tool_call
+        called: set[str] = set()
+        args = {"project_path": "/p.epp"}
+        assert not _is_duplicate_tool_call(called, "open_edi_project", args)
+        assert _is_duplicate_tool_call(called, "open_edi_project", args)
+
+    def test_next_round_allows(self):
+        from servers.chat.service import _is_duplicate_tool_call
+        called1: set[str] = set()
+        called2: set[str] = set()
+        args = {"task_id": "t1"}
+        assert not _is_duplicate_tool_call(called1, "get_simulation_async_status", args)
+        assert not _is_duplicate_tool_call(called2, "get_simulation_async_status", args)
+
+
+class TestMessageTrim:
+    """Bug 修复：按 user 消息边界裁剪，调用实际生产代码。"""
+
+    def test_trim_starts_at_user(self, monkeypatch):
+        import servers.chat.service as svc_module
+        from servers.chat.service import ChatService, ChatSession
+
+        monkeypatch.setattr(svc_module, "_MAX_MESSAGES", 2)
+
+        session = ChatSession(session_id="trim-test-1")
+        session.messages = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "q1"},
+            {"role": "assistant", "content": "a1"},
+            {"role": "user", "content": "q2"},
+            {"role": "assistant", "content": "a2"},
+        ]
+
+        svc = ChatService.instance()
+        svc._trim_messages(session)
+
+        assert session.messages[0]["role"] == "system"
+        assert session.messages[1]["role"] == "user"
+        assert "q2" in session.messages[1]["content"]
+
+    def test_system_preserved(self, monkeypatch):
+        import servers.chat.service as svc_module
+        from servers.chat.service import ChatService, ChatSession
+
+        monkeypatch.setattr(svc_module, "_MAX_MESSAGES", 2)
+
+        session = ChatSession(session_id="trim-test-2")
+        session.messages = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "q"},
+            {"role": "assistant", "content": "a"},
+        ]
+
+        svc = ChatService.instance()
+        svc._trim_messages(session)
+
+        assert session.messages[0]["role"] == "system"
 
 
 if __name__ == "__main__":
