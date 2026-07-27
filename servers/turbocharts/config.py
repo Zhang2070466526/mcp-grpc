@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import threading
 from collections.abc import Sequence
 
@@ -31,13 +32,15 @@ def run_turbocharts(
 
     with _TURBOCHARTS_SEMAPHORE:
         try:
-            return subprocess.run(
-                list(command),
+            kwargs = dict(
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,
                 check=False,
             )
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+            return subprocess.run(list(command), **kwargs)
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError(
                 f"Turbocharts 执行超时（{timeout_seconds} 秒）"

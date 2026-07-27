@@ -35,7 +35,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 from servers.eda.project_manage import (  # noqa: E402
     open_edi_project, close_edi_project,
-    list_epp_projects, create_blank_epp,
+    list_epp_projects,
     list_project_components,
     get_component_parameters, get_project_summary,
 )
@@ -65,7 +65,6 @@ _PRUNE_INTERVAL = 300    # 清理间隔 5 分钟
 # ---------------------------------------------------------------------------
 CHAT_TOOL_MAP: dict[str, Any] = {
     "list_epp_projects":              list_epp_projects,
-    "create_blank_epp":               create_blank_epp,
     "open_edi_project":               open_edi_project,
     "close_edi_project":              close_edi_project,
     "list_project_components":        list_project_components,
@@ -109,7 +108,6 @@ def _build_tools_schema() -> list[dict]:
     """构建聊天工具 schema，与 CHAT_TOOL_MAP 保持一致。"""
     return [
         _rtool("list_epp_projects", "扫描文件夹中的 .epp 工程文件", {"folder_path": "string"}),
-        _rtool("create_blank_epp", "创建空白的 .epp 工程", {"folder_path": "string", "project_name": "string"}),
         _rtool("open_edi_project", "打开 .epp 工程", {"project_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("close_edi_project", "关闭 EDA 工程", {"project_path": "string"}, {"need_save": "boolean"}),
         _rtool("list_project_components", "列出工程原理图中的元件", {"project_path": "string"}, {"schematic_name": "string", "component_type": "string", "name_contains": "string", "offset": "integer", "limit": "integer"}),
@@ -500,7 +498,7 @@ class ChatService:
                                               f"{key} 不能为空，请提供正确的 {key}")
 
         # 自动补齐 project_path
-        if tool_name not in ("list_epp_projects", "create_blank_epp", "launch_edi", "compare_simulation_results",
+        if tool_name not in ("list_epp_projects", "launch_edi", "compare_simulation_results",
                               "turbocharts_convert", "show_image", "simulate_netlist_with_ads",
                               "get_simulation_async_status", "get_simulation_async_result"):
             if not args.get("project_path"):
@@ -595,7 +593,6 @@ def _safe_json(raw: str) -> dict:
 
 _TOOL_LABELS: dict[str, str] = {
     "list_epp_projects": "扫描工程",
-    "create_blank_epp": "创建工程",
     "open_edi_project": "打开工程",
     "close_edi_project": "关闭工程",
     "list_project_components": "列出元件",

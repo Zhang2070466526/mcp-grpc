@@ -8,10 +8,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 def test_all_tools_registered():
     from start_servers import mcp
     tools = list(mcp._tool_manager._tools.keys())
-    assert len(tools) == 26, f"expected 26 tools, got {len(tools)}"
+    assert len(tools) == 25, f"expected 25 tools, got {len(tools)}"
     required = [
         "list_epp_projects", "open_edi_project", "close_edi_project",
-        "create_blank_epp",
         "list_project_components", "get_component_parameters", "get_project_summary",
         "simulate_project", "simulate_netlist", "simulate_netlist_with_ads",
         "compare_simulation_results",

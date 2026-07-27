@@ -303,7 +303,7 @@ def get_project_summary(
     }
 
 
-@mcp.tool()
+# TODO: create_blank_epp 暂不可用，取消注释 @mcp.tool() 即可恢复注册
 def create_blank_epp(
     folder_path: str,
     project_name: str,

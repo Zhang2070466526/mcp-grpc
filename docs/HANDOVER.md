@@ -56,9 +56,9 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 
 PyPI: https://pypi.org/project/edi-mcp/
 
-## MCP 工具清单（26 个）
+## MCP 工具清单（25 个）
 
-**工程管理**：list_epp_projects, create_blank_epp, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary
+**工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary
 
 **仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist, simulate_netlist_with_ads, compare_simulation_results
 

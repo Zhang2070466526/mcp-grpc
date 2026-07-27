@@ -1,8 +1,7 @@
 r"""EDI gRPC MCP 工具包 -- 通过 ExternalCall gRPC 操作 EDI 工程。
 
-project_manage.py  工程管理（7 个工具）
+project_manage.py  工程管理（6 个工具）
     list_epp_projects             扫描文件夹中的所有 .epp 工程文件
-    create_blank_epp              创建空白的 .epp 工程
     open_edi_project              打开 .epp 工程
     close_edi_project             关闭已打开的工程
     list_project_components       列出工程中的元件
@@ -33,7 +32,6 @@ edi_launcher.py  启动 EDI（1 个工具）
 # -- 工程管理 --
 from servers.eda.project_manage import (  # noqa: F401
     list_epp_projects,
-    create_blank_epp,
     open_edi_project,
     close_edi_project,
     list_project_components,

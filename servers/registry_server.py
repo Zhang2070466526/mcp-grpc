@@ -1,11 +1,10 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（共 26 个）：
+  已注册工具（共 25 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
-    create_blank_epp              创建空白的 .epp 工程
     open_edi_project              打开 .epp 工程
     close_edi_project             关闭 .epp 工程
     list_project_components       列出工程中的元件

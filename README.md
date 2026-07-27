@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/edi-mcp?label=PyPI)](https://pypi.org/project/edi-mcp/)
 
-每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 26 个 MCP 工具，
+每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 25 个 MCP 工具，
 支持 **SSE** 和 **stdio** 两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
 
 ---
@@ -80,7 +80,7 @@ uv run python start_servers.py
 - EDI gRPC 操作由全局锁保证串行
 - Turbocharts 由信号量保证同一时间一个进程
 - `/health` 健康检查 — 返回 EDA gRPC 和 Turbocharts 状态
-- `/ui` 聊天客户端 — 自然语言驱动 26 个工具，带工具面板和系统主题
+- `/ui` 聊天客户端 — 自然语言驱动 25 个工具，带工具面板和系统主题
 - `/chat` 聊天 API — POST `{"message":"..."}` 返回 LLM + 工具执行结果
 - 聊天客户端文件：`servers/chat/index.html`（与路由同目录）
 
@@ -134,7 +134,7 @@ r3 = start_simulation_async("C:/Projects/test/test.epp")
 
 ### 方式三：MCP 客户端接入
 
-Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 26 个工具。无需写代码。
+Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 25 个工具。无需写代码。
 
 ---
 
@@ -164,14 +164,13 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 
 ---
 
-## 工具参考（26 个）
+## 工具参考（25 个）
 
 ### 工程管理
 
 | 工具 | 说明 | 参数 |
 |---|---|---|
 | `list_epp_projects` | 扫描文件夹中的 .epp 工程 | `folder_path` |
-| `create_blank_epp` | 创建空白 .epp 工程（文件夹+结构） | `folder_path`, `project_name` |
 | `open_edi_project` | 打开 .epp 工程 | `project_path`, `timeout_seconds`（默认 60） |
 | `close_edi_project` | 关闭工程 | `project_path`, `need_save`（默认 false） |
 | `list_project_components` | 列出工程中所有元件 | `project_path`, `schematic_name`, `component_type`, `name_contains` |
@@ -278,7 +277,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 │   ├── eda/
 │   │   ├── config.py            # 配置 + validate_file + ProjectReader + S-expression
 │   │   ├── grpc_client.py       # gRPC 通信（带 EDA 全局锁）
-│   │   ├── project_manage.py    # 工程管理（7 工具）
+│   │   ├── project_manage.py    # 工程管理（6 工具）
 │   │   ├── simulation.py        # 仿真（6 工具）
 │   │   ├── design_export.py     # 网表/截图（2 工具）
 │   │   ├── model_replace.py     # 模型替换（1 工具）
@@ -405,7 +404,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 ### 相关文档
 
 - [部署指南](./docs/DEPLOY.md) — 打包产物使用 & 智能体 Claude Code / OpenClaw 配置
-- [API 参考](./docs/API_REFERENCE.md) — 全部 26 个函数的参数、返回值、使用示例
+- [API 参考](./docs/API_REFERENCE.md) — 全部 25 个函数的参数、返回值、使用示例
 - [交接文档](./docs/HANDOVER.md) — 架构、技术栈、通信流程
 - [接口汇总](./docs/EDI系统接口与外部调用汇总.md) — EDI 全量接口文档
 - [gRPC 协议](./docs/grpc接口调用.md) — 底层 gRPC 调用说明
