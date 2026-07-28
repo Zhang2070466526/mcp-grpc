@@ -35,6 +35,7 @@ TURBOCHARTS_PATH=                    # 留空自动检测
 MCP_TRANSPORT=sse                    # sse（Web）或 stdio（本地）
 MCP_PORT=50026                       # 监听端口
 MCP_HOST=127.0.0.1                   # 监听地址
+OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace  # 手动填写，show_image工具需要
 LLM_API_KEY=sk-xxx                   # 可选：聊天 AI 功能
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
@@ -123,6 +124,14 @@ http://127.0.0.1:50026/health
 ---
 
 
+## OpenClaw 图片显示
+
+配置 `.env` 中的 `OPENCLAW_WORKSPACE` 为有效路径后，`show_image` 工具自动复制图片到工作区并返回 `MEDIA:` 指令，OpenClaw 可直接显示。未配置时返回本地路径供本机查看。
+
+> 不需要修改 `openclaw.json`，不需要 TOOLS.md，不需要 `[embed]`。
+
+---
+
 ## 常见问题
 
 **双击 exe 没反应？**
@@ -143,6 +152,14 @@ taskkill -f -pid <PID>
 ```powershell
 netstat -ano | findstr 50055
 ```
+
+**图片显示"不在聊天中显示"？**
+
+检查 `.env` 中 `OPENCLAW_WORKSPACE` 是否已配置为有效的 OpenClaw 工作区路径（如 `C:\Users\JGL\.openclaw\workspace`）。打包生成的 `.env` 默认为空，需要手动填写。
+
+**图片显示白屏或 Outside allowed folders？**
+
+不要使用 `[embed]` 或直接发送本地路径。让 Agent 调用 `show_image`，工具会自动复制到工作区并返回 `MEDIA:` 路径。
 
 **如何停止服务？**
 

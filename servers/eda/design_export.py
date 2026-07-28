@@ -16,6 +16,7 @@ capture_schematic     截取工程原理图并保存为图片
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from proto import ecserver_pb2
@@ -58,9 +59,13 @@ def capture_schematic(
         timeout_seconds: 最长等待时间，默认 60 秒。
     """
     resolved_path = validate_project_path(project_path)
-    return call_grpc(
+    result = call_grpc(
         ecserver_pb2.CAPTURE_SCHEMATIC,
         {"project_path": resolved_path, "img_path": img_path},
         timeout_seconds,
         max_timeout_seconds=300,
     )
+    img_ok = Path(img_path).is_file()
+    if img_ok:
+        result["img_generated"] = True
+    return result

@@ -38,7 +38,7 @@
     get_hfss_analysis_status      查询 HFSS 仿真状态
 
   图片：
-    show_image                    读取本地图片，返回 MCP ImageContent
+    show_image                    显示本地图片
 
   图表：
     compare_simulation_results    多 RAW 结果对比叠图

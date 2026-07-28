@@ -213,6 +213,117 @@ class TestMessageTrim:
         assert session.messages[0]["role"] == "system"
 
 
+class TestShowImage:
+    """show_image 工具测试。"""
+
+    def _setup_workspace(self, tmp_path, monkeypatch):
+        """辅助：创建临时 workspace 并设置环境变量。返回 media_dir。"""
+        ws = tmp_path / "workspace"
+        ws.mkdir()
+        monkeypatch.setenv("OPENCLAW_WORKSPACE", str(ws))
+        import servers.image_tools as it
+        return it, it._get_openclaw_media_dir()
+
+    def test_no_workspace_returns_local_path(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("OPENCLAW_WORKSPACE", raising=False)
+        from PIL import Image
+        img = Image.new("RGB", (10, 10), color="red")
+        src = tmp_path / "nope.png"
+        img.save(str(src))
+
+        from servers.image_tools import show_image
+        result = show_image(str(src))
+        assert str(src) in result[0].text
+
+    def test_show_image_real(self, tmp_path, monkeypatch):
+        it, _ = self._setup_workspace(tmp_path, monkeypatch)
+
+        from PIL import Image
+        img = Image.new("RGB", (10, 10), color="red")
+        src = tmp_path / "real_test.png"
+        img.save(str(src))
+
+        result = it.show_image(str(src))
+        assert "MEDIA:" in result[0].text
+        assert "real_test" in result[0].text
+
+    def test_old_image_not_immediately_cleaned(self, tmp_path, monkeypatch):
+        it, media_dir = self._setup_workspace(tmp_path, monkeypatch)
+
+        from PIL import Image
+        import os as _os
+        img = Image.new("RGB", (10, 10), color="red")
+        src = tmp_path / "old_source.png"
+        img.save(str(src))
+        _os.utime(src, (0, 0))
+
+        result = it.show_image(str(src))
+        assert "MEDIA:" in result[0].text
+
+        it._cleanup_openclaw_media_cache(media_dir)
+        files = list(media_dir.glob("*.png"))
+        assert len(files) >= 1
+
+    def test_duplicate_calls_unique_files(self, tmp_path, monkeypatch):
+        it, _ = self._setup_workspace(tmp_path, monkeypatch)
+
+        from PIL import Image
+        img = Image.new("RGB", (10, 10), color="red")
+        src = tmp_path / "dup.png"
+        img.save(str(src))
+
+        r1 = it.show_image(str(src))
+        r2 = it.show_image(str(src))
+        assert r1[0].text != r2[0].text
+
+    def test_cleanup_removes_old_files(self, tmp_path, monkeypatch):
+        it, media_dir = self._setup_workspace(tmp_path, monkeypatch)
+
+        from PIL import Image
+        import os as _os
+        old_file = media_dir / "old_image.png"
+        img = Image.new("RGB", (10, 10), color="red")
+        img.save(str(old_file))
+        _os.utime(old_file, (0, 0))
+
+        it._cleanup_openclaw_media_cache(media_dir)
+        assert not old_file.exists()
+
+    def test_cleanup_failure_does_not_crash(self, tmp_path, monkeypatch):
+        it, media_dir = self._setup_workspace(tmp_path, monkeypatch)
+
+        from PIL import Image
+        import os as _os
+        img = Image.new("RGB", (10, 10), color="red")
+        img.save(str(media_dir / "keep.png"))
+
+        def _failing(path):
+            raise OSError("denied")
+        monkeypatch.setattr(_os, "unlink", _failing)
+        it._cleanup_openclaw_media_cache(media_dir)
+
+    def test_rejects_invalid_extension(self, tmp_path, monkeypatch):
+        it, _ = self._setup_workspace(tmp_path, monkeypatch)
+        txt = tmp_path / "test.txt"
+        txt.write_text("hello")
+        try:
+            it.show_image(str(txt))
+            assert False
+        except ValueError as e:
+            assert "不支持的图片格式" in str(e)
+
+    def test_no_workspace_still_works(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("OPENCLAW_WORKSPACE", raising=False)
+        from PIL import Image
+        img = Image.new("RGB", (10, 10), color="red")
+        src = tmp_path / "valid.png"
+        img.save(str(src))
+        from servers.image_tools import show_image
+        result = show_image(str(src))
+        # 无工作区时返回本地路径
+        assert str(src) in result[0].text
+
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v", "-p", "no:cacheprovider"])

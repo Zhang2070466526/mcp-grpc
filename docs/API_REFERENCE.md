@@ -537,18 +537,27 @@ from servers.image_tools import show_image
 show_image(image_path: str) -> list
 ```
 
-读取本地图片，生成临时 HTTP 链接（10 分钟有效），供 MCP 客户端显示。
+显示本地图片，不分析图片内容。
+
+配置了 `OPENCLAW_WORKSPACE` 时复制到 `media/eda/` 并返回 `MEDIA:` 指令。
+未配置时返回本地路径供用户本机查看。
 
 | 参数 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `image_path` | str | 是 | 图片文件绝对路径 |
 
-返回 `[TextContent, ImageContent]`，其中 TextContent 包含可直接渲染的 Markdown：
+返回示例（配置了工作区）：
 ```
-![image.png](http://127.0.0.1:50026/images/token)
+MEDIA:C:/Users/.../workspace/media/eda/a91c58f5_s11_real.png
 ```
 
-> 需要 MCP 服务在运行中才能访问 `/images/{token}` 路由。
+返回示例（未配置工作区）：
+```
+请在本机打开：C:/.../s11_real.png
+```
+
+> `OPENCLAW_WORKSPACE` 可选：配置为有效路径时复制图片到工作区并返回 MEDIA:；
+> 留空或无效时返回原始路径。图片上限 20 MB，缓存保留 24 小时。
 
 ---
 

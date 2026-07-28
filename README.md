@@ -37,6 +37,8 @@ TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
 MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
 MCP_PORT=50026
+# OpenClaw 工作区（show_image 用于聊天中显示图片，留空则只返回本地路径）
+OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace
 
 # 以下可选，用于聊天客户端 AI 对话
 LLM_API_KEY=sk-xxx
@@ -66,7 +68,7 @@ uv run python start_servers.py
 输出示例：
 ```
 ==================================================
-  EDI MCP v0.1.2
+  EDI MCP v0.1.3
   UI:   http://127.0.0.1:50026/ui
   MCP:  http://127.0.0.1:50026/sse
   Tools: 25 loaded
@@ -213,7 +215,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 
 | 工具 | 说明 | 参数 |
 |---|---|---|
-| `show_image` | 读取本地图片，返回 MCP ImageContent | `image_path` |
+| `show_image` | 显示本地图片（复制到工作区）| `image_path` |
 
 ### 图表
 

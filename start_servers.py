@@ -28,7 +28,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+if getattr(sys, "frozen", False):
+    load_dotenv(Path(sys.executable).parent / ".env")
+else:
+    load_dotenv()
 
 # -- 配置 --
 DEFAULT_TRANSPORT = os.getenv("MCP_TRANSPORT","sse")

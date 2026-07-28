@@ -49,10 +49,12 @@ Write-Host "[6/7] Generating config + launcher..." -ForegroundColor Yellow
 $envContent = @"
 # EDA MCP configuration - edit paths for this computer
 EDA_GRPC_SERVER=127.0.0.1:50055
-# EDI 可执行文件：留空自动检测（优先级 EDI.exe > EDA-PMDS.exe > CAIS.exe）
+# EDI exe path: leave empty to auto-detect (EDI.exe > EDA-PMDS.exe > CAIS.exe)
 EDI_PATH=
-# TurboCharts：留空自动检测（优先级 turbocharts_app.exe > TurboCharts.exe）
+# TurboCharts path: leave empty to auto-detect (turbocharts_app.exe > TurboCharts.exe)
 TURBOCHARTS_PATH=
+# Optional OpenClaw workspace. Leave empty to disable workspace copying.
+OPENCLAW_WORKSPACE=
 MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
 MCP_PORT=50026

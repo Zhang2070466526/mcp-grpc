@@ -112,6 +112,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    icon=str(root / 'scripts' / 'Logo.ico'),
     disable_windowed_traceback=False,
 )
 

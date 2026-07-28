@@ -122,7 +122,7 @@ def _build_tools_schema() -> list[dict]:
         _rtool("launch_edi", "启动 EDI 客户端并等待 gRPC 就绪", {}, {"edi_path": "string", "wait_for_grpc": "boolean", "wait_timeout": "integer"}),
         _rtool("compare_simulation_results", "多个 RAW 结果同一条曲线对比叠图", {"result_paths": "array", "curve": "string", "img_path": "string"}, {"chart_type": "string", "labels": "array", "dependency": "string", "csv_path": "string", "alignment": "string", "reference_index": "integer"}),
         _rtool("turbocharts_convert", "ADS RAW 文件转曲线图和 CSV", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
-        _rtool("show_image", "读取本地图片，返回 MCP ImageContent", {"image_path": "string"}),
+        _rtool("show_image", "显示本地图片", {"image_path": "string"}),
     ]
 
 

@@ -68,7 +68,7 @@ PyPI: https://pypi.org/project/edi-mcp/
 
 **模型启动**：replace_models_from_csv, launch_edi
 
-**图片**：show_image（读取本地图片，返回 MCP ImageContent 供客户端显示）
+**图片**：show_image（显示本地图片，复制到工作区缓存目录，不分析内容）
 
 **图表**：turbocharts_convert
 
@@ -186,7 +186,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 24. UPX 压缩已关闭（某些原生 DLL 压缩后兼容性问题），目录模式依赖 `_internal/` 不可单独分发 EXE
 25. 构建脚本增加体积阈值检查：目录 > 105 MB 或 ZIP > 80 MB 视为失败，EXE > 15 MB 告警重复打包
 26. Pillow AVIF/WebP 编码器已排除（节省约 7~8 MB），需通过 .spec excludes 控制，不可手动删除文件
-27. `show_image` 通过 MCP ImageContent 返回图片，客户端无需访问本地路径；仅限制格式/大小/UNC
+27. `show_image` 配置了 OPENCLAW_WORKSPACE 时返回 MEDIA:，未配置时返回本地路径；冻结模式下 .env 从 EXE 同级目录加载
 28. SIMULATE_PROJECT 的 ads_output 通过 FetchEvent 长连接增量推送，每个事件追加原样片段；最终 SUCCESS/FAILED 事件的片段同样追加；不 strip、不覆写
 29. 仿真 task_id 和 client_uuid 由 MCP 侧生成，贯穿 FetchEvent → PerformAction → 状态/结果查询
 30. FetchEvent 必须在 PerformAction 之前建立（文档要求），否则 EDI 返回 external handler not ready

@@ -19,15 +19,20 @@ import os
 from pathlib import Path
 from typing import Any
 
+import sys as _sys
 from dotenv import load_dotenv
 
-load_dotenv()
+# 冻结模式下从 EXE 所在目录加载 .env
+if getattr(_sys, "frozen", False):
+    _env_path = Path(_sys.executable).parent / ".env"
+    load_dotenv(_env_path)
+else:
+    load_dotenv()
 
 EDA_GRPC_SERVER = os.getenv("EDA_GRPC_SERVER")
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT")
 
 # ── 应用根目录检测 ──
-import sys as _sys
 
 if getattr(_sys, "frozen", False):
     _APP_ROOT = Path(_sys.executable).parent.resolve()
