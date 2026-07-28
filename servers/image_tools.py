@@ -1,19 +1,15 @@
-"""MCP 图片工具 — show_image 始终注册，工作区未配置时返回本地路径供用户查看。
+"""MCP 图片工具。
 
-show_image
-  - OPENCLAW_WORKSPACE 有效 → 复制到 media/eda/ → 返回 MEDIA:
-  - 未配置/无效/复制失败 → 返回原始路径，让用户在本机打开
+show_image              返回标准 MCP ImageContent，不复制文件，不依赖 OpenClaw。
+copy_image_to_workspace 条件注册，复制到 media/edi/mcp-cache/，返回 openclaw_attachment。
 
-GET /images/{token}   临时图片访问路由（10 分钟过期）。
-
-安全限制：
-  - 只允许 PNG / JPG / GIF / WebP / BMP / SVG
-  - 单张最大 20 MB
-  - 禁止 UNC 网络路径
+GET /images/{token}     临时图片访问路由（10 分钟过期）。
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import logging
 import os
 import secrets
@@ -24,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from mcp.types import TextContent
+from mcp.types import ImageContent, TextContent
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 
@@ -34,13 +30,19 @@ load_dotenv()
 
 _logger = logging.getLogger("image_tools")
 
-_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
-_MAX_IMAGE_SIZE = 20 * 1024 * 1024       # 20 MB，工作区复制上限
-_TOKEN_TTL = 600                    # HTTP Token 有效期 10 分钟
-_OPENCLAW_CACHE_TTL = 24 * 60 * 60  # 工作区缓存 24 小时
+_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+_MAX_NATIVE_IMAGE_SIZE = 10 * 1024 * 1024       # 10 MB，Base64 原生图片上限
+_MAX_WORKSPACE_IMAGE_SIZE = 40 * 1024 * 1024    # 40 MB，工作区复制上限
+_TOKEN_TTL = 600
+_OPENCLAW_CACHE_TTL = 24 * 60 * 60
 
 _IMAGE_TOKENS: dict[str, dict[str, Any]] = {}
 _TOKEN_LOCK = threading.RLock()
+
+_MIME_TYPES: dict[str, str] = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp",
+}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -50,85 +52,199 @@ _TOKEN_LOCK = threading.RLock()
 def _validate_image_path(image_path: str) -> Path:
     """校验图片路径，通过则返回 resolved Path。"""
     path = Path(image_path).expanduser().resolve()
-
-    path_str = str(path)
-    if path_str.startswith(r"\\") or path_str.startswith("//"):
+    if str(path).startswith(r"\\") or str(path).startswith("//"):
         raise PermissionError(f"禁止访问网络路径: {path}")
-
     if not path.is_file():
         raise FileNotFoundError(f"图片不存在: {path}")
-
     if path.suffix.lower() not in _ALLOWED_EXTENSIONS:
-        raise ValueError(
-            f"不支持的图片格式: {path.suffix}，"
-            f"请使用 {', '.join(sorted(_ALLOWED_EXTENSIONS))}"
-        )
-
+        raise ValueError(f"不支持的图片格式: {path.suffix}")
     return path
 
 
 # ═══════════════════════════════════════════════════════════
-# OpenClaw 工作区（每次调用时检查）
+# show_image — 纯 MCP ImageContent，不复制文件
 # ═══════════════════════════════════════════════════════════
 
-def _get_openclaw_media_dir() -> Path | None:
-    """解析 OPENCLAW_WORKSPACE，有效则返回 media/eda 路径，否则 None。"""
+@mcp.tool(structured_output=False)
+def show_image(image_path: str) -> list[Any]:
+    """读取本地图片，返回标准 MCP ImageContent。
+
+    如果客户端无法渲染 ImageContent，直接报告"客户端不支持"，停止处理。
+    不得通过 Read、Exec、Write、Canvas、HTML 或 MEDIA 文本再次尝试显示。
+    不得自动调用工作区复制工具。
+
+    Args:
+        image_path: 图片文件绝对路径。
+    """
+    path = _validate_image_path(image_path)
+
+    size = path.stat().st_size
+    if size > _MAX_NATIVE_IMAGE_SIZE:
+        return [
+            TextContent(
+                type="text",
+                text=(
+                    "图片文件较大（>10 MB），未内嵌到 MCP 返回内容中。\n\n"
+                    f"原始路径：{path}\n\n"
+                    "可以在本机查看，或明确要求复制到 OpenClaw 工作区。"
+                ),
+            ),
+        ]
+
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    mime = _MIME_TYPES.get(path.suffix.lower(), "application/octet-stream")
+
+    return [
+        TextContent(
+            type="text",
+            text=(
+                "图片内容已返回给客户端。能否直接显示取决于客户端的图片渲染和文件访问策略。\n"
+                f"原始路径：{path}\n"
+                "如果客户端限制工作区外文件访问，可要求用户将图片复制到 OpenClaw 工作区。\n"
+                "不要自行调用 Read、Exec 或 filePath 读取原始文件。"
+            ),
+        ),
+        ImageContent(type="image", data=encoded, mimeType=mime),
+    ]
+
+
+# ═══════════════════════════════════════════════════════════
+# copy_image_to_workspace — 工作区复制
+# ═══════════════════════════════════════════════════════════
+
+def _get_openclaw_workspace() -> Path | None:
+    """读取 OPENCLAW_WORKSPACE，仅当有效时返回路径。"""
     value = os.getenv("OPENCLAW_WORKSPACE", "").strip()
     if not value:
         return None
-
     try:
-        workspace = Path(value).expanduser().resolve()
-        if not workspace.is_dir():
-            _logger.warning("OpenClaw image display unavailable: workspace not a directory")
+        w = Path(value).expanduser().resolve()
+        if not w.is_dir():
+            _logger.warning("OPENCLAW_WORKSPACE is invalid; copy_image_to_workspace disabled")
             return None
-
-        media_dir = workspace / "media" / "eda"
-        media_dir.mkdir(parents=True, exist_ok=True)
-        return media_dir
-
-    except OSError as exc:
-        _logger.warning("OpenClaw image display unavailable: %s", exc)
+        return w
+    except OSError:
+        _logger.warning("OPENCLAW_WORKSPACE is invalid; copy_image_to_workspace disabled")
         return None
 
+OPENCLAW_WORKSPACE_PATH = _get_openclaw_workspace()
 
-def _cleanup_openclaw_media_cache(media_dir: Path) -> None:
-    """删除超过 24 小时的缓存图片。"""
+if OPENCLAW_WORKSPACE_PATH is not None:
+    _logger.info("copy_image_to_workspace enabled: %s", OPENCLAW_WORKSPACE_PATH)
+else:
+    _logger.info("OPENCLAW_WORKSPACE not configured; copy_image_to_workspace disabled")
+
+
+def _copy_to_workspace(source: Path, workspace: Path) -> str:
+    """复制图片到 workspace/media/edi/，返回目标路径。超过 40 MB 返回空。"""
+    if source.stat().st_size > _MAX_WORKSPACE_IMAGE_SIZE:
+        return ""
+
+    media_dir = workspace / "media" / "edi" / "mcp-cache"
+    media_dir.mkdir(parents=True, exist_ok=True)
+
+    # 清理过期缓存
     expire_before = time.time() - _OPENCLAW_CACHE_TTL
     try:
-        entries = list(media_dir.iterdir())
+        for item in media_dir.iterdir():
+            try:
+                if item.is_file() and item.suffix.lower() in _ALLOWED_EXTENSIONS and item.stat().st_mtime < expire_before:
+                    item.unlink()
+            except OSError:
+                continue
     except OSError:
-        return
-    for item in entries:
-        try:
-            if (
-                item.is_file()
-                and item.suffix.lower() in _ALLOWED_EXTENSIONS
-                and item.stat().st_mtime < expire_before
-            ):
-                item.unlink()
-        except OSError:
-            continue
+        pass
 
-
-def _stage_image_for_openclaw(source: Path, media_dir: Path) -> Path | None:
-    """复制图片到工作区，返回缓存路径。超过 20 MB 返回 None。"""
-    if source.stat().st_size > _MAX_IMAGE_SIZE:
-        _logger.warning("Image too large for workspace: %s", source)
-        return None
-    _cleanup_openclaw_media_cache(media_dir)
-
-    safe_name = "".join(
-        c if c.isalnum() or c in "._-" else "_"
-        for c in source.name
-    )
-    target = media_dir / f"{secrets.token_hex(4)}_{safe_name}"
+    # 基于源路径哈希生成稳定文件名
+    path_hash = hashlib.md5(str(source.resolve()).encode()).hexdigest()[:8]
+    safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in source.stem)
+    target = media_dir / f"{safe_name}_{path_hash}{source.suffix}"
     shutil.copyfile(source, target)
-    return target
+    return str(target)
+
+
+def copy_image_to_workspace(image_path: str) -> dict[str, Any]:
+    """复制图片到 OpenClaw 工作区 media/edi，返回绝对路径供结构化附件发送。
+
+    仅当用户明确要求复制到 OpenClaw 工作区时才调用。
+    需要 MCP 服务配置 OPENCLAW_WORKSPACE，未配置时不复制，只返回配置提示。
+    不得猜测默认工作区，不得使用 Read 或 Exec 手动复制。
+    不要在 show_image 成功后自动调用。
+
+    Args:
+        image_path: 图片文件绝对路径。
+    """
+    path = _validate_image_path(image_path)
+
+    workspace = OPENCLAW_WORKSPACE_PATH
+    if workspace is None:
+        return {
+            "success": True,
+            "copied": False,
+            "status": "WORKSPACE_NOT_CONFIGURED",
+            "retryable": False,
+            "source_path": str(path),
+            "message": (
+                "未配置 OPENCLAW_WORKSPACE，未执行图片复制。"
+                "请在 MCP 服务的 .env 中配置 OPENCLAW_WORKSPACE 并重启服务，"
+                "或由用户手动复制图片到工作区media目录下。"
+            ),
+        }
+
+    size = path.stat().st_size
+    if size > _MAX_WORKSPACE_IMAGE_SIZE:
+        return {
+            "success": True,
+            "copied": False,
+            "status": "IMAGE_TOO_LARGE",
+            "retryable": False,
+            "source_path": str(path),
+            "message": "图片超过工作区复制大小限制（40 MB），可以直接在本机查看。",
+        }
+
+    try:
+        target = _copy_to_workspace(path, workspace)
+    except OSError as exc:
+        _logger.warning("Failed to copy to workspace: %s", exc)
+        return {
+            "success": False,
+            "copied": False,
+            "status": "COPY_FAILED",
+            "retryable": False,
+            "source_path": str(path),
+            "message": "图片复制到工作区失败，可以直接查看原始文件。",
+        }
+
+    if not target:
+        return {
+            "success": True,
+            "copied": False,
+            "status": "IMAGE_TOO_LARGE",
+            "retryable": False,
+            "source_path": str(path),
+            "message": "图片超过工作区复制大小限制（40 MB），可以直接在本机查看。",
+        }
+
+    return {
+        "success": True,
+        "copied": True,
+        "displayed": False,
+        "status": "COPIED",
+        "retryable": False,
+        "source_path": str(path),
+        "workspace_path": str(workspace),
+        "image_path": target,
+        "openclaw_attachment": {"filePath": target},
+        "message": (
+            "图片已复制到工作区。"
+            "请使用 OpenClaw 原生消息工具的 filePath 或 media 结构化字段发送图片。"
+            "不要在普通文本中输出 MEDIA 行。"
+        ),
+    }
 
 
 # ═══════════════════════════════════════════════════════════
-# HTTP Token（图表工具和其他 MCP 客户端使用）
+# HTTP Token（保留供图表工具或其他客户端使用）
 # ═══════════════════════════════════════════════════════════
 
 def _base_url() -> str:
@@ -138,91 +254,21 @@ def _base_url() -> str:
 
 
 def register_image_url(img_path: str) -> str:
-    """将图片路径注册为临时 HTTP Token，返回可访问的 URL。"""
     p = Path(img_path).expanduser().resolve()
     if not p.is_file():
         return ""
     _cleanup_expired()
     token = secrets.token_urlsafe(24)
     with _TOKEN_LOCK:
-        _IMAGE_TOKENS[token] = {
-            "path": str(p),
-            "expires_at": time.time() + _TOKEN_TTL,
-        }
+        _IMAGE_TOKENS[token] = {"path": str(p), "expires_at": time.time() + _TOKEN_TTL}
     return f"{_base_url()}/images/{token}"
 
 
 def _cleanup_expired() -> None:
     now = time.time()
     with _TOKEN_LOCK:
-        expired = [t for t, v in _IMAGE_TOKENS.items() if v["expires_at"] < now]
-        for t in expired:
+        for t in [t for t, v in _IMAGE_TOKENS.items() if v["expires_at"] < now]:
             del _IMAGE_TOKENS[t]
-
-
-# ═══════════════════════════════════════════════════════════
-# 返回内容构建
-# ═══════════════════════════════════════════════════════════
-
-def _build_media_response(cached_path: Path) -> list[Any]:
-    return [
-        TextContent(
-            type="text",
-            text=(
-                "图片已准备完成。\n"
-                "请原样输出下面的 MEDIA 行，"
-                "不要读取图片，不要调用其他工具：\n\n"
-                f"MEDIA:{cached_path}"
-            ),
-        )
-    ]
-
-
-def _build_local_view_response(path: Path) -> list[Any]:
-    return [
-        TextContent(
-            type="text",
-            text=(
-                "图片文件已准备好。\n"
-                f"本地路径：{path}\n\n"
-                "如果当前客户端未自动显示，可以在本机打开该文件查看。\n"
-                "这是正常的可选显示结果，无需重试或检查配置。"
-            ),
-        )
-    ]
-
-
-# ═══════════════════════════════════════════════════════════
-# MCP 工具 — 始终注册
-# ═══════════════════════════════════════════════════════════
-
-@mcp.tool(structured_output=False)
-def show_image(image_path: str) -> list[Any]:
-    """显示本地图片
-
-    配置了 OpenClaw 工作区时复制到 media/eda/ 并返回 MEDIA: 行。
-    未配置时返回本地路径供用户本机查看。
-    不要重试，不要检查环境变量、配置文件、服务进程或端口。
-
-    Args:
-        image_path: 图片文件绝对路径。
-    """
-    path = _validate_image_path(image_path)
-    media_dir = _get_openclaw_media_dir()
-
-    if media_dir is None:
-        return _build_local_view_response(path)
-
-    try:
-        cached_path = _stage_image_for_openclaw(path, media_dir)
-    except OSError as exc:
-        _logger.warning("Failed to stage image for OpenClaw: %s", exc)
-        return _build_local_view_response(path)
-
-    if cached_path is None:
-        return _build_local_view_response(path)
-
-    return _build_media_response(cached_path)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -230,11 +276,8 @@ def show_image(image_path: str) -> list[Any]:
 # ═══════════════════════════════════════════════════════════
 
 async def serve_image(request: Request) -> FileResponse | JSONResponse:
-    """GET /images/{token} — 临时图片访问路由。"""
     token = request.path_params.get("token", "")
-
     _cleanup_expired()
-
     with _TOKEN_LOCK:
         entry = _IMAGE_TOKENS.get(token)
     if entry is None:
@@ -245,23 +288,23 @@ async def serve_image(request: Request) -> FileResponse | JSONResponse:
         return JSONResponse({"error": "file gone"}, status_code=404)
 
     ext = image_path.suffix.lower()
-    media_map = {
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".gif": "image/gif",
-        ".webp": "image/webp",
-        ".bmp": "image/bmp",
-        ".svg": "image/svg+xml",
-    }
-
+    media_map = {**{k: v for k, v in _MIME_TYPES.items()},
+                 ".svg": "image/svg+xml"}
     return FileResponse(
         image_path,
         media_type=media_map.get(ext, "application/octet-stream"),
         filename=image_path.name,
         content_disposition_type="inline",
-        headers={
-            "Cache-Control": "private, max-age=600",
-            "X-Content-Type-Options": "nosniff",
-        },
+        headers={"Cache-Control": "private, max-age=600", "X-Content-Type-Options": "nosniff"},
     )
+
+
+# ═══════════════════════════════════════════════════════════
+# 条件注册 copy_image_to_workspace
+# ═══════════════════════════════════════════════════════════
+
+if OPENCLAW_WORKSPACE_PATH is not None:
+    mcp.tool()(copy_image_to_workspace)
+    _logger.info("Image mode: native ImageContent; workspace copy enabled")
+else:
+    _logger.info("Image mode: native ImageContent only; workspace copy disabled")

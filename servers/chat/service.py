@@ -49,7 +49,7 @@ from servers.eda.model_replace import replace_models_from_csv  # noqa: E402
 from servers.eda.edi_launcher import launch_edi  # noqa: E402
 from servers.turbocharts.compare_results import compare_simulation_results  # noqa: E402
 from servers.turbocharts.convert_raw import turbocharts_convert  # noqa: E402
-from servers.image_tools import show_image  # noqa: E402
+from servers.image_tools import show_image, copy_image_to_workspace, OPENCLAW_WORKSPACE_PATH  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 常量
@@ -81,6 +81,8 @@ CHAT_TOOL_MAP: dict[str, Any] = {
     "turbocharts_convert":            turbocharts_convert,
     "show_image":                     show_image,
 }
+if OPENCLAW_WORKSPACE_PATH is not None:
+    CHAT_TOOL_MAP["copy_image_to_workspace"] = copy_image_to_workspace
 
 def _rtool(name: str, desc: str, required: dict, optional: dict | None = None) -> dict:
     """构建单个 OpenAI function-call 工具 schema。"""
@@ -106,7 +108,7 @@ def _rtool(name: str, desc: str, required: dict, optional: dict | None = None) -
 
 def _build_tools_schema() -> list[dict]:
     """构建聊天工具 schema，与 CHAT_TOOL_MAP 保持一致。"""
-    return [
+    tools = [
         _rtool("list_epp_projects", "扫描文件夹中的 .epp 工程文件", {"folder_path": "string"}),
         _rtool("open_edi_project", "打开 .epp 工程", {"project_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("close_edi_project", "关闭 EDA 工程", {"project_path": "string"}, {"need_save": "boolean"}),
@@ -122,8 +124,11 @@ def _build_tools_schema() -> list[dict]:
         _rtool("launch_edi", "启动 EDI 客户端并等待 gRPC 就绪", {}, {"edi_path": "string", "wait_for_grpc": "boolean", "wait_timeout": "integer"}),
         _rtool("compare_simulation_results", "多个 RAW 结果同一条曲线对比叠图", {"result_paths": "array", "curve": "string", "img_path": "string"}, {"chart_type": "string", "labels": "array", "dependency": "string", "csv_path": "string", "alignment": "string", "reference_index": "integer"}),
         _rtool("turbocharts_convert", "ADS RAW 文件转曲线图和 CSV", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
-        _rtool("show_image", "显示本地图片", {"image_path": "string"}),
+        _rtool("show_image", "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）", {"image_path": "string"}),
     ]
+    if OPENCLAW_WORKSPACE_PATH is not None:
+        tools.append(_rtool("copy_image_to_workspace", "复制图片到工作区 media/edi，需配置 OPENCLAW_WORKSPACE", {"image_path": "string"}))
+    return tools
 
 
 CHAT_TOOLS_SCHEMA = _build_tools_schema()
@@ -445,11 +450,14 @@ class ChatService:
                                      request_id, tool_name, act.duration_ms,
                                      act.status == "success")
 
-                        # show_image：收集图片 URL
+                        # show_image：用原始 image_path 注册 HTTP URL 供前端渲染
                         if tool_name == "show_image" and act.status == "success":
-                            image_url = _register_image_from_result(tool_result)
-                            if image_url:
-                                media.append({"type": "image", "url": image_url, "name": ""})
+                            img_path = validation_result.get("image_path", "")
+                            if img_path:
+                                from servers.image_tools import register_image_url
+                                image_url = register_image_url(img_path)
+                                if image_url:
+                                    media.append({"type": "image", "url": image_url, "name": Path(img_path).name})
 
                         activities.append(act)
 
@@ -519,7 +527,7 @@ class ChatService:
 
         # 自动补齐 project_path
         if tool_name not in ("list_epp_projects", "launch_edi", "compare_simulation_results",
-                              "turbocharts_convert", "show_image", "simulate_netlist_with_ads",
+                              "turbocharts_convert", "show_image", "copy_image_to_workspace", "simulate_netlist_with_ads",
                               "get_simulation_async_status", "get_simulation_async_result"):
             if not args.get("project_path"):
                 if session.current_project_path:
@@ -654,24 +662,12 @@ _TOOL_LABELS: dict[str, str] = {
     "turbocharts_convert": "RAW 转图",
     "show_image": "显示图片",
 }
+if OPENCLAW_WORKSPACE_PATH is not None:
+    _TOOL_LABELS["copy_image_to_workspace"] = "复制到工作区"
 
 
 def _tool_label(name: str) -> str:
     return _TOOL_LABELS.get(name, name)
-
-
-def _register_image_from_result(result: Any) -> str:
-    """从 show_image 结果中提取并注册图片 HTTP URL。"""
-    if isinstance(result, list):
-        text = "\n".join(r.text for r in result if hasattr(r, "text"))
-    else:
-        text = str(result)
-    # 从 MEDIA: 路径注册 HTTP Token
-    for line in text.split("\n"):
-        if line.startswith("MEDIA:"):
-            from servers.image_tools import register_image_url
-            return register_image_url(line[6:].strip())
-    return ""
 
 
 def _result_summary(act: Activity) -> str:

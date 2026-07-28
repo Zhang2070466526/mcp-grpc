@@ -36,7 +36,7 @@ TURBOCHARTS_PATH=                    # 留空自动检测
 MCP_TRANSPORT=sse                    # sse（Web）或 stdio（本地）
 MCP_PORT=50026                       # 监听端口
 MCP_HOST=127.0.0.1                   # 监听地址
-OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace  # 手动填写，show_image工具需要(不知道可忽略)
+OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace  # copy_image_to_workspace 需要
 LLM_API_KEY=sk-xxx                   # 可选：聊天 AI 功能
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
@@ -127,7 +127,7 @@ http://127.0.0.1:50026/health
 
 ## OpenClaw 图片显示
 
-配置 `.env` 中的 `OPENCLAW_WORKSPACE` 为有效路径后，`show_image` 工具自动复制图片到工作区并返回 `MEDIA:` 指令，OpenClaw 可直接显示。未配置时返回本地路径供本机查看。
+`show_image` 始终可用，返回 MCP ImageContent。`copy_image_to_workspace` 仅在 `OPENCLAW_WORKSPACE` 有效时注册，复制到 `media/edi/`，显示由 OpenClaw Agent 消息工具负责。
 
 > 不需要修改 `openclaw.json`，不需要 TOOLS.md，不需要 `[embed]`。
 

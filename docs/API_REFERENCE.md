@@ -527,7 +527,7 @@ compare_simulation_results(
 
 ---
 
-## 图片（1 个）
+## 图片（2 个）
 
 ### `show_image`
 
@@ -537,27 +537,32 @@ from servers.image_tools import show_image
 show_image(image_path: str) -> list
 ```
 
-显示本地图片，不分析图片内容。
-
-配置了 `OPENCLAW_WORKSPACE` 时复制到 `media/eda/` 并返回 `MEDIA:` 指令。
-未配置时返回本地路径供用户本机查看。
+读取本地图片，返回标准 MCP ImageContent。不复制文件，不依赖 OpenClaw。
 
 | 参数 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `image_path` | str | 是 | 图片文件绝对路径 |
 
-返回示例（配置了工作区）：
-```
-MEDIA:C:/Users/.../workspace/media/eda/a91c58f5_s11_real.png
+返回 `[TextContent, ImageContent]`，其中 ImageContent 包含 Base64 编码的图片数据。
+≤10MB 时内嵌图片；>10MB 时只返回本地路径供本机查看。
+
+---
+
+### `copy_image_to_workspace`（条件注册）
+
+仅在 `OPENCLAW_WORKSPACE` 配置有效时注册。负责将图片复制到 `media/edi/`，返回绝对路径和 `openclaw_attachment.filePath`。显示由 OpenClaw Agent 的消息工具负责。
+
+```python
+from servers.image_tools import copy_image_to_workspace
+
+copy_image_to_workspace(image_path: str) -> dict
 ```
 
-返回示例（未配置工作区）：
-```
-请在本机打开：C:/.../s11_real.png
-```
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `image_path` | str | 是 | 图片文件绝对路径 |
 
-> `OPENCLAW_WORKSPACE` 可选：配置为有效路径时复制图片到工作区并返回 MEDIA:；
-> 留空或无效时返回原始路径。图片上限 20 MB，缓存保留 24 小时。
+返回：`{"success": true, "copied": true, "displayed": false, "image_path": "...", "openclaw_attachment": {"filePath": "..."}}`
 
 ---
 

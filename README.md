@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/edi-mcp?label=PyPI)](https://pypi.org/project/edi-mcp/)
 
-每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 25 个 MCP 工具，
+每台安装 EDI 的电脑运行一个本地 MCP 服务，将 EDA-PMDS/EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 MCP 工具（`copy_image_to_workspace` 需配置 `OPENCLAW_WORKSPACE` 后注册），
 支持 **SSE** 和 **stdio** 两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
 
 ---
@@ -37,7 +37,7 @@ TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe
 MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
 MCP_PORT=50026
-# OpenClaw 工作区（show_image 用于聊天中显示图片，留空则只返回本地路径）
+# OpenClaw 工作区（启用 copy_image_to_workspace，留空则不注册该工具）
 OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace
 
 # 以下可选，用于聊天客户端 AI 对话
@@ -71,7 +71,7 @@ uv run python start_servers.py
   EDI MCP v0.1.3
   UI:   http://127.0.0.1:50026/ui
   MCP:  http://127.0.0.1:50026/sse
-  Tools: 25 loaded
+  Tools: loaded（默认 25，配置 OPENCLAW_WORKSPACE 后 26）
   gRPC: 127.0.0.1:50055 [ONLINE]
   Close window to stop
 ==================================================
@@ -82,7 +82,7 @@ uv run python start_servers.py
 - EDI gRPC 操作由全局锁保证串行
 - Turbocharts 由信号量保证同一时间一个进程
 - `/health` 健康检查 — 返回 EDA gRPC 和 Turbocharts 状态
-- `/ui` 聊天客户端 — 自然语言驱动 25 个工具，带工具面板和系统主题
+- `/ui` 聊天客户端 — 自然语言驱动全部工具，带工具面板和系统主题
 - `/chat` 聊天 API — POST `{"message":"..."}` 返回 LLM + 工具执行结果
 - 聊天客户端文件：`servers/chat/index.html`（与路由同目录）
 
@@ -132,7 +132,7 @@ r2 = start_simulation_async("C:/Projects/test/test.epp")
 
 ### 方式三：MCP 客户端接入
 
-Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 25 个工具。无需写代码。
+Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部工具。无需写代码。
 
 ---
 
@@ -162,7 +162,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 
 ---
 
-## 工具参考（25 个）
+## 工具参考（默认 25 个，配置工作区后 26 个）
 
 ### 工程管理
 
@@ -215,7 +215,8 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 
 | 工具 | 说明 | 参数 |
 |---|---|---|
-| `show_image` | 显示本地图片 | `image_path` |
+| `show_image` | 返回 MCP ImageContent（原生图片） | `image_path` |
+| `copy_image_to_workspace`* | 复制到工作区（需配置 OPENCLAW_WORKSPACE） | `image_path` |
 
 ### 图表
 
@@ -271,7 +272,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 │   │   ├── service.py            # 聊天服务（会话/LLM/工具闭环）
 │   │   ├── routes.py             # Web 路由（/health /chat /ui /tools/list）
 │   │   └── index.html            # 聊天前端页面
-│   ├── image_tools.py           # 图片工具 — show_image（1 工具）
+│   ├── image_tools.py           # 图片工具 — show_image + copy（2 工具）
 │   ├── eda/
 │   │   ├── config.py            # 配置 + validate_file + ProjectReader + S-expression
 │   │   ├── grpc_client.py       # gRPC 通信（带 EDA 全局锁）

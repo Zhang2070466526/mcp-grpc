@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 def test_all_tools_registered():
     from start_servers import mcp
     tools = list(mcp._tool_manager._tools.keys())
-    assert len(tools) == 25, f"expected 25 tools, got {len(tools)}"
     required = [
         "list_epp_projects", "open_edi_project", "close_edi_project",
         "list_project_components", "get_component_parameters", "get_project_summary",
@@ -21,6 +20,11 @@ def test_all_tools_registered():
         "open_hfss_project", "close_hfss_project", "launch_aedt", "get_hfss_project_info",
         "start_hfss_analysis_async", "get_hfss_analysis_status",
     ]
+    # copy_image_to_workspace is conditional
+    from servers.image_tools import OPENCLAW_WORKSPACE_PATH
+    if OPENCLAW_WORKSPACE_PATH is not None:
+        required.append("copy_image_to_workspace")
+    assert len(tools) == len(required), f"expected {len(required)} tools, got {len(tools)} ({sorted(tools)})"
     for name in required:
         assert name in tools, f"missing tool: {name}"
 
