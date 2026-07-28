@@ -572,7 +572,7 @@ from servers.chat.service import ChatService
 
 svc = ChatService.instance()
 response = await svc.chat(session_id="abc123", message="打开第一个工程")
-# response: ChatResponse(success=True, reply="已打开 demo1.epp", activities=[...], context={...})
+# response: ChatResponse(success=True, reply="已打开 demo1.epp", activities=[...], context={...}, media=[...])
 ```
 
 会话自动记住当前工程路径和最近仿真 task_id，消除重复输入。

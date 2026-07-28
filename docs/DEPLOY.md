@@ -1,6 +1,7 @@
 # 部署指南 — 打包产物使用 & 智能体对接
 
 > 面向最终用户：如何部署打包好的 `edi-mcp.zip`，以及配置 AI 客户端接入 MCP 服务。
+> PyPI：<https://pypi.org/project/edi-mcp/>
 
 ---
 
@@ -35,13 +36,13 @@ TURBOCHARTS_PATH=                    # 留空自动检测
 MCP_TRANSPORT=sse                    # sse（Web）或 stdio（本地）
 MCP_PORT=50026                       # 监听端口
 MCP_HOST=127.0.0.1                   # 监听地址
-OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace  # 手动填写，show_image工具需要
+OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace  # 手动填写，show_image工具需要(不知道可忽略)
 LLM_API_KEY=sk-xxx                   # 可选：聊天 AI 功能
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
 ```
 
-> 留空的字段走自动检测，一般只需确认 `EDA_GRPC_SERVER` 正确。
+> 留空的字段走自动检测(除OPENCLAW_WORKSPACE)，一般只需确认 `EDA_GRPC_SERVER` 正确。
 
 ---
 

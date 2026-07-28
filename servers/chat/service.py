@@ -167,6 +167,7 @@ class ChatResponse:
     reply: str
     activities: list[dict] = field(default_factory=list)
     context: dict = field(default_factory=dict)
+    media: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -176,6 +177,7 @@ class ChatResponse:
             "reply": self.reply,
             "activities": self.activities,
             "context": self.context,
+            "media": self.media,
         }
 
 
@@ -309,6 +311,7 @@ class ChatService:
         session = self._get_or_create(session_id)
         activities: list[Activity] = []
         called_fingerprints: set[str] = set()
+        media: list[dict] = []
         t_start = time.time()
 
         _logger.info("request=%s session=%s chat started msg_len=%d",
@@ -377,7 +380,7 @@ class ChatService:
                             success=True, session_id=session.session_id,
                             request_id=request_id,
                             reply=assistant_text or "操作已完成。",
-                            activities=[a.__dict__ for a in activities],
+                            media=media, activities=[a.__dict__ for a in activities],
                             context=self._build_context(session),
                         )
 
@@ -420,7 +423,11 @@ class ChatService:
                                 try:
                                     func = CHAT_TOOL_MAP[tool_name]
                                     result = await asyncio.to_thread(func, **validation_result)
-                                    act.result = result
+                                    # 将 TextContent 列表转为纯文本，避免 JSON 序列化报错
+                                    if isinstance(result, list):
+                                        act.result = "\n".join(r.text for r in result if hasattr(r, "text"))
+                                    else:
+                                        act.result = result
                                     if isinstance(result, dict) and not result.get("success", True):
                                         act.status = "error"
                                         act.error = result.get("message", "")
@@ -438,14 +445,29 @@ class ChatService:
                                      request_id, tool_name, act.duration_ms,
                                      act.status == "success")
 
+                        # show_image：收集图片 URL
+                        if tool_name == "show_image" and act.status == "success":
+                            image_url = _register_image_from_result(tool_result)
+                            if image_url:
+                                media.append({"type": "image", "url": image_url, "name": ""})
+
                         activities.append(act)
 
                         # 工具结果交回模型
+                        serialized = tool_result
+                        if isinstance(tool_result, list):
+                            text_parts = []
+                            for item in tool_result:
+                                if hasattr(item, "text"):
+                                    text_parts.append(item.text)
+                            serialized = "\n".join(text_parts) if text_parts else _json.dumps(tool_result, ensure_ascii=False)
+                        else:
+                            serialized = _json.dumps(tool_result, ensure_ascii=False)
                         session.messages.append({
                             "role": "tool",
                             "tool_call_id": tc.get("id", ""),
                             "name": tool_name,
-                            "content": _json.dumps(tool_result, ensure_ascii=False),
+                            "content": serialized,
                         })
 
                 # 超过最大轮数
@@ -455,7 +477,7 @@ class ChatService:
                     success=False, session_id=session.session_id,
                     request_id=request_id,
                     reply=f"工具调用轮数超过上限（{_MAX_ROUNDS} 轮），请简化你的问题或补充必要信息。",
-                    activities=[a.__dict__ for a in activities],
+                    media=media, activities=[a.__dict__ for a in activities],
                     context=self._build_context(session),
                 )
 
@@ -472,7 +494,7 @@ class ChatService:
                 success=False, session_id=session.session_id,
                 request_id=request_id,
                 reply="聊天服务内部错误，请重试。",
-                activities=[a.__dict__ for a in activities],
+                media=media, activities=[a.__dict__ for a in activities],
             )
 
     # ── 工具校验 ──
@@ -636,6 +658,20 @@ _TOOL_LABELS: dict[str, str] = {
 
 def _tool_label(name: str) -> str:
     return _TOOL_LABELS.get(name, name)
+
+
+def _register_image_from_result(result: Any) -> str:
+    """从 show_image 结果中提取并注册图片 HTTP URL。"""
+    if isinstance(result, list):
+        text = "\n".join(r.text for r in result if hasattr(r, "text"))
+    else:
+        text = str(result)
+    # 从 MEDIA: 路径注册 HTTP Token
+    for line in text.split("\n"):
+        if line.startswith("MEDIA:"):
+            from servers.image_tools import register_image_url
+            return register_image_url(line[6:].strip())
+    return ""
 
 
 def _result_summary(act: Activity) -> str:

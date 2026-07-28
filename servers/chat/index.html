@@ -1,226 +1,147 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>EDA Chat</title>
-    <style>
-        :root {
-            --bg: #1a1b26;
-            --surface: #24283b;
-            --overlay: #2f3346;
-            --muted: #565f89;
-            --text: #c0caf5;
-            --subtext: #9aa5ce;
-            --blue: #7aa2f7;
-            --green: #9ece6a;
-            --red: #f7768e;
-            --yellow: #e0af68;
-            --border: #3b4261;
-            --shadow: rgba(0, 0, 0, .3);
-            --radius: 6px;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>EDI Chat</title>
+<style>
+:root {
+    --bg: #1a1b26; --surface: #24283b; --overlay: #2f3346; --muted: #565f89;
+    --text: #c0caf5; --subtext: #9aa5ce; --blue: #7aa2f7; --green: #9ece6a;
+    --red: #f7768e; --yellow: #e0af68; --border: #3b4261;
+    --shadow: rgba(0,0,0,.3); --radius: 6px; --panel-w: 320px; --panel-narrow: 44px;
+}
+@media (prefers-color-scheme: light) {
+:root {
+    --bg: #eff1f5; --surface: #e6e9ef; --overlay: #ccd0da; --muted: #9ca0b0;
+    --text: #4c4f69; --subtext: #5c5f77; --blue: #1e66f5; --green: #40a02b;
+    --red: #d20f39; --yellow: #df8e1d; --border: #bcc0cc; --shadow: rgba(0,0,0,.08);
+}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden}
 
-        @media (prefers-color-scheme: light) {
-            :root {
-                --bg: #eff1f5;
-                --surface: #e6e9ef;
-                --overlay: #ccd0da;
-                --muted: #9ca0b0;
-                --text: #4c4f69;
-                --subtext: #5c5f77;
-                --blue: #1e66f5;
-                --green: #40a02b;
-                --red: #d20f39;
-                --yellow: #df8e1d;
-                --border: #bcc0cc;
-                --shadow: rgba(0, 0, 0, .08);
-            }
-        }
+/* Sidebar */
+.panel{width:var(--panel-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:width .3s;flex-shrink:0}
+.panel.narrow{width:var(--panel-narrow)}
+.panel.narrow .panel-inner{display:none}
+.panel.narrow .panel-expand{display:flex}
+.panel-expand{display:none;flex-direction:column;align-items:center;padding-top:12px;gap:4px}
+.panel-expand button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;writing-mode:vertical-lr;letter-spacing:2px}
+.panel-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-head h2{font-size:14px;font-weight:600;color:var(--subtext)}
+.panel-head button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;transition:color .2s}
+.panel-head button:hover{color:var(--text)}
+.tool-search{padding:8px 10px}
+.tool-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;font-size:13px;color:var(--text);outline:none}
+.tool-search input:focus{border-color:var(--blue)}
+.tools-list{flex:1;overflow-y:auto;padding:4px 8px}
+.cat-label{font-size:12px;color:var(--muted);font-weight:600;padding:12px 8px 2px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:4px}
+.cat-label:hover{color:var(--text)}
+.cat-label .arrow{font-size:8px;transition:transform .2s}
+.cat-label.folded .arrow{transform:rotate(-90deg)}
+.cat-items.folded{display:none}
+.tool-item{display:flex;flex-direction:column;padding:7px 8px;border-radius:var(--radius);cursor:default;position:relative;margin-bottom:1px}
+.tool-item:hover{background:var(--overlay)}
+.tool-item .tn-top{display:flex;align-items:center;gap:6px}
+.tool-item .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot.on{background:var(--green)}.dot.off{background:var(--red)}
+.tool-item .zh{font-size:14px;font-weight:500;color:var(--text);margin-bottom:1px}
+.tool-item .en{font-size:11px;color:var(--muted)}
+.tool-tip{display:none;position:fixed;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:11px;max-width:280px;box-shadow:0 4px 12px var(--shadow);pointer-events:none}
+.tool-tip .tip-zh{color:var(--text);font-weight:600;font-size:14px;margin-bottom:2px}
+.tool-tip .tip-desc{color:var(--subtext);font-size:12px;line-height:1.4}
 
-        * { margin: 0; padding: 0; box-sizing: border-box }
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.top{background:var(--surface);padding:10px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.hamburger{background:none;border:none;color:var(--text);cursor:pointer;font-size:18px}
+.top .logo{width:28px;height:28px;border-radius:var(--radius);background:linear-gradient(135deg,var(--blue),#bb9af7);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff}
+.top .title{font-size:14px;font-weight:600}
+.top .context-bar{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:11px;color:var(--subtext)}
+.btn-new{background:var(--overlay);border:1px solid var(--border);color:var(--text);font-size:11px;padding:3px 10px;border-radius:var(--radius);cursor:pointer}
+.btn-new:hover{background:var(--muted);color:#fff}
 
-        body {
-            font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            height: 100vh;
-            overflow: hidden
-        }
+/* Messages */
+.msgs{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+.msg{display:flex;gap:8px;max-width:85%;animation:in .2s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end;flex-direction:row-reverse}
+.msg.assistant{align-self:flex-start}
+.msg .avatar{width:28px;height:28px;border-radius:var(--radius);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.msg.user .avatar{background:var(--blue);color:#fff}
+.msg.assistant .avatar{background:var(--overlay);color:var(--blue)}
+.bubble{padding:9px 12px;border-radius:10px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.msg.user .bubble{background:var(--blue);color:#fff;border-bottom-right-radius:3px}
+.msg.assistant .bubble{background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:3px}
 
-        /* ── Sidebar ── */
-        .panel {
-            width: 260px;
-            background: var(--surface);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transition: width .3s
-        }
-        .panel.collapsed { width: 0 }
-        .panel-head {
-            padding: 14px 16px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between
-        }
-        .panel-head h2 { font-size: 13px; font-weight: 600; color: var(--subtext) }
-        .panel-head button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px }
-        .tools-list { flex: 1; overflow-y: auto; padding: 8px }
-        .tool-item {
-            display: flex; align-items: center; gap: 8px;
-            padding: 6px 10px; border-radius: var(--radius);
-            font-size: 11px; color: var(--text); cursor: default
-        }
-        .tool-item:hover { background: var(--overlay) }
-        .tool-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0 }
-        .tool-item .dot.on { background: var(--green) }
-        .tool-item .dot.off { background: var(--red) }
-        .tool-item .dot.file { background: var(--blue) }
-        .tool-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-        .cat-label {
-            font-size: 10px; color: var(--muted); font-weight: 600;
-            padding: 10px 10px 4px; text-transform: uppercase; letter-spacing: .5px
-        }
+/* Image cards */
+.img-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;max-width:720px}
+.img-wrap img{display:block;width:100%;max-height:60vh;object-fit:contain;cursor:pointer;background:var(--bg)}
+.img-wrap img.full{max-height:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999;max-width:95vw;max-height:95vh;box-shadow:0 0 40px rgba(0,0,0,.6);border-radius:4px}
+.img-actions{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;font-size:11px;color:var(--muted)}
+.img-actions a{color:var(--blue);text-decoration:none}
+.img-actions a:hover{text-decoration:underline}
 
-        /* ── Main ── */
-        .main { flex: 1; display: flex; flex-direction: column; overflow: hidden }
+/* Activities */
+.activities{margin-top:6px}
+.activity{font-size:11px;border-radius:var(--radius);background:var(--bg);border:1px solid var(--border);margin-bottom:4px;overflow:hidden}
+.activity-header{display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;user-select:none}
+.activity-header:hover{background:var(--overlay)}
+.activity-header .status-icon{font-size:12px}
+.status-icon.ok{color:var(--green)}.status-icon.err{color:var(--red)}
+.activity-header .tool-label{flex:1;font-weight:500}
+.activity-header .duration{color:var(--muted);font-size:10px}
+.activity-header .expand{color:var(--muted);font-size:10px}
+.activity-body{display:none;padding:6px 10px 10px 28px;border-top:1px solid var(--border)}
+.activity-body.open{display:block}
+.activity-body pre{background:var(--surface);padding:6px 8px;border-radius:4px;overflow-x:auto;font-size:10px;margin:4px 0;border:1px solid var(--border);max-height:120px}
+.activity-body .label{font-size:10px;color:var(--muted);margin-top:4px}
+.activity-body .error-text{color:var(--red);font-size:10px}
 
-        /* ── Top bar ── */
-        .top {
-            background: var(--surface);
-            padding: 10px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; gap: 10px
-        }
-        .hamburger { background: none; border: none; color: var(--text); cursor: pointer; font-size: 18px }
-        .top .logo {
-            width: 28px; height: 28px; border-radius: var(--radius);
-            background: linear-gradient(135deg, var(--blue), #bb9af7);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 14px; font-weight: 700; color: #fff
-        }
-        .top .title { font-size: 14px; font-weight: 600 }
-        .top .context-bar {
-            margin-left: auto;
-            display: flex; align-items: center; gap: 10px;
-            font-size: 11px; color: var(--subtext)
-        }
-        .top .context-bar .dot { width: 6px; height: 6px; border-radius: 50% }
-        .top .context-bar .dot.online { background: var(--green) }
-        .top .context-bar .dot.offline { background: var(--red) }
-        .btn-new {
-            background: var(--overlay); border: 1px solid var(--border);
-            color: var(--text); font-size: 11px; padding: 3px 10px;
-            border-radius: var(--radius); cursor: pointer
-        }
-        .btn-new:hover { background: var(--muted); color: #fff }
+/* Typing */
+.typing{display:flex;gap:3px;padding:4px 0;align-self:flex-start}
+.typing span{width:6px;height:6px;background:var(--muted);border-radius:50%;animation:wave 1.4s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes wave{0%,60%,100%{opacity:.3}30%{opacity:1}}
 
-        /* ── Messages ── */
-        .msgs {
-            flex: 1; overflow-y: auto;
-            padding: 16px 20px;
-            display: flex; flex-direction: column; gap: 14px;
-            scroll-behavior: smooth
-        }
-        .msg { display: flex; gap: 8px; max-width: 85%; animation: in .2s ease-out }
-        @keyframes in { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
-        .msg.user { align-self: flex-end; flex-direction: row-reverse }
-        .msg.assistant { align-self: flex-start }
-        .msg .avatar {
-            width: 28px; height: 28px; border-radius: var(--radius);
-            flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-            font-size: 11px; font-weight: 700
-        }
-        .msg.user .avatar { background: var(--blue); color: #fff }
-        .msg.assistant .avatar { background: var(--overlay); color: var(--blue) }
-        .bubble {
-            padding: 9px 12px; border-radius: 10px;
-            font-size: 13px; line-height: 1.5;
-            white-space: pre-wrap; word-break: break-word
-        }
-        .msg.user .bubble { background: var(--blue); color: #fff; border-bottom-right-radius: 3px }
-        .msg.assistant .bubble {
-            background: var(--surface); border: 1px solid var(--border);
-            border-bottom-left-radius: 3px
-        }
-
-        /* ── Activities ── */
-        .activities { margin-top: 6px }
-        .activity {
-            font-size: 11px; border-radius: var(--radius);
-            background: var(--bg); border: 1px solid var(--border);
-            margin-bottom: 4px; overflow: hidden
-        }
-        .activity-header {
-            display: flex; align-items: center; gap: 6px;
-            padding: 5px 10px; cursor: pointer; user-select: none
-        }
-        .activity-header:hover { background: var(--overlay) }
-        .activity-header .status-icon { font-size: 12px }
-        .activity-header .status-icon.ok { color: var(--green) }
-        .activity-header .status-icon.err { color: var(--red) }
-        .activity-header .tool-label { flex: 1; font-weight: 500 }
-        .activity-header .duration { color: var(--muted); font-size: 10px }
-        .activity-header .expand { color: var(--muted); font-size: 10px }
-        .activity-body { display: none; padding: 6px 10px 10px 28px; border-top: 1px solid var(--border) }
-        .activity-body.open { display: block }
-        .activity-body pre {
-            background: var(--surface); padding: 6px 8px; border-radius: 4px;
-            overflow-x: auto; font-size: 10px; margin: 4px 0;
-            border: 1px solid var(--border); max-height: 120px
-        }
-        .activity-body .label { font-size: 10px; color: var(--muted); margin-top: 4px }
-        .activity-body .error-text { color: var(--red); font-size: 10px }
-
-        /* ── Typing ── */
-        .typing { display: flex; gap: 3px; padding: 4px 0; align-self: flex-start }
-        .typing span { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; animation: wave 1.4s infinite }
-        .typing span:nth-child(2) { animation-delay: .2s }
-        .typing span:nth-child(3) { animation-delay: .4s }
-        @keyframes wave { 0%,60%,100%{opacity:.3} 30%{opacity:1} }
-
-        /* ── Input ── */
-        .input-wrap { padding: 10px 20px 14px; background: var(--surface); border-top: 1px solid var(--border) }
-        .input-row {
-            display: flex; gap: 6px; background: var(--bg);
-            border: 1px solid var(--border); border-radius: 10px; padding: 4px;
-            transition: border-color .2s
-        }
-        .input-row:focus-within { border-color: var(--blue) }
-        .input-row textarea {
-            flex: 1; background: none; border: none; color: var(--text);
-            font-size: 13px; font-family: inherit; resize: none; outline: none;
-            padding: 6px; min-height: 18px; max-height: 100px
-        }
-        .input-row button {
-            background: var(--blue); color: #fff; border: none;
-            border-radius: var(--radius); padding: 6px 16px;
-            cursor: pointer; font-size: 13px; font-weight: 600; align-self: flex-end
-        }
-        .input-row button:hover { opacity: .85 }
-        .input-row button:disabled { opacity: .4 }
-    </style>
+/* Input area */
+.input-wrap{padding:12px 20px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.input-row{display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:6px 8px 4px;transition:border-color .2s}
+.input-row:focus-within{border-color:var(--blue)}
+.input-row textarea{flex:1;background:none;border:none;color:var(--text);font-size:13px;font-family:inherit;resize:none;outline:none;padding:4px 6px;min-height:72px;max-height:200px}
+.input-foot{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 4px}
+.input-hint{font-size:10px;color:var(--muted)}
+.input-hint kbd{background:var(--overlay);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-family:inherit;font-size:9px}
+#sendBtn{background:var(--blue);color:#fff;border:none;border-radius:var(--radius);padding:5px 18px;cursor:pointer;font-size:13px;font-weight:600;align-self:flex-end}
+#sendBtn:hover{opacity:.85}
+#sendBtn:disabled{opacity:.4}
+#sendBtn.stop{background:var(--red)}
+</style>
 </head>
 <body>
 
-<!-- ── sidebar ── -->
+<!-- Sidebar -->
 <div class="panel" id="panel">
-    <div class="panel-head"><h2>TOOLS</h2>
-        <button onclick="togglePanel()" title="collapse">&times;</button>
+    <div class="panel-inner">
+        <div class="panel-head">
+            <h2>工具 / Tools</h2>
+            <button onclick="foldPanel()" title="折叠侧栏">&laquo;</button>
+        </div>
+        <div class="tool-search"><input type="text" id="toolSearch" placeholder="搜索工具..." oninput="renderTools()"></div>
+        <div class="tools-list" id="toolsList"></div>
     </div>
-    <div class="tools-list" id="toolsList"></div>
+    <div class="panel-expand" id="panelExpand">
+        <button onclick="unfoldPanel()" title="展开侧栏">&raquo;</button>
+    </div>
 </div>
 
-<!-- ── main ── -->
+<!-- Main -->
 <div class="main">
     <div class="top">
         <button class="hamburger" onclick="togglePanel()">&#9776;</button>
         <div class="logo">E</div>
-        <div class="title">EDA Chat</div>
+        <div class="title">EDI Chat</div>
         <div class="context-bar">
             <span id="ctxStatus"></span>
             <button class="btn-new" onclick="newSession()" title="开始新对话">新对话</button>
@@ -229,17 +150,23 @@
     <div class="msgs" id="msgs">
         <div class="msg assistant">
             <div class="avatar">AI</div>
-            <div class="bubble">你好！我可以帮你操作 EDA 工程。<br>试试：打开工程 / 查看元件 / 工程概览 / 执行仿真</div>
+            <div class="bubble">你好！我可以帮你操作 EDI 工程。<br>试试：打开工程 / 查看元件 / 工程概览 / 执行仿真</div>
         </div>
     </div>
     <div class="input-wrap">
         <div class="input-row">
-            <textarea id="q" rows="1" placeholder="输入消息..."
+            <textarea id="q" rows="3" placeholder="输入消息...&#10;Enter 发送 · Shift+Enter 换行"
                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
-            <button id="sendBtn" onclick="send()">&#10148;</button>
+            <div class="input-foot">
+                <span class="input-hint"><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行</span>
+                <button id="sendBtn" onclick="send()">发送</button>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Tooltip -->
+<div class="tool-tip" id="tooltip"></div>
 
 <script>
 const CHAT_URL = location.origin + "/chat";
@@ -248,37 +175,50 @@ const TOOLS_URL = location.origin + "/tools/list";
 
 let tools = [], edaReady = false, tcReady = false;
 
-// ── Session ──
+// Tool name mappings
+const TOOL_ZH = {
+    list_epp_projects:"扫描工程",create_blank_epp:"创建工程",open_edi_project:"打开工程",close_edi_project:"关闭工程",
+    list_project_components:"列出元件",get_component_parameters:"查询参数",get_project_summary:"工程概览",
+    simulate_project:"执行仿真(同步)",start_simulation_async:"启动异步仿真",get_simulation_async_status:"查询仿真状态",
+    get_simulation_async_result:"获取仿真结果",simulate_netlist:"仿真网表",simulate_netlist_with_ads:"ADS仿真控制器",
+    export_project_netlist:"导出网表",capture_schematic:"截图原理图",replace_models_from_csv:"批量替换模型",
+    launch_edi:"启动EDI",compare_simulation_results:"对比仿真结果",turbocharts_convert:"RAW转曲线图",
+    show_image:"显示图片",open_hfss_project:"打开HFSS",close_hfss_project:"关闭HFSS",launch_aedt:"启动AEDT",
+    get_hfss_project_info:"HFSS信息",start_hfss_analysis_async:"HFSS异步仿真",get_hfss_analysis_status:"HFSS仿真状态",
+};
+
+// Session
 let sessionId = localStorage.getItem("eda_chat_session_id");
-if (!sessionId) {
-    sessionId = crypto.randomUUID();
-    localStorage.setItem("eda_chat_session_id", sessionId);
-}
+if (!sessionId) { sessionId = crypto.randomUUID(); localStorage.setItem("eda_chat_session_id", sessionId); }
 
 function newSession() {
-    sessionId = crypto.randomUUID();
-    localStorage.setItem("eda_chat_session_id", sessionId);
-    let msgs = document.getElementById("msgs");
-    msgs.innerHTML = '';
+    sessionId = crypto.randomUUID(); localStorage.setItem("eda_chat_session_id", sessionId);
+    document.getElementById("msgs").innerHTML = '';
     addMsg("assistant", "新对话已开始。当前工程等信息已清空。");
     updateContext({});
 }
 
-// ── Context bar ──
 function updateContext(ctx) {
-    let el = document.getElementById("ctxStatus");
-    let parts = [];
-    let online = edaReady;
-    parts.push(online ? "EDA 在线" : "EDA 离线");
-    if (ctx && ctx.current_project_name) {
-        parts.push("当前工程：" + ctx.current_project_name);
-    } else {
-        parts.push("未选择工程");
-    }
-    el.textContent = parts.join(" · ");
+    let parts = []; let online = edaReady;
+    parts.push(online ? "EDI 在线" : "EDI 离线");
+    parts.push(ctx && ctx.current_project_name ? "当前工程：" + ctx.current_project_name : "未选择工程");
+    document.getElementById("ctxStatus").textContent = parts.join(" · ");
 }
 
-// ── Tool panel ──
+// Sidebar
+function foldPanel() { setPanelState("narrow"); }
+function unfoldPanel() { setPanelState("open"); }
+function togglePanel() { setPanelState(document.getElementById("panel").classList.contains("narrow") ? "open" : "narrow"); }
+function setPanelState(state) {
+    let p = document.getElementById("panel");
+    p.classList.toggle("narrow", state === "narrow");
+    localStorage.setItem("eda_panel_state", state);
+}
+(function() { if (localStorage.getItem("eda_panel_state") === "narrow") setPanelState("narrow"); })();
+
+// Tool panel
+let foldedCats = JSON.parse(localStorage.getItem("eda_folded_cats") || "[]");
+
 function catFor(name) {
     if (name.startsWith("list_") || name.startsWith("get_")) return "查询";
     if (name.startsWith("open_") || name.startsWith("close_")) return "工程";
@@ -294,123 +234,117 @@ function catFor(name) {
 }
 
 async function loadTools() {
-    try {
-        let r = await fetch(TOOLS_URL);
-        let data = await r.json();
-        tools = Array.isArray(data) ? data : (data.result?.tools || []);
-    } catch(e) {}
+    try { let r = await fetch(TOOLS_URL); let d = await r.json(); tools = Array.isArray(d) ? d : (d.result?.tools || []); } catch(e) {}
     renderTools();
 }
 
 function renderTools() {
+    let q = (document.getElementById("toolSearch").value || "").toLowerCase();
     let h = {};
-    for (let t of tools) { let c = catFor(t.name); if (!h[c]) h[c] = []; h[c].push(t); }
+    for (let t of tools) {
+        let c = catFor(t.name);
+        if (q && !TOOL_ZH[t.name]?.includes(q) && !t.name.includes(q) && !t.description?.includes(q)) continue;
+        if (!h[c]) h[c] = []; h[c].push(t);
+    }
     let el = document.getElementById("toolsList"), html = "";
     for (let cat of Object.keys(h).sort()) {
-        html += '<div class="cat-label">' + cat + '</div>';
+        let isFolded = foldedCats.includes(cat);
+        html += '<div class="cat-label'+(isFolded?' folded':'')+'" onclick="toggleCat(this,\''+cat+'\')"><span class="arrow">&#9660;</span>'+cat+'</div>';
+        html += '<div class="cat-items'+(isFolded?' folded':'')+'">';
         for (let t of h[cat]) {
+            let zh = TOOL_ZH[t.name] || t.name;
             let cls = edaReady || tcReady ? "on" : "off";
             if (t.name.startsWith("list_") || t.name.startsWith("get_")) cls = "file";
-            let escapedName = t.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            let escapedDesc = (t.description||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-            html += '<div class="tool-item"><span class="dot ' + cls + '"></span><span class="name" title="' + escapedDesc + '">' + escapedName + '</span></div>';
+            html += '<div class="tool-item" data-name="'+t.name.replace(/"/g,'&quot;')+'" data-desc="'+(t.description||'').replace(/"/g,'&quot;')+'" data-zh="'+zh.replace(/"/g,'&quot;')+'" onmouseenter="showTip(event,this)" onmouseleave="hideTip()">';
+            html += '<div class="tn-top"><span class="dot '+cls+'"></span><span class="zh">'+zh+'</span></div>';
+            html += '<span class="en">'+t.name+'</span></div>';
         }
+        html += '</div>';
     }
     el.innerHTML = html;
 }
 
-async function checkHealth() {
-    try {
-        let r = await fetch(HLTH_URL), d = await r.json();
-        edaReady = d.eda_grpc_ready; tcReady = d.turbocharts_ready;
-    } catch(e) {}
+function toggleCat(el, cat) {
+    if (foldedCats.includes(cat)) foldedCats = foldedCats.filter(c => c !== cat);
+    else foldedCats.push(cat);
+    localStorage.setItem("eda_folded_cats", JSON.stringify(foldedCats));
     renderTools();
 }
 
-function togglePanel() {
-    document.getElementById("panel").classList.toggle("collapsed");
+function showTip(e, el) {
+    let tip = document.getElementById("tooltip");
+    tip.innerHTML = '<div class="tip-zh">'+el.dataset.zh+'</div><div class="tip-desc">'+el.dataset.desc+'</div>';
+    tip.style.display = "block";
+    let r = tip.getBoundingClientRect();
+    let x = e.clientX + 12, y = e.clientY - 10;
+    if (x + r.width > window.innerWidth) x = e.clientX - r.width - 12;
+    if (y + r.height > window.innerHeight) y = e.clientY - r.height - 10;
+    tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip() { document.getElementById("tooltip").style.display = "none"; }
+
+async function checkHealth() {
+    try { let r = await fetch(HLTH_URL), d = await r.json(); edaReady = d.eda_grpc_ready; tcReady = d.turbocharts_ready; } catch(e) {}
+    renderTools();
 }
 
-// ── Chat ──
+// Chat
 function addMsg(role, text) {
     let div = document.createElement("div"), av = document.createElement("div"), bub = document.createElement("div");
-    div.className = "msg " + role;
-    av.className = "avatar";
-    av.textContent = role === "user" ? "U" : "AI";
-    bub.className = "bubble";
-    bub.textContent = text;
-    div.append(av, bub);
-    document.getElementById("msgs").appendChild(div);
+    div.className = "msg "+role; av.className = "avatar"; av.textContent = role==="user"?"U":"AI"; bub.className = "bubble";
+    bub.textContent = text; div.append(av, bub);
+    document.getElementById("msgs").appendChild(div); scrollDown(); return div;
+}
+function renderMedia(mediaList) {
+    if (!mediaList || !mediaList.length) return;
+    let msgs = document.getElementById("msgs");
+    for (let m of mediaList) {
+        if (m.type === "image" && m.url) {
+            let div = document.createElement("div"), av = document.createElement("div"), card = document.createElement("div");
+            div.className = "msg assistant"; av.className = "avatar"; av.textContent = "AI";
+            card.className = "img-card";
+            card.innerHTML = '<div class="img-wrap"><img src="' + m.url.replace(/&/g,'&amp;') + '" alt="' + (m.name||'image').replace(/"/g,'&quot;') + '" loading="lazy" onclick="this.classList.toggle(\'full\')"></div><div class="img-actions"><span>' + (m.name||'') + '</span><a href="' + m.url.replace(/&/g,'&amp;') + '" target="_blank">新窗口</a></div>';
+            div.append(av, card); msgs.appendChild(div);
+        }
+    }
     scrollDown();
-    return div;
+}
+
+function stripMediaLine(text) {
+    return text.split("\n").filter(l => !l.startsWith("MEDIA:")).join("\n").trim();
 }
 
 function addActivityBubble(activities) {
     let div = document.createElement("div"), av = document.createElement("div"), wrap = document.createElement("div");
-    div.className = "msg assistant";
-    av.className = "avatar";
-    av.textContent = "AI";
-    wrap.className = "bubble";
-    wrap.style.fontSize = "11px";
-
-    let header = document.createElement("div");
-    header.textContent = "工具执行详情：";
-    header.style.marginBottom = "4px";
-    header.style.color = "var(--subtext)";
-    wrap.appendChild(header);
-
-    let list = document.createElement("div");
-    list.className = "activities";
-
+    div.className = "msg assistant"; av.className = "avatar"; av.textContent = "AI";
+    wrap.className = "bubble"; wrap.style.fontSize = "11px";
+    let hdr = document.createElement("div"); hdr.textContent = "工具执行详情："; hdr.style.cssText = "margin-bottom:4px;color:var(--subtext)";
+    wrap.appendChild(hdr);
+    let list = document.createElement("div"); list.className = "activities";
     for (let a of activities) {
-        let item = document.createElement("div");
-        item.className = "activity";
-
-        let hdr = document.createElement("div");
-        hdr.className = "activity-header";
+        let item = document.createElement("div"); item.className = "activity";
+        let h = document.createElement("div"); h.className = "activity-header";
         let ok = a.status === "success";
-        hdr.innerHTML = '<span class="status-icon ' + (ok ? 'ok' : 'err') + '">' + (ok ? '&#10003;' : '&#10007;') + '</span>' +
-            '<span class="tool-label">' + (a.label || a.tool) + '</span>' +
-            (a.duration_ms ? '<span class="duration">' + a.duration_ms + 'ms</span>' : '') +
-            '<span class="expand">&#9660;</span>';
-
-        let body = document.createElement("div");
-        body.className = "activity-body";
-        let bodyHtml = '';
-        if (a.tool) bodyHtml += '<div class="label">工具</div><div>' + a.tool.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
-        if (a.args && Object.keys(a.args).length) bodyHtml += '<div class="label">参数</div><pre>' + JSON.stringify(a.args, null, 2).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</pre>';
-        if (a.summary) bodyHtml += '<div class="label">摘要</div><div>' + a.summary.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
-        if (a.error) bodyHtml += '<div class="label">错误</div><div class="error-text">' + a.error.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>';
-        body.innerHTML = bodyHtml;
-
-        hdr.onclick = function() {
-            body.classList.toggle("open");
-            let arrow = hdr.querySelector(".expand");
-            arrow.textContent = body.classList.contains("open") ? "▲" : "▼";
-        };
-
-        item.append(hdr, body);
-        list.appendChild(item);
+        h.innerHTML = '<span class="status-icon '+(ok?'ok':'err')+'">'+(ok?'&#10003;':'&#10007;')+'</span><span class="tool-label">'+(a.label||a.tool)+'</span>'+(a.duration_ms?'<span class="duration">'+a.duration_ms+'ms</span>':'')+'<span class="expand">&#9660;</span>';
+        let b = document.createElement("div"); b.className = "activity-body";
+        let bh = '';
+        if (a.tool) bh += '<div class="label">工具</div><div>'+a.tool.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>';
+        if (a.args&&Object.keys(a.args).length) bh += '<div class="label">参数</div><pre>'+JSON.stringify(a.args,null,2).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</pre>';
+        if (a.summary) bh += '<div class="label">摘要</div><div>'+a.summary.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>';
+        if (a.error) bh += '<div class="label">错误</div><div class="error-text">'+a.error.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>';
+        b.innerHTML = bh;
+        h.onclick = function() { b.classList.toggle("open"); h.querySelector(".expand").textContent = b.classList.contains("open")?"▲":"▼"; };
+        item.append(h, b); list.appendChild(item);
     }
-    wrap.appendChild(list);
-    div.append(av, wrap);
-    document.getElementById("msgs").appendChild(div);
-    scrollDown();
+    wrap.appendChild(list); div.append(av, wrap);
+    document.getElementById("msgs").appendChild(div); scrollDown();
 }
-
-function scrollDown() {
-    let m = document.getElementById("msgs");
-    m.scrollTo({top: m.scrollHeight, behavior: "smooth"});
-}
-
+function scrollDown() { let m = document.getElementById("msgs"); m.scrollTo({top:m.scrollHeight,behavior:"smooth"}); }
 function showTyping() {
-    let d = document.createElement("div");
-    d.className = "typing"; d.id = "typing";
+    let d = document.createElement("div"); d.className = "typing"; d.id = "typing";
     for (let i = 0; i < 3; i++) { let s = document.createElement("span"); d.appendChild(s) }
-    document.getElementById("msgs").appendChild(d);
-    scrollDown();
+    document.getElementById("msgs").appendChild(d); scrollDown();
 }
-
 function hideTyping() { document.getElementById("typing")?.remove(); }
 
 async function send() {
@@ -419,48 +353,25 @@ async function send() {
     q.value = ""; q.style.height = "auto";
     addMsg("user", m);
     showTyping();
-    document.getElementById("sendBtn").disabled = true;
+    let btn = document.getElementById("sendBtn");
+    btn.disabled = true; btn.classList.add("stop"); btn.textContent = "停止";
     try {
-        let r = await fetch(CHAT_URL, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({session_id: sessionId, message: m})
-        });
+        let r = await fetch(CHAT_URL, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:sessionId,message:m})});
         let d = await r.json();
         hideTyping();
-
-        // 活动列表（折叠）
-        if (d.activities && d.activities.length) {
-            addActivityBubble(d.activities);
-        }
-
-        // 上下文更新
+        if (d.activities && d.activities.length) addActivityBubble(d.activities);
+        renderMedia(d.media);
         updateContext(d.context || {});
-
-        // 模型回复
-        if (d.reply) {
-            addMsg("assistant", d.reply);
-        } else if (d.error) {
-            addMsg("assistant", "错误: " + d.error);
-        } else {
-            addMsg("assistant", "已完成。");
-        }
-    } catch (e) {
-        hideTyping();
-        addMsg("assistant", "请求失败: " + e.message);
-    }
-    document.getElementById("sendBtn").disabled = false;
+        if (d.reply) addMsg("assistant", stripMediaLine(d.reply));
+        else if (d.error) addMsg("assistant", "错误: " + d.error);
+        else addMsg("assistant", "已完成。");
+    } catch (e) { hideTyping(); addMsg("assistant", "请求失败: " + e.message); }
+    btn.disabled = false; btn.classList.remove("stop"); btn.textContent = "发送";
 }
 
-// ── Init ──
-document.getElementById("q").addEventListener("input", function () {
-    this.style.height = "auto";
-    this.style.height = Math.min(this.scrollHeight, 100) + "px";
-});
-
-loadTools();
-checkHealth();
-setInterval(checkHealth, 30000);
+// Init
+document.getElementById("q").addEventListener("input", function() { this.style.height = "auto"; this.style.height = Math.min(this.scrollHeight, 200) + "px"; });
+loadTools(); checkHealth(); setInterval(checkHealth, 30000);
 </script>
 </body>
 </html>

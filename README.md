@@ -215,7 +215,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部 
 
 | 工具 | 说明 | 参数 |
 |---|---|---|
-| `show_image` | 显示本地图片（复制到工作区）| `image_path` |
+| `show_image` | 显示本地图片 | `image_path` |
 
 ### 图表
 

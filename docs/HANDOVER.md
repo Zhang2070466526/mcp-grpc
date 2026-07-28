@@ -68,7 +68,7 @@ PyPI: https://pypi.org/project/edi-mcp/
 
 **模型启动**：replace_models_from_csv, launch_edi
 
-**图片**：show_image（显示本地图片，复制到工作区缓存目录，不分析内容）
+**图片**：show_image（显示本地图片，配置工作区时返回 MEDIA:，否则返回本地路径）
 
 **图表**：turbocharts_convert
 
