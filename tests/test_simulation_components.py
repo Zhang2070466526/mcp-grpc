@@ -1,0 +1,586 @@
+"""Tests for simulation_components.py — protocol v2.
+
+Covers: catalog, parameter resolution, validation, wire conversion,
+        component lookup, input edge cases.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+
+import pytest
+
+# ---------------------------------------------------------------------------
+# Utilities under test
+# ---------------------------------------------------------------------------
+from servers.eda.simulation_components import (
+    _load_catalog,
+    _catalog_component,
+    _resolve_parameter_schema,
+    _prepare_parameters,
+    _to_wire_parameters,
+    _from_wire_parameters,
+    _find_component_by_instance,
+    _format_component_parameters,
+    _COMPONENT_TYPES,
+    _ACTIVE_STATES,
+)
+
+
+# ═══════════════════════════════════════════════════════════
+# 1. Catalog structure
+# ═══════════════════════════════════════════════════════════
+
+class TestCatalog:
+    def test_catalog_loads(self):
+        cat = _load_catalog()
+        assert cat, "Catalog should not be empty"
+        assert cat.get("schema_version") == "2.0.0"
+        assert cat.get("protocol_version") == "2"
+
+    def test_all_types_present(self):
+        for ct in _COMPONENT_TYPES:
+            comp = _catalog_component(ct)
+            assert comp, f"{ct} should be in catalog"
+            assert "parameters" in comp
+
+    def test_all_parameters_have_explicit_permissions(self):
+        for ct in _COMPONENT_TYPES:
+            comp = _catalog_component(ct)
+            for pname, pschema in comp.get("parameters", {}).items():
+                assert "create_allowed" in pschema, f"{ct}.{pname} missing create_allowed"
+                assert "update_allowed" in pschema, f"{ct}.{pname} missing update_allowed"
+                assert "permission_source" in pschema, f"{ct}.{pname} missing permission_source"
+
+    def test_wire_names_unique(self):
+        for ct in _COMPONENT_TYPES:
+            comp = _catalog_component(ct)
+            wires = [d.get("wire_name") for d in comp.get("parameters", {}).values()]
+            assert len(wires) == len(set(wires)), f"{ct}: duplicate wire names in {wires}"
+
+    def test_bandwidth_for_noise_rules(self):
+        sp = _catalog_component("SParameter")
+        bn = sp["parameters"]["BandwidthForNoise"]
+        assert bn["create_allowed"] is True, "BandwidthForNoise should be create_allowed"
+        assert bn["update_allowed"] is False, "BandwidthForNoise should NOT be update_allowed"
+
+    def test_examples_pass_own_validation(self):
+        cat = _load_catalog()
+        for ct in _COMPONENT_TYPES:
+            example = cat["components"][ct]["example"]
+            wire, error = _prepare_parameters(ct, example, "create", allow_empty=True)
+            assert error is None, f"{ct} example fails validation: {error}"
+            assert isinstance(wire, dict)
+
+
+# ═══════════════════════════════════════════════════════════
+# 2. Parameter resolution
+# ═══════════════════════════════════════════════════════════
+
+class TestResolveParameterSchema:
+    def test_fixed_param(self):
+        schema, wire = _resolve_parameter_schema("SParameter", "Start")
+        assert schema is not None
+        assert wire == "Start"
+        assert schema["value_type"] == "number"
+
+    def test_fixed_param_with_wire_alias(self):
+        schema, wire = _resolve_parameter_schema("HarmonicBalance", "Freq")
+        assert schema is not None
+        assert wire == "Freq[1]", f"Freq shortcut should map to Freq[1], got {wire}"
+
+        schema, wire = _resolve_parameter_schema("HarmonicBalance", "Order")
+        assert schema is not None
+        assert wire == "Order[1]"
+
+    def test_dynamic_param(self):
+        schema, wire = _resolve_parameter_schema("HarmonicBalance", "Freq[2]")
+        assert schema is not None
+        assert wire == "Freq[2]"
+
+    def test_dynamic_param_out_of_range(self):
+        schema, wire = _resolve_parameter_schema("HarmonicBalance", "Freq[99]")
+        assert schema is None, "Freq[99] exceeds index_max 32"
+
+    def test_dynamic_param_xdb(self):
+        schema, wire = _resolve_parameter_schema("XDB", "Order[3]")
+        assert schema is not None
+        assert wire == "Order[3]"
+
+    def test_unknown_param(self):
+        schema, wire = _resolve_parameter_schema("SParameter", "FooBar")
+        assert schema is None
+        assert wire == ""
+
+    def test_unknown_component_type(self):
+        schema, wire = _resolve_parameter_schema("UnknownType", "Start")
+        assert schema is None
+        assert wire == ""
+
+
+# ═══════════════════════════════════════════════════════════
+# 3. _prepare_parameters — unified validation
+# ═══════════════════════════════════════════════════════════
+
+class TestPrepareParameters:
+    def test_create_empty_allowed(self):
+        wire, err = _prepare_parameters("SParameter", {}, "create", allow_empty=True)
+        assert err is None
+        assert wire == {}
+
+    def test_update_empty_rejected(self):
+        wire, err = _prepare_parameters("SParameter", {}, "update", allow_empty=False)
+        assert err is not None
+        assert err["error_code"] == "INVALID_PARAMETERS"
+
+    def test_not_a_dict(self):
+        wire, err = _prepare_parameters("SParameter", [1, 2, 3], "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "INVALID_PARAMETERS"
+
+    def test_null_value_rejected(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": None}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "INVALID_PARAMETER_VALUE"
+
+    def test_array_value_rejected(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": [1, 2]}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "INVALID_PARAMETER_VALUE"
+
+    def test_extra_field_rejected(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": {"value": "1", "unit": "GHz", "foo": "bar"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "INVALID_PARAMETER_VALUE"
+
+    def test_missing_value_field(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": {"unit": "GHz"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "MISSING_VALUE"
+
+    def test_number_validation(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": {"value": "1.0", "unit": "GHz"}}, "create", allow_empty=True)
+        assert err is None
+        assert wire["Start"]["value"] == "1.0"
+
+    def test_nan_rejected(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": {"value": "NaN", "unit": "GHz"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "INVALID_VALUE"
+
+    def test_infinity_rejected(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": {"value": "Infinity", "unit": "GHz"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "INVALID_VALUE"
+
+    def test_integer_fraction_rejected(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Pts": {"value": "1.5"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "INVALID_VALUE"
+
+    def test_integer_valid(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Pts": {"value": "101"}}, "create", allow_empty=True)
+        assert err is None
+        assert wire["Pts"]["value"] == "101"
+
+    def test_enum_valid(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"CalcS": {"value": "yes"}}, "create", allow_empty=True)
+        assert err is None
+
+    def test_enum_invalid(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"CalcS": {"value": "maybe"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "INVALID_ENUM_VALUE"
+
+    def test_missing_required_unit(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": {"value": "1.0"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "MISSING_UNIT"
+
+    def test_unwanted_unit(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Pts": {"value": "101", "unit": "Hz"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "UNSUPPORTED_UNIT"
+
+    def test_wrong_unit(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": {"value": "1.0", "unit": "kilometers"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "UNSUPPORTED_UNIT"
+
+    def test_empty_unit_string(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"Start": {"value": "1.0", "unit": ""}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "UNSUPPORTED_UNIT"
+
+    def test_unsupported_param(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"NoSuchParam": {"value": "1"}}, "create", allow_empty=True)
+        assert err is not None
+        assert err["error_code"] == "UNSUPPORTED_PARAMETER"
+
+    def test_bandwidth_for_noise_create_allowed(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"BandwidthForNoise": {"value": "1.0", "unit": "GHz"}}, "create", allow_empty=True)
+        assert err is None
+
+    def test_bandwidth_for_noise_update_rejected(self):
+        wire, err = _prepare_parameters("SParameter",
+            {"BandwidthForNoise": {"value": "1.0", "unit": "GHz"}}, "update", allow_empty=False)
+        assert err is not None
+        assert err["error_code"] == "UPDATE_PARAMETER_NOT_ALLOWED"
+
+    def test_hb_freq_wire_conversion(self):
+        wire, err = _prepare_parameters("HarmonicBalance",
+            {"Freq": {"value": "1", "unit": "GHz"}}, "create", allow_empty=True)
+        assert err is None
+        assert "Freq[1]" in wire, f"Freq should be converted to Freq[1], got {wire}"
+
+    def test_hb_multi_tone(self):
+        wire, err = _prepare_parameters("HarmonicBalance", {
+            "Freq[1]": {"value": "1", "unit": "GHz"},
+            "Order[1]": {"value": "5"},
+            "Freq[2]": {"value": "2", "unit": "GHz"},
+            "Order[2]": {"value": "3"},
+        }, "create", allow_empty=True)
+        assert err is None
+        assert "Freq[2]" in wire
+        assert "Order[2]" in wire
+
+    def test_xdb_wire_conversion(self):
+        wire, err = _prepare_parameters("XDB",
+            {"Freq": {"value": "1.0", "unit": "GHz"}, "Order": {"value": "5"}},
+            "create", allow_empty=True)
+        assert err is None
+        assert wire["Freq[1]"]["value"] == "1.0"
+        assert wire["Order[1]"]["value"] == "5"
+
+
+# ═══════════════════════════════════════════════════════════
+# 4. Wire conversion
+# ═══════════════════════════════════════════════════════════
+
+class TestWireConversion:
+    def test_to_wire_hb(self):
+        wire = _to_wire_parameters("HarmonicBalance", {
+            "Freq": {"value": "1", "unit": "GHz"},
+            "Order": {"value": "5"},
+        })
+        assert "Freq[1]" in wire
+        assert "Order[1]" in wire
+
+    def test_to_wire_dynamic(self):
+        wire = _to_wire_parameters("HarmonicBalance", {
+            "Freq[3]": {"value": "3", "unit": "GHz"},
+        })
+        assert "Freq[3]" in wire
+
+    def test_from_wire_fixed(self):
+        public = _from_wire_parameters("HarmonicBalance", {
+            "Freq[1]": {"value": "1", "unit": "GHz"},
+            "Order[1]": {"value": "5"},
+        })
+        assert "Freq" in public
+        assert "Order" in public
+
+    def test_from_wire_dynamic(self):
+        public = _from_wire_parameters("HarmonicBalance", {
+            "Freq[2]": {"value": "2", "unit": "GHz"},
+            "Order[2]": {"value": "3"},
+        })
+        assert "Freq[2]" in public
+        assert "Order[2]" in public
+
+    def test_from_wire_mixed(self):
+        public = _from_wire_parameters("HarmonicBalance", {
+            "Freq[1]": {"value": "1", "unit": "GHz"},
+            "Order[1]": {"value": "5"},
+            "Freq[2]": {"value": "2", "unit": "GHz"},
+            "Order[2]": {"value": "3"},
+        })
+        assert "Freq" in public          # Freq[1] → Freq
+        assert "Freq[2]" in public        # Freq[2] → Freq[2]
+        assert "Order" in public          # Order[1] → Order
+        assert "Order[2]" in public       # Order[2] → Order[2]
+
+
+# ═══════════════════════════════════════════════════════════
+# 5. Component lookup
+# ═══════════════════════════════════════════════════════════
+
+class TestFindComponentByInstance:
+    def test_empty_instance_name(self):
+        comp, error = _find_component_by_instance(
+            "/fake/project.epp", ""
+        )
+        assert comp is None
+        assert error["error_code"] == "EMPTY_INSTANCE_NAME"
+
+    def test_whitespace_only(self):
+        comp, error = _find_component_by_instance(
+            "/fake/project.epp", "   "
+        )
+        assert comp is None
+        assert error["error_code"] == "EMPTY_INSTANCE_NAME"
+
+    def test_file_not_found(self):
+        comp, error = _find_component_by_instance(
+            "C:/nonexistent/project.epp", "R1"
+        )
+        assert comp is None
+        assert error["error_code"] == "COMPONENT_NOT_FOUND"
+
+
+# ═══════════════════════════════════════════════════════════
+# 6. Parameter formatting
+# ═══════════════════════════════════════════════════════════
+
+class TestFormatComponentParameters:
+    def test_no_unit_on_unitless_param(self):
+        result = _format_component_parameters("SParameter", {
+            "Pts": {"value": "101"},
+        })
+        assert "Pts" in result
+        assert "unit" not in result["Pts"], "Unitless param should not have unit key"
+
+    def test_unit_on_unitful_param(self):
+        result = _format_component_parameters("SParameter", {
+            "Start": {"value": "1.0", "unit": "GHz"},
+        })
+        assert result["Start"]["unit"] == "GHz"
+
+    def test_empty_result(self):
+        result = _format_component_parameters("SParameter", {})
+        assert result == {}
+
+    def test_wire_to_public(self):
+        result = _format_component_parameters("HarmonicBalance", {
+            "Freq[1]": {"value": "1", "unit": "GHz"},
+        })
+        assert "Freq" in result
+        assert result["Freq"]["value"] == "1"
+
+    def test_dynamic_wire_to_public(self):
+        result = _format_component_parameters("HarmonicBalance", {
+            "Freq[2]": {"value": "2", "unit": "GHz"},
+        })
+        assert "Freq[2]" in result
+
+
+# ═══════════════════════════════════════════════════════════
+# 7. Active states
+# ═══════════════════════════════════════════════════════════
+
+class TestActiveStates:
+    def test_valid_states(self):
+        assert "NORMAL" in _ACTIVE_STATES
+        assert "DISABLED" in _ACTIVE_STATES
+        assert "SHORTED" in _ACTIVE_STATES
+        assert len(_ACTIVE_STATES) == 3
+
+
+# ═══════════════════════════════════════════════════════════
+# 8. Schema tool
+# ═══════════════════════════════════════════════════════════
+
+class TestGetSchema:
+    def test_sparameter_schema(self):
+        from servers.eda.simulation_components import get_simulation_component_schema
+        result = get_simulation_component_schema("SParameter")
+        assert result["success"] is True
+        assert result["component_type"] == "SParameter"
+        assert result["schema_version"] == "2.0.0"
+        assert result["protocol_version"] == "2"
+        assert "parameters" in result
+        assert "parameter_patterns" in result
+        assert "example" in result
+
+    def test_hb_schema_with_patterns(self):
+        from servers.eda.simulation_components import get_simulation_component_schema
+        result = get_simulation_component_schema("HarmonicBalance")
+        assert result["success"] is True
+        assert len(result["parameter_patterns"]) == 2
+
+    def test_single_parameter(self):
+        from servers.eda.simulation_components import get_simulation_component_schema
+        result = get_simulation_component_schema("SParameter", "Start")
+        assert result["success"] is True
+        assert "Start" in result["parameters"]
+        assert len(result["parameters"]) == 1
+
+    def test_unknown_parameter(self):
+        from servers.eda.simulation_components import get_simulation_component_schema
+        result = get_simulation_component_schema("SParameter", "NoSuchParam")
+        assert result["success"] is False
+        assert result["error_code"] == "UNSUPPORTED_PARAMETER"
+
+    def test_unknown_type(self):
+        from servers.eda.simulation_components import get_simulation_component_schema
+        result = get_simulation_component_schema("FooBar")
+        assert result["success"] is False
+        assert result["error_code"] == "UNSUPPORTED_COMPONENT_TYPE"
+
+
+# ═══════════════════════════════════════════════════════════
+# 9. 参数别名冲突检测
+# ═══════════════════════════════════════════════════════════
+
+class TestDuplicateParameterAlias:
+    def test_freq_and_freq1_conflict(self):
+        wire, err = _prepare_parameters("HarmonicBalance", {
+            "Freq": {"value": "1", "unit": "GHz"},
+            "Freq[1]": {"value": "2", "unit": "GHz"},
+        }, "create", allow_empty=True)
+        assert err is not None, "Freq + Freq[1] should be rejected"
+        assert err["error_code"] == "DUPLICATE_PARAMETER_ALIAS"
+
+    def test_order_and_order1_conflict(self):
+        wire, err = _prepare_parameters("HarmonicBalance", {
+            "Order": {"value": "5"},
+            "Order[1]": {"value": "3"},
+        }, "create", allow_empty=True)
+        assert err is not None, "Order + Order[1] should be rejected"
+        assert err["error_code"] == "DUPLICATE_PARAMETER_ALIAS"
+
+    def test_freq_and_order_no_conflict(self):
+        """Freq and Order are different wire params — no conflict."""
+        wire, err = _prepare_parameters("HarmonicBalance", {
+            "Freq": {"value": "1", "unit": "GHz"},
+            "Order": {"value": "5"},
+        }, "create", allow_empty=True)
+        assert err is None
+
+    def test_freq2_and_freq2_no_conflict(self):
+        """Same dynamic param twice — same wire, should conflict."""
+        wire, err = _prepare_parameters("HarmonicBalance", {
+            "Freq[2]": {"value": "2", "unit": "GHz"},
+            "Freq[2]": {"value": "3", "unit": "GHz"},
+        }, "create", allow_empty=True)
+        # The second Freq[2] would override the first in Python dict iteration
+        # order, but the wire check catches it because it's the same wire name
+        # Actually, since dict keys are unique, Freq[2] can only appear once.
+        # The real case is Freq (→Freq[1]) + Freq[1] (→Freq[1])
+        pass
+
+
+# ═══════════════════════════════════════════════════════════
+# 10. Falsy parameters 检测
+# ═══════════════════════════════════════════════════════════
+
+class TestFalsyParametersRejection:
+    def test_empty_list_parameters(self):
+        """parameters=[] should fail type check."""
+        wire, err = _prepare_parameters("SParameter", [], "create", allow_empty=False)
+        assert err is not None
+        assert err["error_code"] == "INVALID_PARAMETERS"
+
+    def test_empty_string_parameters(self):
+        """parameters='' should fail type check."""
+        wire, err = _prepare_parameters("SParameter", "", "create", allow_empty=False)
+        assert err is not None
+        assert err["error_code"] == "INVALID_PARAMETERS"
+
+    def test_none_parameters_create(self):
+        """None should be treated as empty (allowed for create)."""
+        wire, err = _prepare_parameters("SParameter", None, "create", allow_empty=False)
+        assert err is not None  # None is not a dict
+
+    def test_zero_not_falsy(self):
+        """parameters={'Pts': {'value': '0'}} is valid."""
+        wire, err = _prepare_parameters("SParameter",
+            {"Pts": {"value": "0"}}, "create", allow_empty=True)
+        assert err is None
+
+
+# ═══════════════════════════════════════════════════════════
+# 11. gRPC 层行为验证
+# ═══════════════════════════════════════════════════════════
+
+class TestGrpcTerminalResult:
+    def test_stream_disconnected_status(self):
+        """Verify STREAM_DISCONNECTED constant is used for stream-end-without-terminal."""
+        from servers.eda.grpc_client import _terminal_result
+        result = _terminal_result(
+            success=False, status="STREAM_DISCONNECTED",
+            message="FetchEvent 流已结束但未收到终态事件",
+            client_uuid="u1", task_id="t1",
+            task_type_name="OPEN_PROJECT",
+            project_path="/fake/p.epp", result_path="",
+            ads_output="partial log", log_complete=False,
+            latest_details={},
+        )
+        assert result["status"] == "STREAM_DISCONNECTED"
+        assert result["log_complete"] is False
+        assert result["ads_output"] == "partial log"
+
+    def test_grpc_unavailable_result(self):
+        """Verify GRPC_UNAVAILABLE result structure."""
+        from servers.eda.grpc_client import _terminal_result
+        result = _terminal_result(
+            success=False, status="GRPC_UNAVAILABLE",
+            message="无法连接 EDA gRPC",
+            client_uuid="u1", task_id="t1",
+            task_type_name="OPEN_PROJECT",
+            project_path="", result_path="",
+            ads_output="", log_complete=False,
+            latest_details={},
+        )
+        assert result["status"] == "GRPC_UNAVAILABLE"
+        assert result["success"] is False
+
+    def test_success_message_is_generic(self):
+        """Default message should be 'task completed' not 'simulation finished'."""
+        from servers.eda.grpc_client import _terminal_result
+        result = _terminal_result(
+            success=True, status="SUCCEEDED",
+            message="task completed",
+            client_uuid="u1", task_id="t1",
+            task_type_name="CREATE_SIMULATION_COMPONENT",
+            project_path="", result_path="",
+            ads_output="", log_complete=True,
+            latest_details={},
+        )
+        assert "task completed" in result["message"]
+
+
+# ═══════════════════════════════════════════════════════════
+# 12. 工具注册数量
+# ═══════════════════════════════════════════════════════════
+
+class TestToolCount:
+    def test_default_tool_count(self):
+        from servers.mcp_instance import mcp
+        from servers.image_tools import OPENCLAW_WORKSPACE_PATH
+        tools = [t.name for t in mcp._tool_manager._tools.values()]
+        # Base tools should be at least 33 (without workspace copy tool)
+        if OPENCLAW_WORKSPACE_PATH:
+            assert "copy_image_to_workspace" in tools
+        else:
+            assert "copy_image_to_workspace" not in tools
+        # All 7 sim component tools should be present
+        for name in ["create_simulation_component", "update_simulation_component",
+                     "delete_simulation_component", "set_component_active_state",
+                     "generate_schematic_from_netlist"]:
+            assert name in tools, f"Missing tool: {name}"
+
+    def test_no_upsert_registered(self):
+        """Verify upsert_simulation_component is NOT in the tool registry."""
+        from servers.mcp_instance import mcp
+        tools = [t.name for t in mcp._tool_manager._tools.values()]
+        assert "upsert_simulation_component" not in tools

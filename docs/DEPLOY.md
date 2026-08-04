@@ -160,7 +160,7 @@ netstat -ano | findstr 50055
 
 **图片显示白屏或 Outside allowed folders？**
 
-不要使用 `[embed]` 或直接发送本地路径。让 Agent 调用 `show_image`，工具会自动复制到工作区并返回 `MEDIA:` 路径。
+不要使用 `[embed]` 或直接发送本地路径。让 Agent 调用 `show_image`（返回 ImageContent）或 `copy_image_to_workspace`（复制到工作区 media/edi/）。
 
 **如何停止服务？**
 

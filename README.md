@@ -71,7 +71,7 @@ uv run python start_servers.py
   EDI MCP v0.1.3
   UI:   http://127.0.0.1:50026/ui
   MCP:  http://127.0.0.1:50026/sse
-  Tools: loaded（默认 25，配置 OPENCLAW_WORKSPACE 后 26）
+  Tools: loaded（33 个，配置 OPENCLAW_WORKSPACE 后 34 个）
   gRPC: 127.0.0.1:50055 [ONLINE]
   Close window to stop
 ==================================================
@@ -162,7 +162,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部�
 
 ---
 
-## 工具参考（默认 25 个，配置工作区后 26 个）
+## 工具参考（33 个，配置工作区后 34 个）
 
 ### 工程管理
 
@@ -178,18 +178,21 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部�
 
 ### 仿真
 
-| 工具 | 说明 | 参数 |
-|---|---|---|
-| `simulate_project` | 执行工程仿真（同步） | `project_path` | `log_source`、`timeout_seconds`（默认 600） |
-| `start_simulation_async` | 启动异步仿真 | `project_path` | `log_source`、`timeout_seconds` |
-| `get_simulation_async_status` | 查询异步仿真状态 | `task_id` | - |
-| `get_simulation_async_result` | 获取异步仿真结果 | `task_id` | - |
-| `simulate_netlist` | 仿真网表，返回 RAW 结果 | `netlist_path` | `timeout_seconds`（默认 600） |
-| `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path` | `ads_path`、`timeout_seconds`（默认 120） |
+| 工具 | 说明 | 必填参数 | 可选参数 |
+|---|---|---|---|---|
+| `simulate_project` | 执行工程仿真（同步） | `project_path` | `log_source`, `timeout_seconds` (600) |
+| `start_simulation_async` | 启动异步仿真 | `project_path` | `log_source`, `timeout_seconds` |
+| `get_simulation_async_status` | 查询异步仿真状态 | `task_id` | — |
+| `get_simulation_async_result` | 获取异步仿真结果 | `task_id` | — |
+| `simulate_netlist` | 仿真网表，返回 RAW 结果 | `netlist_path` | `timeout_seconds` (600) |
+| `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path` | `ads_path`, `timeout_seconds` (120) |
 | `get_simulation_component_schema` | 查询器件参数定义 | `component_type` | `parameter_name` |
 | `list_simulation_components` | 查询仿真器件 | `project_path` | `component_type` |
-| `upsert_simulation_component` | 新增/更新仿真器件 | `project_path`, `component_type`, `parameters` | `timeout_seconds` |
-| `delete_simulation_component` | 删除仿真器件 | `project_path`, `component_type` | `timeout_seconds` |
+| `create_simulation_component` | 新增仿真器件（创建新实例） | `project_path`, `component_type` | `parameters`, `timeout_seconds` |
+| `update_simulation_component` | 按实例名更新参数 | `project_path`, `instance_name`, `parameters` | `component_type`, `timeout_seconds` |
+| `delete_simulation_component` | 按实例名删除器件 | `project_path`, `instance_name` | `timeout_seconds` |
+| `set_component_active_state` | 设置器件状态 | `project_path`, `instance_name`, `state` | `timeout_seconds` |
+| `generate_schematic_from_netlist` | 网表生成原理图 | `project_path`, `netlist_path` | `clear_before_import`, `confirm_clear`, `timeout_seconds` |
 
 ### 导出与分析
 
@@ -283,7 +286,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部�
 │   │   ├── grpc_client.py       # gRPC 通信（带 EDA 全局锁）
 │   │   ├── project_manage.py    # 工程管理（6 工具）
 │   │   ├── simulation.py        # 仿真（6 工具）
-│   │   ├── simulation_components.py        # 仿真器件（4 工具）
+│   │   ├── simulation_components.py        # 仿真器件（7 工具）
 │   │   └── simulation_component_catalog.json # 参数目录
 │   │   ├── design_export.py     # 网表/截图（2 工具）
 │   │   ├── model_replace.py     # 模型替换（1 工具）
@@ -410,7 +413,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 ### 相关文档
 
 - [部署指南](./docs/DEPLOY.md) — 打包产物使用 & 智能体 Claude Code / OpenClaw 配置
-- [API 参考](./docs/API_REFERENCE.md) — 全部 25 个函数的参数、返回值、使用示例
+- [API 参考](./docs/API_REFERENCE.md) — 全部工具的详细参数、返回值、使用示例
 - [交接文档](./docs/HANDOVER.md) — 架构、技术栈、通信流程
 - [接口汇总](./docs/EDI系统接口与外部调用汇总.md) — EDI 全量接口文档
 - [gRPC 协议](proto/grpc接口调用.md) — 底层 gRPC 调用说明

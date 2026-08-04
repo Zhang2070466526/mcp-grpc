@@ -38,8 +38,14 @@ from servers.eda.project_manage import (  # noqa: E402
     list_epp_projects,
     list_project_components,
     get_component_parameters, get_project_summary,
+    analyze_variables,
 )
-from servers.eda.simulation_components import get_simulation_component_schema, list_simulation_components, upsert_simulation_component, delete_simulation_component  # noqa: E402
+from servers.eda.simulation_components import (  # noqa: E402
+    get_simulation_component_schema, list_simulation_components,
+    create_simulation_component, update_simulation_component,
+    delete_simulation_component, set_component_active_state,
+    generate_schematic_from_netlist,
+)
 from servers.eda.simulation import (  # noqa: E402
     start_simulation_async, get_simulation_async_status, get_simulation_async_result,
 )
@@ -65,6 +71,7 @@ _PRUNE_INTERVAL = 300    # 清理间隔 5 分钟
 # 聊天工具注册表（不含同步仿真 simulate_project）
 # ---------------------------------------------------------------------------
 CHAT_TOOL_MAP: dict[str, Any] = {
+    "analyze_variables":               analyze_variables,
     "list_epp_projects":              list_epp_projects,
     "open_edi_project":               open_edi_project,
     "close_edi_project":              close_edi_project,
@@ -83,8 +90,11 @@ CHAT_TOOL_MAP: dict[str, Any] = {
     "show_image":                     show_image,
     "get_simulation_component_schema": get_simulation_component_schema,
     "list_simulation_components": list_simulation_components,
-    "upsert_simulation_component": upsert_simulation_component,
+    "create_simulation_component": create_simulation_component,
+    "update_simulation_component": update_simulation_component,
     "delete_simulation_component": delete_simulation_component,
+    "set_component_active_state": set_component_active_state,
+    "generate_schematic_from_netlist": generate_schematic_from_netlist,
 }
 if OPENCLAW_WORKSPACE_PATH is not None:
     CHAT_TOOL_MAP["copy_image_to_workspace"] = copy_image_to_workspace
@@ -114,6 +124,7 @@ def _rtool(name: str, desc: str, required: dict, optional: dict | None = None) -
 def _build_tools_schema() -> list[dict]:
     """构建聊天工具 schema，与 CHAT_TOOL_MAP 保持一致。"""
     tools = [
+        _rtool("analyze_variables", "分析工程中的 Var 变量定义、引用关系和 Sweep 扫描配置", {"project_path": "string"}),
         _rtool("list_epp_projects", "扫描文件夹中的 .epp 工程文件", {"folder_path": "string"}),
         _rtool("open_edi_project", "打开 .epp 工程", {"project_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("close_edi_project", "关闭 EDA 工程", {"project_path": "string"}, {"need_save": "boolean"}),
@@ -132,8 +143,11 @@ def _build_tools_schema() -> list[dict]:
         _rtool("show_image", "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）", {"image_path": "string"}),
         _rtool("get_simulation_component_schema", "查询仿真控件支持的参数、类型和单位；配置控件前优先调用", {"component_type": "string"}, {"parameter_name": "string"}),
         _rtool("list_simulation_components", "查询工程中的仿真器件", {"project_path": "string"}, {"component_type": "string"}),
-        _rtool("upsert_simulation_component", "新增或更新仿真器件参数", {"project_path": "string", "component_type": "string", "parameters": "object"}, {"timeout_seconds": "integer"}),
-        _rtool("delete_simulation_component", "删除仿真器件", {"project_path": "string", "component_type": "string"}, {"timeout_seconds": "integer"}),
+        _rtool("create_simulation_component", "创建新的 SP/HB/XDB 实例；每次调用都会新增。配置参数前先调用 get_simulation_component_schema", {"project_path": "string", "component_type": "string"}, {"parameters": "object", "timeout_seconds": "integer"}),
+        _rtool("update_simulation_component", "按实例名更新 SP/HB/XDB 的部分参数；建议先查类型再传 component_type", {"project_path": "string", "instance_name": "string", "parameters": "object"}, {"component_type": "string", "timeout_seconds": "integer"}),
+        _rtool("delete_simulation_component", "按实例名删除任意原理图器件及其连接线；删除直接由 EDI 执行", {"project_path": "string", "instance_name": "string"}, {"timeout_seconds": "integer"}),
+        _rtool("set_component_active_state", "确定性设置器件状态为 NORMAL、DISABLED 或 SHORTED，不是状态切换", {"project_path": "string", "instance_name": "string", "state": "string"}, {"timeout_seconds": "integer"}),
+        _rtool("generate_schematic_from_netlist", "从网表追加或重建 main 原理图；clear_before_import=true 会清空原理图，必须同时确认", {"project_path": "string", "netlist_path": "string"}, {"clear_before_import": "boolean", "confirm_clear": "boolean", "timeout_seconds": "integer"}),
     ]
     if OPENCLAW_WORKSPACE_PATH is not None:
         tools.append(_rtool("copy_image_to_workspace", "复制图片到工作区 media/edi，需配置 OPENCLAW_WORKSPACE", {"image_path": "string"}))
@@ -530,7 +544,7 @@ class ChatService:
             if isinstance(val, str) and val.strip() == "":
                 if key in ("project_path", "folder_path", "netlist_path",
                            "raw_path", "img_path", "csv_path", "image_path",
-                           "component_id", "result_paths", "curve"):
+                           "component_id", "instance_name", "result_paths", "curve"):
                     return False, _tool_error("MISSING_REQUIRED_ARGUMENT",
                                               f"{key} 不能为空，请提供正确的 {key}")
 
@@ -654,6 +668,7 @@ def _safe_json(raw: str) -> dict:
 
 
 _TOOL_LABELS: dict[str, str] = {
+    "analyze_variables": "分析变量",
     "list_epp_projects": "扫描工程",
     "open_edi_project": "打开工程",
     "close_edi_project": "关闭工程",
@@ -670,10 +685,13 @@ _TOOL_LABELS: dict[str, str] = {
     "compare_simulation_results": "对比结果",
     "turbocharts_convert": "RAW 转图",
     "show_image": "显示图片",
-    "get_simulation_component_schema": "查询参数",
+    "get_simulation_component_schema": "控件参数",
     "list_simulation_components": "查询器件",
-    "upsert_simulation_component": "仿真器件",
+    "create_simulation_component": "新增器件",
+    "update_simulation_component": "更新器件",
     "delete_simulation_component": "删除器件",
+    "set_component_active_state": "设置状态",
+    "generate_schematic_from_netlist": "生成原理图",
 }
 if OPENCLAW_WORKSPACE_PATH is not None:
     _TOOL_LABELS["copy_image_to_workspace"] = "复制到工作区"

@@ -18,8 +18,9 @@ def test_all_tools_registered():
         "replace_models_from_csv", "launch_edi", "turbocharts_convert",
         "show_image", "analyze_variables",
         "get_simulation_component_schema",
-        "list_simulation_components", "upsert_simulation_component",
-        "delete_simulation_component",
+        "list_simulation_components", "create_simulation_component",
+        "update_simulation_component", "delete_simulation_component",
+        "generate_schematic_from_netlist", "set_component_active_state",
         "open_hfss_project", "close_hfss_project", "launch_aedt", "get_hfss_project_info",
         "start_hfss_analysis_async", "get_hfss_analysis_status",
     ]

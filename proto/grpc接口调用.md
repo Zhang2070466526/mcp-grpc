@@ -49,24 +49,29 @@ enum EventType {
   CLOSE_PROJECT = 8;
   CALL_SIMULATION_CONTROLLER = 9;
   SIMULATE_NETLIST = 10;
-  UPSERT_SIMULATION_COMPONENT = 11;
+  CREATE_SIMULATION_COMPONENT = 11;
   DELETE_SIMULATION_COMPONENT = 12;
+  GENERATE_SCHEMATIC_FROM_NETLIST = 13;
+  SET_COMPONENT_ACTIVE_STATE = 14;
+  UPDATE_SIMULATION_COMPONENT = 15;
 }
 ```
 
 任务类型：
 
 - `OPEN_PROJECT`：打开工程。
-- `SIMULATE_PROJECT`：执行仿真。
+- `SIMULATE_PROJECT`：执行工程仿真。
 - `VIEW_PROJECT_NETLIST`：查看工程网表。
 - `MODEL_REPLACE`：按 CSV 执行模型替换。
 - `CAPTURE_SCHEMATIC`：截图保存原理图图片。
 - `CLOSE_PROJECT`：关闭工程，可选择是否保存工程。
 - `CALL_SIMULATION_CONTROLLER`：直接调用 ADS 仿真器。
 - `SIMULATE_NETLIST`：仿真指定的 `netlist.log`，返回 RAW 结果和仿真器输出日志。
-- `UPSERT_SIMULATION_COMPONENT`：在工程唯一原理图中新增或更新 `SParameter`、`HarmonicBalance` 或 `XDB` 器件。
-- `DELETE_SIMULATION_COMPONENT`：从工程唯一原理图中删除指定类型的仿真器件。
-
+- `CREATE_SIMULATION_COMPONENT`：新增一个 `SParameter`、`HarmonicBalance` 或 `XDB` 器件。
+- `DELETE_SIMULATION_COMPONENT`：按器件实例名删除原理图上的通用器件。
+- `GENERATE_SCHEMATIC_FROM_NETLIST`：将指定网表导入工程的唯一原理图。
+- `SET_COMPONENT_ACTIVE_STATE`：按器件实例名确定性设置正常、禁用或短路状态。
+- `UPDATE_SIMULATION_COMPONENT`：按器件实例名更新仿真器件参数。
 ## 4. payload_json 示例
 
 ### OPEN_PROJECT
@@ -146,146 +151,93 @@ enum EventType {
 
 
 
-### UPSERT_SIMULATION_COMPONENT
+### CREATE_SIMULATION_COMPONENT
 
 ```json
 {
-  "project_path": "D:/test/project.epp",
+  "project_path": "C:/path/to/project.epp",
   "component_type": "SParameter",
   "parameters": {
     "Start": {
-      "value": "1.0",
+      "value": "1",
       "unit": "GHz"
-    },
-    "Stop": {
-      "value": "10.0",
-      "unit": "GHz"
-    },
-    "Step": {
-      "value": "1.0",
-      "unit": "GHz"
-    },
-    "Pts": {
-      "value": "10"
-    },
-    "NoiseInputPort": {
-      "value": "1"
-    },
-    "NoiseOutputPort": {
-      "value": "2"
-    },
-    "BandwidthForNoise": {
-      "value": "1.0",
-      "unit": "GHz"
-    },
-    "CalcNoise": {
-      "value": "no"
-    },
-    "CalcS": {
-      "value": "yes"
-    },
-    "CalcGroupDelay": {
-      "value": "no"
-    },
-    "EnforcePassivity": {
-      "value": "no"
-    },
-    "GroupDelayAperture": {
-      "value": "1e-4"
-    },
-    "FreqConversion": {
-      "value": "no"
-    },
-    "FreqConversionPort": {
-      "value": "1"
     }
   }
 }
 ```
 
 - `component_type` 只支持 `SParameter`、`HarmonicBalance`、`XDB`，区分大小写。
-- `parameters` 必须是非空 JSON 对象；键名必须是该器件实际支持的参数名。
-- 每个参数必须包含标量字段 `value`，可以包含字符串字段 `unit`，不能包含其他字段。
-- `unit` 必须是该参数支持的单位；无单位参数不要填写 `unit`。
-- 工程中已有该类型器件时，只覆盖请求中提供的参数；不存在时创建器件、保留默认参数后再覆盖请求参数。
-- 对于开关类参数，建议按器件现有格式传字符串 `"yes"` 或 `"no"`。
+- `parameters` 可省略、传空对象或只提供部分初始化参数；未提供的参数使用器件默认值。
+- 每个参数包含标量字段 `value`，可选字符串字段 `unit`，不能包含其他字段。
+- 每次调用都创建新器件，同类型器件可以存在多个。服务端自动分配未占用的实例名，并在最终事件的 `instance_name` 中返回。
 
-### UPSERT_SIMULATION_COMPONENT（XDB 示例）
+### UPDATE_SIMULATION_COMPONENT
 
 ```json
 {
-  "project_path": "D:/test/project.epp",
-  "component_type": "XDB",
+  "project_path": "C:/path/to/project.epp",
+  "instance_name": "SP2",
   "parameters": {
-    "Freq[1]": {
-      "value": "1.0",
+    "Stop": {
+      "value": "20",
       "unit": "GHz"
     },
-    "Order[1]": {
-      "value": "5"
-    },
-    "GC_XdB": {
-      "value": "1"
-    },
-    "GC_InputPort": {
-      "value": "1"
-    },
-    "GC_OutputPort": {
-      "value": "2"
-    },
-    "GC_InputFreq": {
-      "value": "1.0",
-      "unit": "GHz"
-    },
-    "GC_OutputFreq": {
-      "value": "1.0",
-      "unit": "GHz"
-    },
-    "GC_InputPowerTol": {
-      "value": "1e-3"
-    },
-    "GC_OutputPowerTol": {
-      "value": "1e-3"
-    },
-    "GC_MaxInputPowerTol": {
-      "value": "100"
-    },
-    "StatusLevel": {
-      "value": "2"
+    "Pts": {
+      "value": "201"
     }
   }
 }
 ```
 
-XDB 支持的参数：
-
-| 参数名 | 说明 | 值类型 | 单位 |
-|---|---|---|---|
-| `Freq[1]` | 基频频率 | number | Hz / kHz / MHz / GHz |
-| `Order[1]` | 谐波阶数 | integer | — |
-| `GC_XdB` | 增益压缩 | number | — |
-| `GC_InputPort` | 输入端口 | integer | — |
-| `GC_OutputPort` | 输出端口 | integer | — |
-| `GC_InputFreq` | 增益压缩输入频率 | number | Hz / kHz / MHz / GHz |
-| `GC_OutputFreq` | 增益压缩输出频率 | number | Hz / kHz / MHz / GHz |
-| `GC_InputPowerTol` | 输入功率容差 | number | — |
-| `GC_OutputPowerTol` | 输出功率容差 | number | — |
-| `GC_MaxInputPowerTol` | 最大输入功率容差 | number | — |
-| `StatusLevel` | 状态等级 | integer | — |
+- `instance_name` 为原理图上的器件实例名，精确匹配。
+- 仅支持更新 `SParameter`、`HarmonicBalance`、`XDB`。
+- `parameters` 必须为非空对象；只更新请求中提供的参数，其他参数保持原值。
+- 保存失败时恢复修改前参数。
 
 ### DELETE_SIMULATION_COMPONENT
 
 ```json
 {
   "project_path": "C:/path/to/project.epp",
-  "component_type": "SParameter"
+  "instance_name": "R1"
 }
 ```
 
-`component_type` 只支持 `SParameter`、`HarmonicBalance`、`XDB`。服务端删除该类型的唯一器件并保存工程；器件不存在或同类型器件超过一个时，任务最终返回失败。
+该任务按 `instance_name` 精确删除任意普通器件，并按原理图正常删除流程处理器件连接线。保存失败时撤销删除。
 
-上述两个任务均使用工程中的唯一原理图。若工程已经在 EDA-PMDS 中打开，服务端复用现有工程窗口；否则先打开工程再执行操作。
+### SET_COMPONENT_ACTIVE_STATE
 
+```json
+{
+  "project_path": "C:/path/to/project.epp",
+  "instance_name": "R1",
+  "state": "SHORTED"
+}
+```
+
+`state` 只接受以下大写值：
+
+- `NORMAL`：正常。
+- `DISABLED`：禁用。
+- `SHORTED`：短路。
+
+该任务直接设置目标状态，不执行状态切换；保存失败时恢复原状态。
+
+### GENERATE_SCHEMATIC_FROM_NETLIST
+
+```json
+{
+  "project_path": "C:/path/to/project.epp",
+  "netlist_path": "C:/path/to/netlist.log",
+  "clear_before_import": false
+}
+```
+
+- `netlist_path` 必须是已存在的文件。
+- `clear_before_import` 为可选布尔值，默认值为 `false`；为 `true` 时导入前清空 `main` 原理图，为 `false` 时追加。
+- 服务端固定向工程中的 `main` 原理图导入器件和连接链路，成功后自动保存工程。最终事件返回 `schematic_path`、`symbols_added`、`nets_added`、`lines_added` 和 `net_points_added`。
+
+上述工程类任务均使用工程中的唯一原理图。工程已打开时复用现有工程窗口，否则先打开工程再执行操作。
 ## 5. PerformAction 返回值
 
 ```proto
@@ -359,9 +311,11 @@ enum ResultStatus {
 - `LOG_EVENT`：`level`、`source`、`text`
 - `CALL_SIMULATION_CONTROLLER`：`netlist_path`、`ads_path`
 - `SIMULATE_NETLIST`：`netlist_path`、`result_path`、`ads_output`
-- `UPSERT_SIMULATION_COMPONENT`：`project_path`、`component_type`、`action`、`instance_name`
-- `DELETE_SIMULATION_COMPONENT`：`project_path`、`component_type`、`instance_name`
-
+- `CREATE_SIMULATION_COMPONENT`：`project_path`、`component_type`、`action`、`instance_name`
+- `UPDATE_SIMULATION_COMPONENT`：`project_path`、`instance_name`
+- `DELETE_SIMULATION_COMPONENT`：`project_path`、`instance_name`
+- `SET_COMPONENT_ACTIVE_STATE`：`project_path`、`instance_name`、`state`
+- `GENERATE_SCHEMATIC_FROM_NETLIST`：`project_path`、`netlist_path`、`schematic_path`、`clear_before_import`、`symbols_added`、`nets_added`、`lines_added`、`net_points_added`
 ## 8. SIMULATE_NETLIST 完整调用示例
 
 建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction` 提交任务。两次调用的 `client_uuid` 必须一致。
@@ -376,6 +330,8 @@ enum ResultStatus {
   "payload_json": "{\"netlist_path\":\"C:/test/netlist.log\"}"
 }
 ```
+
+如果 Postman 未识别最新枚举，可以重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `10`。
 
 `PerformAction` 受理成功时返回：
 
@@ -446,18 +402,20 @@ enum ResultStatus {
 
 ## 9. 仿真器件管理完整调用示例
 
-建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction`。下面两个请求使用相同的 `client_uuid`。
+建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction`。以下请求使用相同的 `client_uuid`。
 
-### 9.1 新增或更新 SParameter
+### 9.1 新增 SParameter
 
 ```json
 {
   "client_uuid": "postman-test-client-001",
-  "task_id": "postman-upsert-sp-001",
-  "type": "UPSERT_SIMULATION_COMPONENT",
-  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"SParameter\",\"parameters\":{\"Start\":{\"value\":\"1\",\"unit\":\"GHz\"},\"Stop\":{\"value\":\"10\",\"unit\":\"GHz\"},\"Step\":{\"value\":\"0.1\",\"unit\":\"GHz\"},\"Pts\":{\"value\":\"101\"}}}"
+  "task_id": "postman-create-sp-001",
+  "type": "CREATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"SParameter\",\"parameters\":{\"Start\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Stop\":{\"value\":\"10.0\",\"unit\":\"GHz\"},\"Step\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Pts\":{\"value\":\"10\"},\"NoiseInputPort\":{\"value\":\"1\"},\"NoiseOutputPort\":{\"value\":\"2\"},\"BandwidthForNoise\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"CalcNoise\":{\"value\":\"no\"},\"CalcS\":{\"value\":\"yes\"},\"CalcGroupDelay\":{\"value\":\"no\"},\"EnforcePassivity\":{\"value\":\"no\"},\"GroupDelayAperture\":{\"value\":\"1e-4\"},\"FreqConversion\":{\"value\":\"no\"},\"FreqConversionPort\":{\"value\":\"1\"}}}"
 }
 ```
+该请求包含 SParameter 当前全部可设置属性。界面中显示的 `Bandwidth` 对应接口字段 `BandwidthForNoise`，不能传 `Bandwidth`。
+
 
 如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `11`。
 
@@ -466,24 +424,52 @@ enum ResultStatus {
 ```json
 {
   "client_uuid": "postman-test-client-001",
-  "task_id": "postman-upsert-sp-001",
-  "event_type": "UPSERT_SIMULATION_COMPONENT",
+  "task_id": "postman-create-sp-001",
+  "event_type": "CREATE_SIMULATION_COMPONENT",
   "status": "RESULT_STATUS_SUCCESS",
   "message": "simulation component created",
   "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"SParameter\",\"action\":\"created\",\"instance_name\":\"SP1\"}"
 }
 ```
 
-`action` 为 `created` 表示新建器件，为 `updated` 表示更新已有器件。
+`CREATE_SIMULATION_COMPONENT` 每次都创建新器件，`action` 固定为 `created`；实际分配名称见 `instance_name`。
 
-### 9.2 删除 SParameter
+### 9.2 新增 HarmonicBalance
+
+下面的请求包含 HarmonicBalance 默认初始化时的全部属性：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-create-hb-001",
+  "type": "CREATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"HarmonicBalance\",\"parameters\":{\"Freq[1]\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Order[1]\":{\"value\":\"5\"}}}"
+}
+```
+
+需要多音设置时，可以继续增加成对的 `Freq[2]`、`Order[2]`、`Freq[3]`、`Order[3]` 等动态参数。
+
+### 9.3 新增 XDB
+
+下面的请求包含 XDB 当前全部可设置属性：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-create-xdb-001",
+  "type": "CREATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"XDB\",\"parameters\":{\"Freq[1]\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Order[1]\":{\"value\":\"5\"},\"GC_XdB\":{\"value\":\"1\"},\"GC_InputPort\":{\"value\":\"1\"},\"GC_OutputPort\":{\"value\":\"2\"},\"GC_InputFreq\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"GC_OutputFreq\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"GC_InputPowerTol\":{\"value\":\"1e-3\"},\"GC_OutputPowerTol\":{\"value\":\"1e-3\"},\"GC_MaxInputPowerTol\":{\"value\":\"100\"},\"StatusLevel\":{\"value\":\"2\"}}}"
+}
+```
+
+### 9.4 删除指定名称的器件
 
 ```json
 {
   "client_uuid": "postman-test-client-001",
   "task_id": "postman-delete-sp-001",
   "type": "DELETE_SIMULATION_COMPONENT",
-  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"SParameter\"}"
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"SP1\"}"
 }
 ```
 
@@ -497,26 +483,119 @@ enum ResultStatus {
   "task_id": "postman-delete-sp-001",
   "event_type": "DELETE_SIMULATION_COMPONENT",
   "status": "RESULT_STATUS_SUCCESS",
-  "message": "simulation component deleted",
-  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"SParameter\",\"instance_name\":\"SP1\"}"
+  "message": "component deleted",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"SP1\"}"
 }
 ```
 
-如果目标器件不存在，最终事件状态为 `RESULT_STATUS_FAILED`，`message` 会说明对应器件未找到。
+该任务不限于三种仿真器件，可以按名称删除普通原理图器件及其连接线。
 
-## 10. 注意事项
+### 9.5 按器件名更新参数
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-update-sp-001",
+  "type": "UPDATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"SP2\",\"parameters\":{\"Stop\":{\"value\":\"20\",\"unit\":\"GHz\"},\"Pts\":{\"value\":\"201\"}}}"
+}
+```
+
+最终成功事件示例：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-update-sp-001",
+  "event_type": "UPDATE_SIMULATION_COMPONENT",
+  "status": "RESULT_STATUS_SUCCESS",
+  "message": "simulation component updated",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"SP2\"}"
+}
+```
+
+### 9.6 设置器件正常、禁用或短路状态
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-state-r1-001",
+  "type": "SET_COMPONENT_ACTIVE_STATE",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"R1\",\"state\":\"SHORTED\"}"
+}
+```
+
+最终成功事件中的 `payload_json` 返回 `project_path`、`instance_name` 和已经设置的 `state`。
+## 10. 网表生成链路完整调用示例
+
+建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction` 提交任务。两次调用的 `client_uuid` 必须一致。
+
+### 10.1 PerformAction 请求
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-generate-schematic-001",
+  "type": "GENERATE_SCHEMATIC_FROM_NETLIST",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"netlist_path\":\"C:/test/netlist.log\",\"clear_before_import\":true}"
+}
+```
+
+`clear_before_import` 可省略，默认值为 `false`：为 `true` 时导入前清空 `main` 原理图；为 `false` 时追加到现有原理图。
+
+如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `13`。
+
+### 10.2 FetchEvent 运行事件
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-generate-schematic-001",
+  "event_type": "GENERATE_SCHEMATIC_FROM_NETLIST",
+  "status": "RESULT_STATUS_RUNNING",
+  "message": "task accepted",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"netlist_path\":\"C:/test/netlist.log\",\"clear_before_import\":true}"
+}
+```
+
+### 10.3 FetchEvent 成功事件
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-generate-schematic-001",
+  "event_type": "GENERATE_SCHEMATIC_FROM_NETLIST",
+  "status": "RESULT_STATUS_SUCCESS",
+  "message": "schematic import finished",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"netlist_path\":\"C:/test/netlist.log\",\"schematic_path\":\"C:/test/schematics/main/schematic.ep\",\"clear_before_import\":true,\"symbols_added\":10,\"nets_added\":8,\"lines_added\":12,\"net_points_added\":4}"
+}
+```
+
+字段说明：
+
+- `schematic_path`：生成并保存后的 `main/schematic.ep` 文件绝对路径。
+- `symbols_added`：本次新增的器件数量。
+- `nets_added`：本次新增的网段数量。
+- `lines_added`：本次新增的连接线数量。
+- `net_points_added`：本次新增的网络连接点数量。
+
+服务端固定操作工程中的 `main` 原理图，调用程序目录下的 `schematic_drawing_tool_edi/schematic_drawing_tool.exe` 解析网表，成功后自动保存工程。如果工程、`main` 原理图、网表文件、绘图工具或配置文件不可用，最终事件状态为 `RESULT_STATUS_FAILED`，原因通过 `message` 返回。
+## 11. 注意事项
 
 - `client_uuid`、`task_id`、`type` 必须填写。
 - `payload_json` 必须是合法 JSON 对象字符串。
-- `project_path` 必须是已存在的 `.epp` 文件。
-- `UPSERT_SIMULATION_COMPONENT` 的 `parameters` 不能为空。
-- `UPSERT_SIMULATION_COMPONENT` 和 `DELETE_SIMULATION_COMPONENT` 的 `component_type` 只接受 `SParameter`、`HarmonicBalance`、`XDB`。
-- 仿真器件新增、修改或删除成功后会立即保存工程。
+- 涉及工程的任务中，`project_path` 必须指向已存在的 `.epp` 文件。
+- `CREATE_SIMULATION_COMPONENT` 的 `component_type` 只接受 `SParameter`、`HarmonicBalance`、`XDB`；`parameters` 可省略或只提供部分参数。
+- `UPDATE_SIMULATION_COMPONENT` 必须提供器件 `instance_name` 和非空 `parameters`，目标必须是上述三种仿真器件之一。
+- `DELETE_SIMULATION_COMPONENT` 和 `SET_COMPONENT_ACTIVE_STATE` 使用 `instance_name` 精确定位器件。
+- 器件创建、参数更新、删除或状态设置成功后会立即保存工程；保存失败时回滚本次操作。
+- `GENERATE_SCHEMATIC_FROM_NETLIST` 必须提供已存在的工程文件和网表文件，固定操作 `main` 原理图。
+- `clear_before_import=true` 会在导入前清空 `main` 原理图，调用方应确认原内容允许删除。
 - `MODEL_REPLACE` 必须提供已存在的 `.csv` 文件路径。
 - `CAPTURE_SCHEMATIC` 必须提供图片输出路径。
 - `CLOSE_PROJECT` 使用 `project_path` 和 `need_save` 关闭工程。
 - 同一客户端会话内，提交任务和拉取事件应使用同一个 `client_uuid`。
-- `SIMULATE_NETLIST` 的 `netlist_path` 必须是已经存在的文件。
+- `SIMULATE_NETLIST` 的 `netlist_path` 必须是已存在的文件。
 - `SIMULATE_NETLIST` 的 `task_id` 只能包含英文字母、数字、下划线、点和连字符，且不能是 `.` 或 `..`。
 - `simulation/<task_id>` 已存在时任务会失败；每次调用应使用新的 `task_id`。
 - 独立的 `LOG_EVENT` 暂未支持；仿真器日志通过最终事件的 `ads_output` 返回。

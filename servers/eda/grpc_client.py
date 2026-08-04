@@ -346,9 +346,22 @@ def _call_grpc_unlocked(
                     ads_output = "".join(ads_output_chunks)
                     _logger.info("task=%s phase=COMPLETED status=SUCCEEDED duration=%.1fs chunks=%d",
                                  task_id[:12], time.monotonic() - started_at, chunk_count)
+                    # Verify payload integrity: SUCCESS must have parseable payload
+                    if parse_error:
+                        _logger.error("task=%s SUCCEEDED but payload_json invalid: %s",
+                                      task_id[:12], parse_error)
+                        return _terminal_result(
+                            success=False, status="PROTOCOL_MISMATCH",
+                            message=f"SUCCEEDED 事件 payload_json 无法解析: {parse_error}",
+                            client_uuid=client_uuid, task_id=task_id,
+                            task_type_name=task_type_name,
+                            project_path=project_path, result_path=result_path,
+                            ads_output=ads_output, log_complete=True,
+                            latest_details=latest_details,
+                        )
                     return _terminal_result(
                         success=True, status="SUCCEEDED",
-                        message=event.message or "simulation finished",
+                        message=event.message or "task completed",
                         client_uuid=client_uuid, task_id=task_id,
                         task_type_name=task_type_name,
                         project_path=project_path, result_path=result_path,
@@ -362,7 +375,7 @@ def _call_grpc_unlocked(
                                  task_id[:12], time.monotonic() - started_at, chunk_count)
                     return _terminal_result(
                         success=False, status="FAILED",
-                        message=event.message or "simulation failed",
+                        message=event.message or "task failed",
                         client_uuid=client_uuid, task_id=task_id,
                         task_type_name=task_type_name,
                         project_path=project_path, result_path=result_path,
@@ -372,8 +385,8 @@ def _call_grpc_unlocked(
 
             # ── 流结束但无终态 ──
             return _terminal_result(
-                success=False, status="TIMEOUT",
-                message="MCP 已停止等待，EDI 端任务状态未知",
+                success=False, status="STREAM_DISCONNECTED",
+                message="FetchEvent 流已结束但未收到终态事件，EDI 端任务状态未知",
                 client_uuid=client_uuid, task_id=task_id,
                 task_type_name=task_type_name,
                 project_path=latest_details.get("project_path", payload.get("project_path", "")),
@@ -410,9 +423,15 @@ def _call_grpc_unlocked(
                 ads_output="".join(ads_output_chunks), log_complete=False,
                 latest_details=latest_details,
             )
-        raise RuntimeError(
-            f"无法完成 EDA gRPC 调用 ({EDA_GRPC_SERVER}, {code}): {exc.details() or exc}"
-        ) from exc
+        return _terminal_result(
+            success=False, status="GRPC_UNAVAILABLE",
+            message=f"无法连接 EDA gRPC ({EDA_GRPC_SERVER}, {code}): {exc.details() or exc}",
+            client_uuid=client_uuid, task_id=task_id,
+            task_type_name=task_type_name,
+            project_path=payload.get("project_path", ""),
+            result_path="", ads_output="", log_complete=False,
+            latest_details={},
+        )
 
     finally:
         # ── 确保事件流释放 ──

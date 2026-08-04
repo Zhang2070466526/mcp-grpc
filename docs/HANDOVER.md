@@ -56,21 +56,23 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 
 PyPI: https://pypi.org/project/edi-mcp/
 
-## MCP 工具清单（默认 25 个，可选 1 个条件注册）
+## MCP 工具清单（33 个，配置 OPENCLAW_WORKSPACE 后 34 个）
 
-**工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary
+**工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary, analyze_variables
 
-**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist, simulate_netlist_with_ads, list_simulation_components, upsert_simulation_component, delete_simulation_component, compare_simulation_results
+**仿真器件**：get_simulation_component_schema, list_simulation_components, create_simulation_component, update_simulation_component, delete_simulation_component, set_component_active_state, generate_schematic_from_netlist
 
-**ANSYS**：open_hfss_project（GetActiveObject附着/单启动）, close_hfss_project（COM优先+PID记录）, launch_aedt, get_hfss_project_info（纯查询不启动）
+**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist, simulate_netlist_with_ads
+
+**ANSYS**：open_hfss_project, close_hfss_project, launch_aedt, get_hfss_project_info, start_hfss_analysis_async, get_hfss_analysis_status
 
 **导出分析**：export_project_netlist, capture_schematic
 
-**模型启动**：replace_models_from_csv, launch_edi
+**模型/启动**：replace_models_from_csv, launch_edi
 
 **图片**：show_image（MCP ImageContent）+ copy_image_to_workspace（需配置工作区，条件注册）
 
-**图表**：turbocharts_convert
+**图表**：turbocharts_convert, compare_simulation_results
 
 ## 配置说明
 

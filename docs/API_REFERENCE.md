@@ -233,7 +233,7 @@ simulate_project(project_path: str, log_source: str = "mcp_client", timeout_seco
     "status": "SUCCEEDED",
     "project_path": "C:/Projects/test/test.epp",
     "result_path": "C:/Projects/test/history/result.raw",
-    "ads_output": "Parsing netlist...\nSimulation finished.\n",
+    "ads_output": "Parsing netlist...\nTask completed.\n",
     "log_complete": True
 }
 ```
@@ -587,7 +587,7 @@ copy_image_to_workspace(image_path: str) -> dict
 
 ---
 
-## 仿真器件管理（4 个）
+## 仿真器件管理（7 个）— 协议 v2
 
 ### `get_simulation_component_schema`
 
@@ -597,7 +597,7 @@ from servers.eda.simulation_components import get_simulation_component_schema
 get_simulation_component_schema(component_type: str, parameter_name: str = "") -> dict
 ```
 
-查询仿真控件支持的参数名、值类型、合法单位和示例。创建或修改器件前优先调用。
+查询仿真控件支持的参数名、值类型、单位、创建/更新权限和动态参数模式。返回 `schema_version`、`protocol_version`、`parameter_patterns`。创建或修改器件前优先调用。
 
 ### `list_simulation_components`
 
@@ -607,29 +607,59 @@ from servers.eda.simulation_components import list_simulation_components
 list_simulation_components(project_path: str, component_type: str = "") -> dict
 ```
 
-本地读取原理图，查询仿真器件（SParameter / HarmonicBalance / XDB）及参数。
+本地读取原理图，查询仿真器件（SParameter / HarmonicBalance / XDB）及其当前参数。
 
-### `upsert_simulation_component`
+### `create_simulation_component`
 
 ```python
-from servers.eda.simulation_components import upsert_simulation_component
+from servers.eda.simulation_components import create_simulation_component
 
-upsert_simulation_component(project_path: str, component_type: str, parameters: dict, timeout_seconds: int = 120) -> dict
+create_simulation_component(project_path: str, component_type: str, parameters: dict | None = None, timeout_seconds: int = 120) -> dict
 ```
 
-新增或更新仿真器件参数。不存在时创建并覆盖；已存在时只覆盖传入参数。
+新增仿真器件。每次调用创建新实例，服务端自动分配实例名。parameters 可选，未提供的参数使用 EDI 默认值。
 
 参数格式：`{"Start": {"value": "1", "unit": "GHz"}, "Pts": {"value": "101"}}`
+
+### `update_simulation_component`
+
+```python
+from servers.eda.simulation_components import update_simulation_component
+
+update_simulation_component(project_path: str, instance_name: str, parameters: dict, timeout_seconds: int = 120) -> dict
+```
+
+按实例名更新仿真器件参数。MCP 内部自动识别器件类型并完成参数校验和 wire 转换，无需提供 component_type。只更新传入的参数，其余保持原值。
 
 ### `delete_simulation_component`
 
 ```python
 from servers.eda.simulation_components import delete_simulation_component
 
-delete_simulation_component(project_path: str, component_type: str, timeout_seconds: int = 120) -> dict
+delete_simulation_component(project_path: str, instance_name: str, timeout_seconds: int = 120) -> dict
 ```
 
-删除指定类型的仿真器件。同类型超过一个时失败。
+按实例名删除任意原理图器件及其连接线。调用前会本地预检查实例是否存在。
+
+### `set_component_active_state`
+
+```python
+from servers.eda.simulation_components import set_component_active_state
+
+set_component_active_state(project_path: str, instance_name: str, state: str, timeout_seconds: int = 120) -> dict
+```
+
+确定性设置器件状态。state 接受 NORMAL / DISABLED / SHORTED（大小写不敏感）。不是状态切换，重复调用具有幂等性。
+
+### `generate_schematic_from_netlist`
+
+```python
+from servers.eda.simulation_components import generate_schematic_from_netlist
+
+generate_schematic_from_netlist(project_path: str, netlist_path: str, clear_before_import: bool = False, confirm_clear: bool = False, timeout_seconds: int = 300) -> dict
+```
+
+从网表文件导入生成 main 原理图。默认追加模式。`clear_before_import=true` 会清空原理图，必须同时传 `confirm_clear=true` 确认。
 
 ---
 

@@ -29,7 +29,7 @@ if getattr(_sys, "frozen", False):
 else:
     load_dotenv()
 
-EDA_GRPC_SERVER = os.getenv("EDA_GRPC_SERVER")
+EDA_GRPC_SERVER = os.getenv("EDA_GRPC_SERVER", "127.0.0.1:50055")
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT")
 
 # ── 应用根目录检测 ──

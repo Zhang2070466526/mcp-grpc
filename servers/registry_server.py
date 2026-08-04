@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（共 25 个）：
+  已注册工具（34 个，工作区配置后）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -20,8 +20,12 @@
     simulate_netlist              仿真网表，返回 RAW 结果
     simulate_netlist_with_ads     调用 ADS 仿真控制器
     list_simulation_components    查询仿真器件
-    upsert_simulation_component   新增或更新仿真器件
-    delete_simulation_component   删除仿真器件
+    get_simulation_component_schema  查询器件参数 schema
+    create_simulation_component   新增仿真器件
+    update_simulation_component   更新仿真器件参数
+    delete_simulation_component   按实例名删除器件
+    set_component_active_state    设置器件状态（NORMAL/DISABLED/SHORTED）
+    generate_schematic_from_netlist  从网表生成原理图
 
   分析：
     export_project_netlist        查看/导出工程网表
