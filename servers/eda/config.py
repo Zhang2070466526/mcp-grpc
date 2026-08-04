@@ -249,11 +249,38 @@ def _kv(items, key):
 
 
 def parse_paramsinfo(raw):
-    """Parse component paramsinfo JSON string."""
+    """解析 component paramsinfo JSON。
+
+    兼容两种结构：
+    - 普通参数: {"Value": "...", "CurrentUnit": "...", "Unit": "...", "Tunable": "false"}
+    - Var 变量: {"Initial": "29", "Max": "", "Min": "", "Status": "Disable", "Tunable": "false"}
+    """
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
         return {}
+    if not isinstance(data, dict):
+        return {}
+
+    result = {}
+    for key, meta in data.items():
+        if key == "BasicParameters" or not isinstance(meta, dict):
+            continue
+        value = meta.get("Value", "")
+        if value == "" and "Initial" in meta:
+            value = meta.get("Initial", "")
+        result[key] = {
+            "value": value,
+            "unit": meta.get("CurrentUnit", meta.get("DefaultUnit", "")),
+            "default_unit": meta.get("DefaultUnit", ""),
+            "tunable": str(meta.get("Tunable", "false")).lower() == "true",
+            "visible": str(meta.get("Visible", "true")).lower() != "false",
+            "initial": meta.get("Initial", ""),
+            "max": meta.get("Max", ""),
+            "min": meta.get("Min", ""),
+            "status": meta.get("Status", ""),
+        }
+    return result
 
 
 def parse_components(schematic_text):

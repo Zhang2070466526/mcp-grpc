@@ -32,7 +32,7 @@ from typing import Any
 
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
-from servers.eda.config import ProjectReader, parse_components, validate_project_path
+from servers.eda.config import ProjectReader, parse_components, parse_paramsinfo, validate_project_path
 from servers.mcp_instance import mcp
 
 
@@ -185,27 +185,24 @@ def get_component_parameters(
         if comp["component_id"] != component_id:
             continue
 
-        params_info = comp.get("paramsinfo", {})
+        params_info = parse_paramsinfo(comp.get("paramsinfo", {}))
         parameters = []
         for key, info in params_info.items():
             if key == "BasicParameters":
                 continue
-            if not isinstance(info, dict):
+            if not include_hidden and str(info.get("visible", "true")).lower() == "false":
                 continue
-            if not include_hidden and info.get("Visible", "true") == "false":
-                continue
-
-            unit_field = info.get("Unit", "")
-            available_units = unit_field.split(",") if unit_field else []
-
             parameters.append({
                 "key": key,
-                "value": info.get("Value", ""),
-                "unit": info.get("CurrentUnit", info.get("DefaultUnit", "")),
-                "default_unit": info.get("DefaultUnit", ""),
-                "available_units": available_units,
-                "tunable": info.get("Tunable", "false") == "true",
-                "visible": info.get("Visible", "true") != "false",
+                "value": info.get("value", ""),
+                "unit": info.get("unit", ""),
+                "default_unit": info.get("default_unit", ""),
+                "tunable": info.get("tunable", False),
+                "visible": info.get("visible", True),
+                "initial": info.get("initial", ""),
+                "max": info.get("max", ""),
+                "min": info.get("min", ""),
+                "status": info.get("status", ""),
             })
 
         return {
@@ -254,26 +251,22 @@ def get_project_summary(
                     components_info["by_type"].get(ct, 0) + 1
                 )
 
-    simulation_info: dict[str, Any] = {}
-    # Read simulation config from SParameter component in schematic
+    simulation_info: list[dict] = []
+    _SIM_TYPES = {"SParameter", "HarmonicBalance", "XDB"}
     for sname in schematics:
         raw = reader.read_schematic(sname)
         if not raw:
             continue
         for comp in parse_components(raw):
-            if comp["type"] == "SParameter":
+            ct = comp.get("type", "")
+            if ct in _SIM_TYPES:
                 pi = comp.get("paramsinfo", {})
-                sim_type = pi.get("CalcS", {}).get("Value", "")
-                start = pi.get("Start", {})
-                stop = pi.get("Stop", {})
-                step = pi.get("Step", {})
-                simulation_info = {
-                    "type": "S_Param" if sim_type == "yes" else sim_type,
-                    "start": f"{start.get('Value','')} {start.get('CurrentUnit','')}".strip(),
-                    "stop": f"{stop.get('Value','')} {stop.get('CurrentUnit','')}".strip(),
-                    "step": f"{step.get('Value','')} {step.get('CurrentUnit','')}".strip(),
-                }
-                break
+                entry: dict[str, Any] = {"component_type": ct, "instance_name": comp.get("name", "")}
+                for key, info in pi.items():
+                    if key == "BasicParameters" or not isinstance(info, dict):
+                        continue
+                    entry[key] = f"{info.get('Value', info.get('Initial',''))} {info.get('CurrentUnit', info.get('DefaultUnit',''))}".strip()
+                simulation_info.append(entry)
 
     latest_result: dict[str, Any] = {}
     if include_latest_result:
@@ -300,6 +293,83 @@ def get_project_summary(
         "simulation": simulation_info,
         "latest_result": latest_result,
         "warnings": warnings,
+    }
+
+
+@mcp.tool()
+def analyze_variables(project_path: str) -> dict[str, Any]:
+    """分析工程中的变量定义和引用关系。
+
+    识别 Var 元件定义的变量、其他元件中对这些变量的引用、
+    以及 Sweep 的扫描配置。
+
+    Args:
+        project_path: .epp 工程文件绝对路径。
+    """
+    reader = ProjectReader(project_path)
+    variables: list[dict] = []
+    references: list[dict] = []
+    sweeps: list[dict] = []
+
+    for sname in reader.list_schematics() or []:
+        raw = reader.read_schematic(sname)
+        if not raw:
+            continue
+        for comp in parse_components(raw):
+            ct = comp.get("type", "")
+            params = parse_paramsinfo(comp.get("paramsinfo", {}))
+
+            # Var 元件：变量定义
+            if ct == "Var":
+                for pkey, pinfo in params.items():
+                    if pinfo.get("initial"):
+                        variables.append({
+                            "name": comp.get("name", ""),
+                            "parameter": pkey,
+                            "initial": pinfo["initial"],
+                            "min": pinfo.get("min", ""),
+                            "max": pinfo.get("max", ""),
+                            "tunable": pinfo.get("tunable", False),
+                            "status": pinfo.get("status", ""),
+                        })
+
+            # Sweep 元件：扫描配置
+            if ct == "Sweep":
+                sweep_var = params.get("SweepVar", {}).get("value", "")
+                targets = [
+                    params.get(f"SimInstanceName[{i}]", {}).get("value", "")
+                    for i in range(1, 10)
+                    if params.get(f"SimInstanceName[{i}]", {}).get("value")
+                ]
+                sweeps.append({
+                    "sweep": comp.get("name", ""),
+                    "variable": sweep_var,
+                    "start": params.get("Start", {}).get("value", ""),
+                    "stop": params.get("Stop", {}).get("value", ""),
+                    "step": params.get("Step", {}).get("value", ""),
+                    "targets": targets,
+                })
+
+        # 查找参数值引用了变量的元件
+        var_names = {v["name"] for v in variables}
+        for comp in parse_components(raw):
+            params = parse_paramsinfo(comp.get("paramsinfo", {}))
+            for pkey, pinfo in params.items():
+                val = pinfo.get("value", "")
+                if val and val in var_names:
+                    references.append({
+                        "variable": val,
+                        "component": comp.get("name", ""),
+                        "component_type": comp.get("type", ""),
+                        "parameter": pkey,
+                    })
+
+    return {
+        "success": True,
+        "project_path": str(reader.epp_path.resolve()),
+        "variables": variables,
+        "references": references,
+        "sweeps": sweeps,
     }
 
 

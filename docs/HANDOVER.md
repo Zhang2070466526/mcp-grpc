@@ -60,7 +60,7 @@ PyPI: https://pypi.org/project/edi-mcp/
 
 **工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary
 
-**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist, simulate_netlist_with_ads, compare_simulation_results
+**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist, simulate_netlist_with_ads, list_simulation_components, upsert_simulation_component, delete_simulation_component, compare_simulation_results
 
 **ANSYS**：open_hfss_project（GetActiveObject附着/单启动）, close_hfss_project（COM优先+PID记录）, launch_aedt, get_hfss_project_info（纯查询不启动）
 

@@ -15,6 +15,7 @@ a = Analysis(
     datas=[
         (str(root / 'proto'), 'proto'),
         (str(root / 'servers' / 'chat' / 'index.html'), 'servers/chat'),
+        (str(root / 'servers' / 'eda' / 'simulation_component_catalog.json'), 'servers/eda'),
     ],
     hiddenimports=[
         # MCP 核心
@@ -32,6 +33,7 @@ a = Analysis(
         'servers.eda.grpc_client',
         'servers.eda.project_manage',
         'servers.eda.simulation',
+        'servers.eda.simulation_components',
         'servers.eda.design_export',
         'servers.eda.model_replace',
         'servers.eda.edi_launcher',

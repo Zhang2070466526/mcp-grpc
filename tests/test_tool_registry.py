@@ -16,7 +16,10 @@ def test_all_tools_registered():
         "start_simulation_async", "get_simulation_async_status", "get_simulation_async_result",
         "export_project_netlist", "capture_schematic",
         "replace_models_from_csv", "launch_edi", "turbocharts_convert",
-        "show_image",
+        "show_image", "analyze_variables",
+        "get_simulation_component_schema",
+        "list_simulation_components", "upsert_simulation_component",
+        "delete_simulation_component",
         "open_hfss_project", "close_hfss_project", "launch_aedt", "get_hfss_project_info",
         "start_hfss_analysis_async", "get_hfss_analysis_status",
     ]

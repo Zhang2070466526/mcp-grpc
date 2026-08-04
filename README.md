@@ -174,6 +174,7 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部�
 | `list_project_components` | 列出工程中所有元件 | `project_path`, `schematic_name`, `component_type`, `name_contains` |
 | `get_component_parameters` | 查询单个元件的全部参数 | `project_path`, `component_id`, `schematic_name`, `include_hidden` |
 | `get_project_summary` | 工程概览（元数据/原理图/仿真） | `project_path`, `include_component_types`, `include_latest_result` |
+| `analyze_variables` | 分析变量定义和引用关系 | `project_path` |
 
 ### 仿真
 
@@ -185,6 +186,10 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部�
 | `get_simulation_async_result` | 获取异步仿真结果 | `task_id` | - |
 | `simulate_netlist` | 仿真网表，返回 RAW 结果 | `netlist_path` | `timeout_seconds`（默认 600） |
 | `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 | `netlist_path` | `ads_path`、`timeout_seconds`（默认 120） |
+| `get_simulation_component_schema` | 查询器件参数定义 | `component_type` | `parameter_name` |
+| `list_simulation_components` | 查询仿真器件 | `project_path` | `component_type` |
+| `upsert_simulation_component` | 新增/更新仿真器件 | `project_path`, `component_type`, `parameters` | `timeout_seconds` |
+| `delete_simulation_component` | 删除仿真器件 | `project_path`, `component_type` | `timeout_seconds` |
 
 ### 导出与分析
 
@@ -278,6 +283,8 @@ Claude Code、OpenClaw 等 MCP 客户端接入后，用自然语言调用全部�
 │   │   ├── grpc_client.py       # gRPC 通信（带 EDA 全局锁）
 │   │   ├── project_manage.py    # 工程管理（6 工具）
 │   │   ├── simulation.py        # 仿真（6 工具）
+│   │   ├── simulation_components.py        # 仿真器件（4 工具）
+│   │   └── simulation_component_catalog.json # 参数目录
 │   │   ├── design_export.py     # 网表/截图（2 工具）
 │   │   ├── model_replace.py     # 模型替换（1 工具）
 │   │   └── edi_launcher.py      # 启动 EDI（1 工具）

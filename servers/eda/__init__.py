@@ -37,9 +37,17 @@ from servers.eda.project_manage import (  # noqa: F401
     list_project_components,
     get_component_parameters,
     get_project_summary,
+    analyze_variables,
 )
 
 # -- 仿真 --
+from servers.eda.simulation_components import (  # noqa: F401
+    get_simulation_component_schema,
+    list_simulation_components,
+    upsert_simulation_component,
+    delete_simulation_component,
+)
+
 from servers.eda.simulation import (  # noqa: F401
     simulate_project,
     simulate_netlist,

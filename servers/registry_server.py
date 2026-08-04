@@ -10,6 +10,7 @@
     list_project_components       列出工程中的元件
     get_component_parameters      查询元件的完整参数
     get_project_summary           工程概览
+    analyze_variables             分析变量定义和引用关系
 
   仿真：
     simulate_project              执行工程仿真（同步）
@@ -18,6 +19,9 @@
     get_simulation_async_result   获取异步仿真结果
     simulate_netlist              仿真网表，返回 RAW 结果
     simulate_netlist_with_ads     调用 ADS 仿真控制器
+    list_simulation_components    查询仿真器件
+    upsert_simulation_component   新增或更新仿真器件
+    delete_simulation_component   删除仿真器件
 
   分析：
     export_project_netlist        查看/导出工程网表
@@ -54,6 +58,7 @@ from servers.mcp_instance import mcp  # noqa: E402 — 全局 MCP 实例
 # 导入工具模块即可触发 @mcp.tool() 装饰器注册
 import servers.eda.project_manage       # noqa: F401
 import servers.eda.simulation            # noqa: F401
+import servers.eda.simulation_components # noqa: F401
 import servers.eda.design_export         # noqa: F401
 import servers.eda.model_replace         # noqa: F401
 import servers.eda.edi_launcher          # noqa: F401

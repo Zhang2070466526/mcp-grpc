@@ -25,9 +25,10 @@ def test_parse_sexp_nested():
 
 
 def test_parse_sexp_escaped_quotes():
-    items = list(parse_sexp(r'(paramsinfo "{\"key\": \"value\"}")'))
+    items = list(parse_sexp(r'(paramsinfo "{\"key\": {\"Value\": \"42\", \"CurrentUnit\": \"GHz\"}}")'))
     param = parse_paramsinfo(items[0][1])
-    assert param["key"] == "value"
+    assert param["key"]["value"] == "42"
+    assert param["key"]["unit"] == "GHz"
 
 
 def test_walk_find():

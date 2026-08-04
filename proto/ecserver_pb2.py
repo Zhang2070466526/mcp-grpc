@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x65\x63server.proto\x12\x08\x65\x63server\"h\n\x07Request\x12\x13\n\x0b\x63lient_uuid\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12!\n\x04type\x18\x03 \x01(\x0e\x32\x13.ecserver.EventType\x12\x14\n\x0cpayload_json\x18\x04 \x01(\t\"x\n\x08Response\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x13\n\x0b\x63lient_uuid\x18\x03 \x01(\t\x12\x0f\n\x07task_id\x18\x04 \x01(\t\x12\'\n\nevent_type\x18\x05 \x01(\x0e\x32\x13.ecserver.EventType\"(\n\x11\x46\x65tchEventRequest\x12\x13\n\x0b\x63lient_uuid\x18\x01 \x01(\t\"\xa5\x01\n\x05\x45vent\x12\x13\n\x0b\x63lient_uuid\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\'\n\nevent_type\x18\x03 \x01(\x0e\x32\x13.ecserver.EventType\x12&\n\x06status\x18\x04 \x01(\x0e\x32\x16.ecserver.ResultStatus\x12\x0f\n\x07message\x18\x05 \x01(\t\x12\x14\n\x0cpayload_json\x18\x06 \x01(\t*\xfc\x01\n\tEventType\x12\x1a\n\x16\x45VENT_TYPE_UNSPECIFIED\x10\x00\x12\x10\n\x0cOPEN_PROJECT\x10\x01\x12\x14\n\x10SIMULATE_PROJECT\x10\x02\x12\x18\n\x14VIEW_PROJECT_NETLIST\x10\x03\x12\r\n\tLOG_EVENT\x10\x04\x12\x0f\n\x0b\x45RROR_EVENT\x10\x05\x12\x11\n\rMODEL_REPLACE\x10\x06\x12\x15\n\x11\x43\x41PTURE_SCHEMATIC\x10\x07\x12\x11\n\rCLOSE_PROJECT\x10\x08\x12\x1e\n\x1a\x43\x41LL_SIMULATION_CONTROLLER\x10\t\x12\x14\n\x10SIMULATE_NETLIST\x10\n*y\n\x0cResultStatus\x12\x19\n\x15RESULT_STATUS_UNKNOWN\x10\x00\x12\x19\n\x15RESULT_STATUS_RUNNING\x10\x01\x12\x19\n\x15RESULT_STATUS_SUCCESS\x10\x02\x12\x18\n\x14RESULT_STATUS_FAILED\x10\x03*O\n\x08LogLevel\x12\x19\n\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\x01\x12\x08\n\x04INFO\x10\x02\x12\x08\n\x04WARN\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x32\x88\x01\n\x0c\x45xternalCall\x12\x38\n\rPerformAction\x12\x11.ecserver.Request\x1a\x12.ecserver.Response\"\x00\x12>\n\nFetchEvent\x12\x1b.ecserver.FetchEventRequest\x1a\x0f.ecserver.Event\"\x00\x30\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0e\x65\x63server.proto\x12\x08\x65\x63server\"h\n\x07Request\x12\x13\n\x0b\x63lient_uuid\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12!\n\x04type\x18\x03 \x01(\x0e\x32\x13.ecserver.EventType\x12\x14\n\x0cpayload_json\x18\x04 \x01(\t\"x\n\x08Response\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\x0f\n\x07message\x18\x02 \x01(\t\x12\x13\n\x0b\x63lient_uuid\x18\x03 \x01(\t\x12\x0f\n\x07task_id\x18\x04 \x01(\t\x12\'\n\nevent_type\x18\x05 \x01(\x0e\x32\x13.ecserver.EventType\"(\n\x11\x46\x65tchEventRequest\x12\x13\n\x0b\x63lient_uuid\x18\x01 \x01(\t\"\xa5\x01\n\x05\x45vent\x12\x13\n\x0b\x63lient_uuid\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\'\n\nevent_type\x18\x03 \x01(\x0e\x32\x13.ecserver.EventType\x12&\n\x06status\x18\x04 \x01(\x0e\x32\x16.ecserver.ResultStatus\x12\x0f\n\x07message\x18\x05 \x01(\t\x12\x14\n\x0cpayload_json\x18\x06 \x01(\t*\xbe\x02\n\tEventType\x12\x1a\n\x16\x45VENT_TYPE_UNSPECIFIED\x10\x00\x12\x10\n\x0cOPEN_PROJECT\x10\x01\x12\x14\n\x10SIMULATE_PROJECT\x10\x02\x12\x18\n\x14VIEW_PROJECT_NETLIST\x10\x03\x12\r\n\tLOG_EVENT\x10\x04\x12\x0f\n\x0b\x45RROR_EVENT\x10\x05\x12\x11\n\rMODEL_REPLACE\x10\x06\x12\x15\n\x11\x43\x41PTURE_SCHEMATIC\x10\x07\x12\x11\n\rCLOSE_PROJECT\x10\x08\x12\x1e\n\x1a\x43\x41LL_SIMULATION_CONTROLLER\x10\t\x12\x14\n\x10SIMULATE_NETLIST\x10\n\x12\x1f\n\x1bUPSERT_SIMULATION_COMPONENT\x10\x0b\x12\x1f\n\x1b\x44\x45LETE_SIMULATION_COMPONENT\x10\x0c*y\n\x0cResultStatus\x12\x19\n\x15RESULT_STATUS_UNKNOWN\x10\x00\x12\x19\n\x15RESULT_STATUS_RUNNING\x10\x01\x12\x19\n\x15RESULT_STATUS_SUCCESS\x10\x02\x12\x18\n\x14RESULT_STATUS_FAILED\x10\x03*O\n\x08LogLevel\x12\x19\n\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\x01\x12\x08\n\x04INFO\x10\x02\x12\x08\n\x04WARN\x10\x03\x12\t\n\x05\x45RROR\x10\x04\x32\x88\x01\n\x0c\x45xternalCall\x12\x38\n\rPerformAction\x12\x11.ecserver.Request\x1a\x12.ecserver.Response\"\x00\x12>\n\nFetchEvent\x12\x1b.ecserver.FetchEventRequest\x1a\x0f.ecserver.Event\"\x00\x30\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,11 +32,11 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'ecserver_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_EVENTTYPE']._serialized_start=467
-  _globals['_EVENTTYPE']._serialized_end=719
-  _globals['_RESULTSTATUS']._serialized_start=721
-  _globals['_RESULTSTATUS']._serialized_end=842
-  _globals['_LOGLEVEL']._serialized_start=844
-  _globals['_LOGLEVEL']._serialized_end=923
+  _globals['_EVENTTYPE']._serialized_end=785
+  _globals['_RESULTSTATUS']._serialized_start=787
+  _globals['_RESULTSTATUS']._serialized_end=908
+  _globals['_LOGLEVEL']._serialized_start=910
+  _globals['_LOGLEVEL']._serialized_end=989
   _globals['_REQUEST']._serialized_start=28
   _globals['_REQUEST']._serialized_end=132
   _globals['_RESPONSE']._serialized_start=134
@@ -45,6 +45,6 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_FETCHEVENTREQUEST']._serialized_end=296
   _globals['_EVENT']._serialized_start=299
   _globals['_EVENT']._serialized_end=464
-  _globals['_EXTERNALCALL']._serialized_start=926
-  _globals['_EXTERNALCALL']._serialized_end=1062
+  _globals['_EXTERNALCALL']._serialized_start=992
+  _globals['_EXTERNALCALL']._serialized_end=1128
 # @@protoc_insertion_point(module_scope)

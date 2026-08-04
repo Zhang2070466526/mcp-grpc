@@ -186,6 +186,27 @@ get_project_summary(
 
 ---
 
+### `analyze_variables`
+
+```python
+from servers.eda.project_manage import analyze_variables
+
+analyze_variables(project_path: str) -> dict
+```
+
+分析工程中的 Var 变量定义、其他元件对变量的引用、Sweep 扫描配置。
+
+返回：
+```python
+{
+    "variables": [{"name": "freqin", "parameter": "freqin", "initial": "29", ...}],
+    "references": [{"variable": "freqin", "component": "PORT1", "parameter": "Freq[1]"}, ...],
+    "sweeps": [{"sweep": "Sweep2", "variable": "freqin", "start": "29", "stop": "31", ...}]
+}
+```
+
+---
+
 ## 仿真（6 个）
 
 ### `simulate_project`
@@ -563,6 +584,52 @@ copy_image_to_workspace(image_path: str) -> dict
 | `image_path` | str | 是 | 图片文件绝对路径 |
 
 返回：`{"success": true, "copied": true, "displayed": false, "image_path": "...", "openclaw_attachment": {"filePath": "..."}}`
+
+---
+
+## 仿真器件管理（4 个）
+
+### `get_simulation_component_schema`
+
+```python
+from servers.eda.simulation_components import get_simulation_component_schema
+
+get_simulation_component_schema(component_type: str, parameter_name: str = "") -> dict
+```
+
+查询仿真控件支持的参数名、值类型、合法单位和示例。创建或修改器件前优先调用。
+
+### `list_simulation_components`
+
+```python
+from servers.eda.simulation_components import list_simulation_components
+
+list_simulation_components(project_path: str, component_type: str = "") -> dict
+```
+
+本地读取原理图，查询仿真器件（SParameter / HarmonicBalance / XDB）及参数。
+
+### `upsert_simulation_component`
+
+```python
+from servers.eda.simulation_components import upsert_simulation_component
+
+upsert_simulation_component(project_path: str, component_type: str, parameters: dict, timeout_seconds: int = 120) -> dict
+```
+
+新增或更新仿真器件参数。不存在时创建并覆盖；已存在时只覆盖传入参数。
+
+参数格式：`{"Start": {"value": "1", "unit": "GHz"}, "Pts": {"value": "101"}}`
+
+### `delete_simulation_component`
+
+```python
+from servers.eda.simulation_components import delete_simulation_component
+
+delete_simulation_component(project_path: str, component_type: str, timeout_seconds: int = 120) -> dict
+```
+
+删除指定类型的仿真器件。同类型超过一个时失败。
 
 ---
 

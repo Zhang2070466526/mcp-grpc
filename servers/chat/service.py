@@ -39,6 +39,7 @@ from servers.eda.project_manage import (  # noqa: E402
     list_project_components,
     get_component_parameters, get_project_summary,
 )
+from servers.eda.simulation_components import get_simulation_component_schema, list_simulation_components, upsert_simulation_component, delete_simulation_component  # noqa: E402
 from servers.eda.simulation import (  # noqa: E402
     start_simulation_async, get_simulation_async_status, get_simulation_async_result,
 )
@@ -80,6 +81,10 @@ CHAT_TOOL_MAP: dict[str, Any] = {
     "compare_simulation_results":     compare_simulation_results,
     "turbocharts_convert":            turbocharts_convert,
     "show_image":                     show_image,
+    "get_simulation_component_schema": get_simulation_component_schema,
+    "list_simulation_components": list_simulation_components,
+    "upsert_simulation_component": upsert_simulation_component,
+    "delete_simulation_component": delete_simulation_component,
 }
 if OPENCLAW_WORKSPACE_PATH is not None:
     CHAT_TOOL_MAP["copy_image_to_workspace"] = copy_image_to_workspace
@@ -125,6 +130,10 @@ def _build_tools_schema() -> list[dict]:
         _rtool("compare_simulation_results", "多个 RAW 结果同一条曲线对比叠图", {"result_paths": "array", "curve": "string", "img_path": "string"}, {"chart_type": "string", "labels": "array", "dependency": "string", "csv_path": "string", "alignment": "string", "reference_index": "integer"}),
         _rtool("turbocharts_convert", "ADS RAW 文件转曲线图和 CSV", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
         _rtool("show_image", "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）", {"image_path": "string"}),
+        _rtool("get_simulation_component_schema", "查询仿真控件支持的参数、类型和单位；配置控件前优先调用", {"component_type": "string"}, {"parameter_name": "string"}),
+        _rtool("list_simulation_components", "查询工程中的仿真器件", {"project_path": "string"}, {"component_type": "string"}),
+        _rtool("upsert_simulation_component", "新增或更新仿真器件参数", {"project_path": "string", "component_type": "string", "parameters": "object"}, {"timeout_seconds": "integer"}),
+        _rtool("delete_simulation_component", "删除仿真器件", {"project_path": "string", "component_type": "string"}, {"timeout_seconds": "integer"}),
     ]
     if OPENCLAW_WORKSPACE_PATH is not None:
         tools.append(_rtool("copy_image_to_workspace", "复制图片到工作区 media/edi，需配置 OPENCLAW_WORKSPACE", {"image_path": "string"}))
@@ -661,6 +670,10 @@ _TOOL_LABELS: dict[str, str] = {
     "compare_simulation_results": "对比结果",
     "turbocharts_convert": "RAW 转图",
     "show_image": "显示图片",
+    "get_simulation_component_schema": "查询参数",
+    "list_simulation_components": "查询器件",
+    "upsert_simulation_component": "仿真器件",
+    "delete_simulation_component": "删除器件",
 }
 if OPENCLAW_WORKSPACE_PATH is not None:
     _TOOL_LABELS["copy_image_to_workspace"] = "复制到工作区"
