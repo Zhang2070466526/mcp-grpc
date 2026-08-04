@@ -626,10 +626,10 @@ create_simulation_component(project_path: str, component_type: str, parameters: 
 ```python
 from servers.eda.simulation_components import update_simulation_component
 
-update_simulation_component(project_path: str, instance_name: str, parameters: dict, timeout_seconds: int = 120) -> dict
+update_simulation_component(project_path: str, instance_name: str, parameters: dict, component_type: str = "", timeout_seconds: int = 120) -> dict
 ```
 
-按实例名更新仿真器件参数。MCP 内部自动识别器件类型并完成参数校验和 wire 转换，无需提供 component_type。只更新传入的参数，其余保持原值。
+按实例名更新仿真器件参数。优先从已保存工程自动识别器件类型；实例未保存时可显式提供 `component_type`。显式类型与实际类型不一致会返回 `COMPONENT_TYPE_MISMATCH`。只更新传入的参数，其余保持原值。
 
 ### `delete_simulation_component`
 
@@ -639,7 +639,7 @@ from servers.eda.simulation_components import delete_simulation_component
 delete_simulation_component(project_path: str, instance_name: str, timeout_seconds: int = 120) -> dict
 ```
 
-按实例名删除任意原理图器件及其连接线。调用前会本地预检查实例是否存在。
+按实例名删除任意原理图器件及其连接线。MCP 只校验实例名非空，最终查找、删除和回滚由 EDI 服务完成。建议调用前先查询目标实例。
 
 ### `set_component_active_state`
 

@@ -11,3 +11,4 @@ logs/
 *.log
 dist/
 build/
+.pytest_tmp*/

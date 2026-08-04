@@ -19,12 +19,12 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
 ]
 dependencies = [
-    "grpcio>=1.81.0",
+    "grpcio>=1.82.1,<2",
     "httpx>=0.28",
     "matplotlib>=3.10",
-    "mcp>=1.0.0",
+    "mcp>=1.28.1,<2",
     "numpy>=2.0",
-    "protobuf>=6.33.5",
+    "protobuf>=7.35.0,<8",
     "psutil>=7.2.2",
     "python-dotenv>=1.0.0",
     "pywin32>=306; platform_system == 'Windows'",

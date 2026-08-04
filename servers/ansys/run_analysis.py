@@ -91,7 +91,7 @@ def _run_hfss_analysis_task(task_id: str) -> None:
     except Exception as exc:
         logger.exception("HFSS analysis failed")
         with _HFSS_TASKS_LOCK:
-            _HFSS_TASKS[task_id].update(status="FAILED", error=repr(exc), finished_at=time.time())
+            _HFSS_TASKS[task_id].update(status="FAILED", error=str(exc), finished_at=time.time())
     finally:
         pythoncom.CoUninitialize()
 
@@ -123,7 +123,7 @@ def _validate_setups(project_path: str, design_name: str) -> dict:
         return {"success": True, "project_name": project_name,
                 "design_name": design_name, "setups": setups}
     except Exception as exc:
-        return {"success": False, "status": "com_error", "error": repr(exc)}
+        return {"success": False, "status": "com_error", "error": str(exc)}
     finally:
         pythoncom.CoUninitialize()
 
@@ -226,7 +226,7 @@ def get_hfss_analysis_status(
             result["aedt_simulations_running"] = desktop.AreThereSimulationsRunning(True)
         except Exception as exc:
             result["aedt_refresh_succeeded"] = False
-            result["aedt_refresh_error"] = repr(exc)
+            result["aedt_refresh_error"] = str(exc)
         finally:
             pythoncom.CoUninitialize()
 

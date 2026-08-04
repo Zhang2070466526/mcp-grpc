@@ -41,7 +41,7 @@ def _com_open_project(project_path: str) -> dict[str, Any]:
     except Exception as exc:
         logger.exception("COM OpenProject failed")
         return {"status": "com_open_failed", "project_name": Path(project_path).stem,
-                "error": repr(exc)}
+                "error": str(exc)}
     finally:
         pythoncom.CoUninitialize()
 

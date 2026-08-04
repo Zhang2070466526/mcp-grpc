@@ -27,6 +27,9 @@ a = Analysis(
         'servers.chat.service',
         'servers.chat.routes',
 
+        # MCP Resources & Prompts
+        'servers.mcp_content',
+
         # EDA 工具
         'servers.eda',
         'servers.eda.config',

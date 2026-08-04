@@ -59,13 +59,21 @@ def capture_schematic(
         timeout_seconds: 最长等待时间，默认 60 秒。
     """
     resolved_path = validate_project_path(project_path)
+    # Basic path validation: resolve and check output extension
+    img_resolved = str(Path(img_path).expanduser().resolve())
+    img_ext = Path(img_resolved).suffix.lower()
+    if img_ext not in (".png", ".jpg", ".jpeg", ".bmp", ".svg"):
+        return {"success": False,
+                "error_code": "INVALID_PATH",
+                "message": f"img_path 扩展名不支持: {img_ext}，请使用 PNG/JPG/BMP/SVG"}
+
     result = call_grpc(
         ecserver_pb2.CAPTURE_SCHEMATIC,
-        {"project_path": resolved_path, "img_path": img_path},
+        {"project_path": resolved_path, "img_path": img_resolved},
         timeout_seconds,
         max_timeout_seconds=300,
     )
-    img_ok = Path(img_path).is_file()
+    img_ok = Path(img_resolved).is_file()
     if img_ok:
         result["img_generated"] = True
     return result

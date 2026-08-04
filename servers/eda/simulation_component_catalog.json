@@ -1,12 +1,10 @@
 {
   "schema_version": "2.0.0",
   "protocol_version": "2",
-  "edi_version": "",
   "generated_at": "2026-08-04",
   "source": "EDA service component parameter whitelist",
   "permissions_verified": false,
   "permission_source": "grpc documentation + legacy catalog",
-
   "components": {
     "SParameter": {
       "display_name": "S 参数仿真控制器",
@@ -17,7 +15,12 @@
           "description": "扫描起始频率",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -27,7 +30,12 @@
           "description": "扫描终止频率",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -37,7 +45,12 @@
           "description": "扫描步长",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -58,7 +71,10 @@
           "value_type": "boolean",
           "unit_required": false,
           "units": [],
-          "enum_values": ["yes", "no"],
+          "enum_values": [
+            "yes",
+            "no"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -69,7 +85,10 @@
           "value_type": "boolean",
           "unit_required": false,
           "units": [],
-          "enum_values": ["yes", "no"],
+          "enum_values": [
+            "yes",
+            "no"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -80,7 +99,10 @@
           "value_type": "boolean",
           "unit_required": false,
           "units": [],
-          "enum_values": ["yes", "no"],
+          "enum_values": [
+            "yes",
+            "no"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -91,7 +113,10 @@
           "value_type": "boolean",
           "unit_required": false,
           "units": [],
-          "enum_values": ["yes", "no"],
+          "enum_values": [
+            "yes",
+            "no"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -102,7 +127,10 @@
           "value_type": "boolean",
           "unit_required": false,
           "units": [],
-          "enum_values": ["yes", "no"],
+          "enum_values": [
+            "yes",
+            "no"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -139,13 +167,18 @@
         },
         "BandwidthForNoise": {
           "wire_name": "BandwidthForNoise",
-          "description": "噪声带宽",
+          "description": "噪声带宽（EDI 内部参数，使用默认值，禁止手动设置）",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
-          "create_allowed": true,
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
+          "create_allowed": false,
           "update_allowed": false,
-          "permission_source": "grpc_create_example + legacy_readonly"
+          "permission_source": "edi internal default"
         },
         "GroupDelayAperture": {
           "wire_name": "GroupDelayAperture",
@@ -160,23 +193,50 @@
       },
       "parameter_patterns": [],
       "example": {
-        "Start": {"value": "1.0", "unit": "GHz"},
-        "Stop": {"value": "10.0", "unit": "GHz"},
-        "Step": {"value": "1.0", "unit": "GHz"},
-        "Pts": {"value": "10"},
-        "CalcS": {"value": "yes"},
-        "CalcNoise": {"value": "no"},
-        "NoiseInputPort": {"value": "1"},
-        "NoiseOutputPort": {"value": "2"},
-        "BandwidthForNoise": {"value": "1.0", "unit": "GHz"},
-        "CalcGroupDelay": {"value": "no"},
-        "EnforcePassivity": {"value": "no"},
-        "GroupDelayAperture": {"value": "1e-4"},
-        "FreqConversion": {"value": "no"},
-        "FreqConversionPort": {"value": "1"}
+        "Start": {
+          "value": "1.0",
+          "unit": "GHz"
+        },
+        "Stop": {
+          "value": "10.0",
+          "unit": "GHz"
+        },
+        "Step": {
+          "value": "1.0",
+          "unit": "GHz"
+        },
+        "Pts": {
+          "value": "10"
+        },
+        "CalcS": {
+          "value": "yes"
+        },
+        "CalcNoise": {
+          "value": "no"
+        },
+        "NoiseInputPort": {
+          "value": "1"
+        },
+        "NoiseOutputPort": {
+          "value": "2"
+        },
+        "CalcGroupDelay": {
+          "value": "no"
+        },
+        "EnforcePassivity": {
+          "value": "no"
+        },
+        "GroupDelayAperture": {
+          "value": "1e-4"
+        },
+        "FreqConversion": {
+          "value": "no"
+        },
+        "FreqConversionPort": {
+          "value": "1"
+        }
       }
     },
-
     "HarmonicBalance": {
       "display_name": "谐波平衡控制器",
       "instance_prefix": "HB",
@@ -186,7 +246,12 @@
           "description": "基频频率（同 Freq[1]）",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -211,7 +276,12 @@
           "description": "第 N 个基频频率",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true
         },
@@ -229,11 +299,15 @@
         }
       ],
       "example": {
-        "Freq": {"value": "1", "unit": "GHz"},
-        "Order": {"value": "5"}
+        "Freq": {
+          "value": "1",
+          "unit": "GHz"
+        },
+        "Order": {
+          "value": "5"
+        }
       }
     },
-
     "XDB": {
       "display_name": "XDB 控制器",
       "instance_prefix": "XDB",
@@ -243,7 +317,12 @@
           "description": "基频频率（同 Freq[1]）",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -293,7 +372,12 @@
           "description": "增益压缩输入频率",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -303,7 +387,12 @@
           "description": "增益压缩输出频率",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true,
           "permission_source": "legacy_non_readonly"
@@ -358,7 +447,12 @@
           "description": "第 N 个基频频率",
           "value_type": "number",
           "unit_required": true,
-          "units": ["Hz", "kHz", "MHz", "GHz"],
+          "units": [
+            "Hz",
+            "kHz",
+            "MHz",
+            "GHz"
+          ],
           "create_allowed": true,
           "update_allowed": true
         },
@@ -376,17 +470,42 @@
         }
       ],
       "example": {
-        "Freq": {"value": "1.0", "unit": "GHz"},
-        "Order": {"value": "5"},
-        "GC_XdB": {"value": "1"},
-        "GC_InputPort": {"value": "1"},
-        "GC_OutputPort": {"value": "2"},
-        "GC_InputFreq": {"value": "1.0", "unit": "GHz"},
-        "GC_OutputFreq": {"value": "1.0", "unit": "GHz"},
-        "GC_InputPowerTol": {"value": "1e-3"},
-        "GC_OutputPowerTol": {"value": "1e-3"},
-        "GC_MaxInputPowerTol": {"value": "100"},
-        "StatusLevel": {"value": "2"}
+        "Freq": {
+          "value": "1.0",
+          "unit": "GHz"
+        },
+        "Order": {
+          "value": "5"
+        },
+        "GC_XdB": {
+          "value": "1"
+        },
+        "GC_InputPort": {
+          "value": "1"
+        },
+        "GC_OutputPort": {
+          "value": "2"
+        },
+        "GC_InputFreq": {
+          "value": "1.0",
+          "unit": "GHz"
+        },
+        "GC_OutputFreq": {
+          "value": "1.0",
+          "unit": "GHz"
+        },
+        "GC_InputPowerTol": {
+          "value": "1e-3"
+        },
+        "GC_OutputPowerTol": {
+          "value": "1e-3"
+        },
+        "GC_MaxInputPowerTol": {
+          "value": "100"
+        },
+        "StatusLevel": {
+          "value": "2"
+        }
       }
     }
   }

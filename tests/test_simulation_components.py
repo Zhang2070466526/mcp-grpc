@@ -60,10 +60,10 @@ class TestCatalog:
             wires = [d.get("wire_name") for d in comp.get("parameters", {}).values()]
             assert len(wires) == len(set(wires)), f"{ct}: duplicate wire names in {wires}"
 
-    def test_bandwidth_for_noise_rules(self):
+    def test_bandwidth_for_noise_fully_readonly(self):
         sp = _catalog_component("SParameter")
         bn = sp["parameters"]["BandwidthForNoise"]
-        assert bn["create_allowed"] is True, "BandwidthForNoise should be create_allowed"
+        assert bn["create_allowed"] is False, "BandwidthForNoise should NOT be create_allowed"
         assert bn["update_allowed"] is False, "BandwidthForNoise should NOT be update_allowed"
 
     def test_examples_pass_own_validation(self):
@@ -235,10 +235,11 @@ class TestPrepareParameters:
         assert err is not None
         assert err["error_code"] == "UNSUPPORTED_PARAMETER"
 
-    def test_bandwidth_for_noise_create_allowed(self):
+    def test_bandwidth_for_noise_create_rejected(self):
         wire, err = _prepare_parameters("SParameter",
             {"BandwidthForNoise": {"value": "1.0", "unit": "GHz"}}, "create", allow_empty=True)
-        assert err is None
+        assert err is not None
+        assert err["error_code"] == "CREATE_PARAMETER_NOT_ALLOWED"
 
     def test_bandwidth_for_noise_update_rejected(self):
         wire, err = _prepare_parameters("SParameter",
@@ -467,16 +468,13 @@ class TestDuplicateParameterAlias:
         assert err is None
 
     def test_freq2_and_freq2_no_conflict(self):
-        """Same dynamic param twice — same wire, should conflict."""
+        """Same dynamic param twice is impossible in a Python dict (keys unique).
+        The real alias risk is Freq (→Freq[1]) + Freq[1] (→Freq[1]), covered above."""
         wire, err = _prepare_parameters("HarmonicBalance", {
             "Freq[2]": {"value": "2", "unit": "GHz"},
-            "Freq[2]": {"value": "3", "unit": "GHz"},
         }, "create", allow_empty=True)
-        # The second Freq[2] would override the first in Python dict iteration
-        # order, but the wire check catches it because it's the same wire name
-        # Actually, since dict keys are unique, Freq[2] can only appear once.
-        # The real case is Freq (→Freq[1]) + Freq[1] (→Freq[1])
-        pass
+        assert err is None, f"Single Freq[2] should be valid, got {err}"
+        assert wire["Freq[2]"]["value"] == "2"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -584,3 +582,179 @@ class TestToolCount:
         from servers.mcp_instance import mcp
         tools = [t.name for t in mcp._tool_manager._tools.values()]
         assert "upsert_simulation_component" not in tools
+
+
+# ═══════════════════════════════════════════════════════════
+# 13. gRPC payload integration (mock call_grpc)
+# ═══════════════════════════════════════════════════════════
+
+from unittest.mock import patch
+from proto import ecserver_pb2
+
+
+_MOCK_GRPC_OK = {
+    "success": True, "completed": True, "status": "SUCCEEDED",
+    "message": "task completed", "project_path": "", "result_path": "",
+    "ads_output": "", "log_complete": True, "details": {},
+}
+
+_VALIDATE_PATCH = patch(
+    "servers.eda.simulation_components.validate_project_path",
+    return_value="C:/test.epp",
+)
+_CALL_GRPC_PATCH = patch(
+    "servers.eda.simulation_components.call_grpc",
+    return_value=_MOCK_GRPC_OK,
+)
+_NETLIST_ISFILE_PATCH = patch(
+    "servers.eda.simulation_components.Path.is_file",
+    return_value=True,
+)
+_DISK_LOOKUP_PATCH = patch(
+    "servers.eda.simulation_components._find_component_by_instance",
+    return_value=(None, None),
+)
+
+
+class TestGrpcPayloads:
+    """验证 7 个工具的最终 gRPC 枚举值和 payload 字段。"""
+
+    def test_create_enum_and_payload(self):
+        from servers.eda.simulation_components import create_simulation_component
+        with _VALIDATE_PATCH, _CALL_GRPC_PATCH as mock:
+            create_simulation_component(
+                "C:/test.epp", "HarmonicBalance",
+                {"Freq": {"value": "1", "unit": "GHz"}},
+            )
+            assert mock.call_args.args[0] == ecserver_pb2.CREATE_SIMULATION_COMPONENT
+            payload = mock.call_args.args[1]
+            assert payload["component_type"] == "HarmonicBalance"
+            assert "Freq[1]" in payload["parameters"]
+
+    def test_create_empty_parameters(self):
+        from servers.eda.simulation_components import create_simulation_component
+        with _VALIDATE_PATCH, _CALL_GRPC_PATCH as mock:
+            create_simulation_component("C:/test.epp", "SParameter")
+            assert mock.call_args.args[0] == ecserver_pb2.CREATE_SIMULATION_COMPONENT
+            assert mock.call_args.args[1]["parameters"] == {}
+
+    def test_create_falsy_parameters_rejected(self):
+        from servers.eda.simulation_components import create_simulation_component
+        with _VALIDATE_PATCH:
+            result = create_simulation_component(
+                "C:/test.epp", "SParameter", parameters=[])
+            assert result["success"] is False
+
+    def test_update_enum_and_payload(self):
+        from servers.eda.simulation_components import update_simulation_component
+        with _VALIDATE_PATCH, _CALL_GRPC_PATCH as mock, \
+             patch("servers.eda.simulation_components._find_component_by_instance",
+                   return_value=({"type": "HarmonicBalance", "name": "HB1"}, None)):
+            update_simulation_component(
+                "C:/test.epp", "HB1",
+                {"Freq": {"value": "2", "unit": "GHz"}},
+            )
+            assert mock.call_args.args[0] == ecserver_pb2.UPDATE_SIMULATION_COMPONENT
+            payload = mock.call_args.args[1]
+            assert payload["instance_name"] == "HB1"
+            assert "Freq[1]" in payload["parameters"]
+
+    def test_update_explicit_type(self):
+        from servers.eda.simulation_components import update_simulation_component
+        with _VALIDATE_PATCH, _CALL_GRPC_PATCH as mock, _DISK_LOOKUP_PATCH:
+            update_simulation_component(
+                "C:/test.epp", "HB2",
+                {"Freq": {"value": "3", "unit": "GHz"}},
+                component_type="HarmonicBalance",
+            )
+            assert mock.call_args.args[0] == ecserver_pb2.UPDATE_SIMULATION_COMPONENT
+
+    def test_update_type_mismatch(self):
+        from servers.eda.simulation_components import update_simulation_component
+        with _VALIDATE_PATCH, \
+             patch("servers.eda.simulation_components._find_component_by_instance",
+                   return_value=({"type": "HarmonicBalance", "name": "HB1"}, None)):
+            result = update_simulation_component(
+                "C:/test.epp", "HB1",
+                {"Start": {"value": "1", "unit": "GHz"}},
+                component_type="SParameter",
+            )
+            assert result["success"] is False
+            assert result["error_code"] == "COMPONENT_TYPE_MISMATCH"
+
+    def test_update_no_type_available(self):
+        from servers.eda.simulation_components import update_simulation_component
+        with _VALIDATE_PATCH, _DISK_LOOKUP_PATCH:
+            result = update_simulation_component(
+                "C:/test.epp", "Unknown1",
+                {"Freq": {"value": "1", "unit": "GHz"}},
+            )
+            assert result["success"] is False
+            assert result["error_code"] == "COMPONENT_TYPE_REQUIRED"
+
+    def test_delete_enum_and_payload(self):
+        from servers.eda.simulation_components import delete_simulation_component
+        with _VALIDATE_PATCH, _CALL_GRPC_PATCH as mock:
+            delete_simulation_component("C:/test.epp", "R1")
+            assert mock.call_args.args[0] == ecserver_pb2.DELETE_SIMULATION_COMPONENT
+            payload = mock.call_args.args[1]
+            assert payload["instance_name"] == "R1"
+            assert "component_type" not in payload
+
+    def test_delete_empty_name_rejected(self):
+        from servers.eda.simulation_components import delete_simulation_component
+        with _VALIDATE_PATCH:
+            result = delete_simulation_component("C:/test.epp", "")
+            assert result["success"] is False
+            assert result["error_code"] == "EMPTY_INSTANCE_NAME"
+
+    def test_set_state_enum_and_payload(self):
+        from servers.eda.simulation_components import set_component_active_state
+        with _VALIDATE_PATCH, _CALL_GRPC_PATCH as mock:
+            set_component_active_state("C:/test.epp", "R1", "disabled")
+            assert mock.call_args.args[0] == ecserver_pb2.SET_COMPONENT_ACTIVE_STATE
+            payload = mock.call_args.args[1]
+            assert payload["state"] == "DISABLED"
+
+    def test_set_state_invalid_rejected(self):
+        from servers.eda.simulation_components import set_component_active_state
+        with _VALIDATE_PATCH:
+            result = set_component_active_state("C:/test.epp", "R1", "BROKEN")
+            assert result["success"] is False
+            assert result["error_code"] == "INVALID_ACTIVE_STATE"
+
+    def test_generate_enum_confirm_clear_not_leaked(self):
+        from servers.eda.simulation_components import generate_schematic_from_netlist
+        with _VALIDATE_PATCH, _NETLIST_ISFILE_PATCH, _CALL_GRPC_PATCH as mock:
+            generate_schematic_from_netlist(
+                "C:/test.epp", "C:/test/netlist.log",
+                clear_before_import=False,
+            )
+            assert mock.call_args.args[0] == ecserver_pb2.GENERATE_SCHEMATIC_FROM_NETLIST
+            payload = mock.call_args.args[1]
+            assert "confirm_clear" not in payload
+            assert payload["clear_before_import"] is False
+
+    def test_generate_clear_without_confirmation(self):
+        from servers.eda.simulation_components import generate_schematic_from_netlist
+        with _VALIDATE_PATCH, _NETLIST_ISFILE_PATCH:
+            result = generate_schematic_from_netlist(
+                "C:/test.epp", "C:/test/netlist.log",
+                clear_before_import=True,
+            )
+            assert result["success"] is False
+            assert result["error_code"] == "CLEAR_CONFIRMATION_REQUIRED"
+
+    def test_generate_clear_confirmed(self):
+        from servers.eda.simulation_components import generate_schematic_from_netlist
+        with _VALIDATE_PATCH, _NETLIST_ISFILE_PATCH, _CALL_GRPC_PATCH as mock:
+            generate_schematic_from_netlist(
+                "C:/test.epp", "C:/test/netlist.log",
+                clear_before_import=True, confirm_clear=True,
+            )
+            payload = mock.call_args.args[1]
+            assert "confirm_clear" not in payload
+            assert payload["clear_before_import"] is True
+
+
+# ═══════════════════════════════════════════════════════════

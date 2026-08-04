@@ -449,12 +449,12 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "grpcio", specifier = ">=1.81.0" },
+    { name = "grpcio", specifier = ">=1.82.1,<2" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "matplotlib", specifier = ">=3.10" },
-    { name = "mcp", specifier = ">=1.0.0" },
+    { name = "mcp", specifier = ">=1.28.1,<2" },
     { name = "numpy", specifier = ">=2.0" },
-    { name = "protobuf", specifier = ">=6.33.5" },
+    { name = "protobuf", specifier = ">=7.35.0,<8" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=306" },

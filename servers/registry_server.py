@@ -72,6 +72,9 @@ import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
 import servers.image_tools                # noqa: F401
 
+# Resources & Prompts
+import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.prompt()
+
 # Web 路由
 from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
 from servers.image_tools import serve_image  # noqa: E402

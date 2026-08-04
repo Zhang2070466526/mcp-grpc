@@ -130,7 +130,7 @@ def _get_openclaw_workspace() -> Path | None:
 OPENCLAW_WORKSPACE_PATH = _get_openclaw_workspace()
 
 if OPENCLAW_WORKSPACE_PATH is not None:
-    _logger.info("copy_image_to_workspace enabled: %s", OPENCLAW_WORKSPACE_PATH)
+    _logger.info("copy_image_to_workspace enabled")
 else:
     _logger.info("OPENCLAW_WORKSPACE not configured; copy_image_to_workspace disabled")
 
@@ -254,9 +254,7 @@ def _base_url() -> str:
 
 
 def register_image_url(img_path: str) -> str:
-    p = Path(img_path).expanduser().resolve()
-    if not p.is_file():
-        return ""
+    p = _validate_image_path(img_path)
     _cleanup_expired()
     token = secrets.token_urlsafe(24)
     with _TOKEN_LOCK:

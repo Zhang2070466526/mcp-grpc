@@ -414,7 +414,7 @@ enum ResultStatus {
   "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"SParameter\",\"parameters\":{\"Start\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Stop\":{\"value\":\"10.0\",\"unit\":\"GHz\"},\"Step\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Pts\":{\"value\":\"10\"},\"NoiseInputPort\":{\"value\":\"1\"},\"NoiseOutputPort\":{\"value\":\"2\"},\"BandwidthForNoise\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"CalcNoise\":{\"value\":\"no\"},\"CalcS\":{\"value\":\"yes\"},\"CalcGroupDelay\":{\"value\":\"no\"},\"EnforcePassivity\":{\"value\":\"no\"},\"GroupDelayAperture\":{\"value\":\"1e-4\"},\"FreqConversion\":{\"value\":\"no\"},\"FreqConversionPort\":{\"value\":\"1\"}}}"
 }
 ```
-该请求包含 SParameter 当前全部可设置属性。界面中显示的 `Bandwidth` 对应接口字段 `BandwidthForNoise`，不能传 `Bandwidth`。
+该请求包含 SParameter 当前全部可设置属性。注意：`BandwidthForNoise` 为 EDI 内部参数，MCP 层禁止手动设置（create_allowed=false, update_allowed=false），EDI 使用默认值。界面中显示的 `Bandwidth` 对应接口字段 `BandwidthForNoise`，不能传 `Bandwidth`。
 
 
 如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `11`。

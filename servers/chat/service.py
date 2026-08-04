@@ -127,7 +127,7 @@ def _build_tools_schema() -> list[dict]:
         _rtool("analyze_variables", "分析工程中的 Var 变量定义、引用关系和 Sweep 扫描配置", {"project_path": "string"}),
         _rtool("list_epp_projects", "扫描文件夹中的 .epp 工程文件", {"folder_path": "string"}),
         _rtool("open_edi_project", "打开 .epp 工程", {"project_path": "string"}, {"timeout_seconds": "integer"}),
-        _rtool("close_edi_project", "关闭 EDA 工程", {"project_path": "string"}, {"need_save": "boolean"}),
+        _rtool("close_edi_project", "关闭 EDA 工程", {"project_path": "string"}, {"need_save": "boolean", "timeout_seconds": "integer"}),
         _rtool("list_project_components", "列出工程原理图中的元件", {"project_path": "string"}, {"schematic_name": "string", "component_type": "string", "name_contains": "string", "offset": "integer", "limit": "integer"}),
         _rtool("get_component_parameters", "查询单个元件的完整参数", {"project_path": "string", "component_id": "string"}, {"schematic_name": "string", "include_hidden": "boolean"}),
         _rtool("get_project_summary", "获取 .epp 工程完整概览", {"project_path": "string"}, {"include_component_types": "boolean", "include_latest_result": "boolean"}),

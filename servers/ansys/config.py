@@ -108,7 +108,7 @@ def query_desktop_state() -> dict[str, Any]:
             "active_design": active_design,
         }
     except Exception as exc:
-        return {"connected": False, "error": repr(exc)}
+        return {"connected": False, "error": str(exc)}
     finally:
         pythoncom.CoUninitialize()
 

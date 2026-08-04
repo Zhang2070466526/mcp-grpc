@@ -528,7 +528,6 @@ def get_simulation_component_schema(
         "component_type": component_type,
         "schema_version": catalog.get("schema_version", ""),
         "protocol_version": catalog.get("protocol_version", ""),
-        "edi_version": catalog.get("edi_version", ""),
         "parameters": params,
         "parameter_patterns": comp.get("parameter_patterns", []),
         "example": comp.get("example", {}),
@@ -555,7 +554,9 @@ def list_simulation_components(
     """
     if component_type and component_type not in _COMPONENT_TYPES:
         return {"success": False,
-                "message": f"不支持的器件类型: {component_type}"}
+                "error_code": "UNSUPPORTED_COMPONENT_TYPE",
+                "message": f"不支持的器件类型: {component_type}",
+                "supported_component_types": sorted(_COMPONENT_TYPES)}
     reader = ProjectReader(project_path)
     return {
         "success": True,
@@ -650,35 +651,47 @@ def update_simulation_component(
                 "error_code": "INVALID_PARAMETERS",
                 "message": "parameters 必须是非空对象"}
 
-    # Determine component_type: explicit > disk inference > skip validation
-    ct = component_type.strip() if component_type else ""
+    # Three-way type inference: explicit > disk > error
+    explicit_type = component_type.strip() if component_type else ""
+    component, _ = _find_component_by_instance(resolved, instance_name)
+    actual_type = component.get("type", "") if component else ""
 
-    if ct:
-        # Explicit type provided — validate it
+    if actual_type:
+        # Instance found on disk — validate consistency with explicit type
+        if explicit_type and explicit_type != actual_type:
+            return {"success": False,
+                    "error_code": "COMPONENT_TYPE_MISMATCH",
+                    "message": (
+                        f"{instance_name} 的实际类型为 {actual_type}，"
+                        f"但请求提供了 {explicit_type}"
+                    )}
+        ct = actual_type
+
+    elif explicit_type:
+        # Not on disk but explicit type given — e.g. newly created, not yet saved
+        ct = explicit_type
         if ct not in _COMPONENT_TYPES:
             return {"success": False,
                     "error_code": "UNSUPPORTED_COMPONENT_TYPE",
                     "message": f"不支持的控件类型: {ct}",
                     "supported_component_types": sorted(_COMPONENT_TYPES)}
-    else:
-        # Try disk inference (best-effort, non-blocking)
-        component, _ = _find_component_by_instance(resolved, instance_name)
-        if component and component.get("type", "") in _COMPONENT_TYPES:
-            ct = component["type"]
 
-    if ct:
-        # We know the type — validate + wire-convert
-        wire_params, prepare_error = _prepare_parameters(
-            ct, parameters,
-            operation="update",
-            allow_empty=False,
-        )
-        if prepare_error:
-            return prepare_error
     else:
-        # Cannot determine type — send parameters as-is, EDI does validation
-        # Convert only what we can (Freq→Freq[1] etc cannot be done without type)
-        wire_params = parameters
+        return {"success": False,
+                "error_code": "COMPONENT_TYPE_REQUIRED",
+                "message": (
+                    f"无法从已保存工程识别 {instance_name} 的类型；"
+                    "请先保存工程，或显式提供 component_type"
+                )}
+
+    # Always validate + wire-convert with known type
+    wire_params, prepare_error = _prepare_parameters(
+        ct, parameters,
+        operation="update",
+        allow_empty=False,
+    )
+    if prepare_error:
+        return prepare_error
 
     return call_grpc(
         ecserver_pb2.UPDATE_SIMULATION_COMPONENT,
