@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 from servers.mcp_instance import mcp
 from servers.eda.simulation_components import _load_catalog
 from servers.eda.config import EDA_GRPC_SERVER
+from servers.image_tools import OPENCLAW_WORKSPACE_PATH
 
 load_dotenv()
 
@@ -39,12 +40,11 @@ from servers import __version__ as SERVER_VERSION
     name="Service Overview",
     title="EDI MCP 服务概览",
     description="当前 MCP 协议版本、服务能力、安全规则和 gRPC 目标。",
+    mime_type="application/json",
 )
 def resource_service_overview() -> dict[str, Any]:
     """返回服务能力概览。不包含密钥、路径或敏感信息。"""
-    workspace_enabled = bool(
-        _os.getenv("OPENCLAW_WORKSPACE", "").strip()
-    )
+    workspace_enabled = OPENCLAW_WORKSPACE_PATH is not None
     grpc_host = EDA_GRPC_SERVER or "127.0.0.1:50055"
 
     return {
@@ -59,7 +59,7 @@ def resource_service_overview() -> dict[str, Any]:
             "do_not_retry_unknown_outcome": True,
             "clear_schematic_requires_confirmation": True,
             "workspace_copy_requires_explicit_user_request": True,
-            "show_image_returns_imagecontent_only": True,
+            "show_image_uses_native_imagecontent": True,
         },
     }
 
@@ -69,6 +69,7 @@ def resource_service_overview() -> dict[str, Any]:
     name="Simulation Components Reference",
     title="仿真器件参数参考",
     description="仿真器件支持的公开参数名、gRPC 参数名、值类型、单位和创建/更新权限。",
+    mime_type="application/json",
 )
 def resource_simulation_components() -> dict[str, Any]:
     """直接复用参数目录，不维护两套定义。"""
@@ -80,6 +81,7 @@ def resource_simulation_components() -> dict[str, Any]:
     name="Operation Guide",
     title="EDI MCP 操作规则",
     description="创建、修改、删除仿真器件和网表导入的安全约束。",
+    mime_type="text/markdown",
 )
 def resource_operation_guide() -> str:
     """返回 Markdown 格式的操作规则。"""
@@ -92,7 +94,7 @@ def resource_operation_guide() -> str:
         "- `delete_simulation_component` 按实例名精确删除，删除前先确认目标。\n"
         "- `set_component_active_state` 是确定性设置，不是状态切换。\n"
         "- `clear_before_import=true` 必须获得用户明确确认，同时传 `confirm_clear=true`。\n"
-        "- `show_image` 只返回 ImageContent，不自动复制到工作区。\n"
+        "- `show_image` 使用原生 MCP ImageContent 返回图片，不复制文件，不输出 MEDIA 文本。\n"
         "- `copy_image_to_workspace` 只在 OPENCLAW_WORKSPACE 配置有效时注册。\n"
         "- 只有用户明确要求复制到工作区时才能调用 `copy_image_to_workspace`。\n"
         "- 不要检查或读取服务端环境变量。\n"
@@ -110,8 +112,8 @@ def resource_operation_guide() -> str:
     description="查看工程基本信息、器件统计、变量配置和仿真设置。不修改工程，不启动仿真。",
 )
 def prompt_inspect_edi_project(
-    project_path: str,
-    detail_level: str = "standard",
+        project_path: str,
+        detail_level: str = "standard",
 ) -> list[dict[str, Any]]:
     """检查 EDI 工程的工作流模板。
 
@@ -153,9 +155,9 @@ def prompt_inspect_edi_project(
     description="对工程执行仿真并分析结果。默认异步执行，支持日志分析。",
 )
 def prompt_run_and_review_simulation(
-    project_path: str,
-    execution_mode: str = "async",
-    analyze_log: bool = True,
+        project_path: str,
+        execution_mode: str = "async",
+        analyze_log: bool = True,
 ) -> list[dict[str, Any]]:
     """仿真执行与分析工作流模板。
 
@@ -174,7 +176,7 @@ def prompt_run_and_review_simulation(
     if mode == "async":
         steps += [
             "2. 调用 `start_simulation_async` 启动仿真，获取 task_id。",
-            "3. 定期调用 `get_simulation_async_status` 查询进度。",
+            "3. 启动后最多立即查询一次 `get_simulation_async_status`。如果仍在运行，返回 task_id 告知用户稍后查询。不要紧密轮询（间隔不少于 10 秒），单次对话最多自动查询 3 次。",
             "4. 完成后调用 `get_simulation_async_result` 获取完整结果和日志。",
         ]
     else:
@@ -204,10 +206,10 @@ def prompt_run_and_review_simulation(
         {
             "role": "user",
             "content": (
-                f"请对工程 {project_path} 执行仿真并分析结果。\n"
-                f"执行方式：{mode}\n"
-                f"分析日志：{'是' if analyze_log else '否'}\n\n"
-                + "\n".join(steps)
+                    f"请对工程 {project_path} 执行仿真并分析结果。\n"
+                    f"执行方式：{mode}\n"
+                    f"分析日志：{'是' if analyze_log else '否'}\n\n"
+                    + "\n".join(steps)
             ),
         },
     ]
@@ -219,11 +221,11 @@ def prompt_run_and_review_simulation(
     description="按用户需求配置 SP/HB/XDB 仿真器件参数。创建或修改前先查询 Schema 和现有配置。",
 )
 def prompt_configure_simulation_component(
-    project_path: str,
-    action: str,
-    component_type: str,
-    instance_name: str = "",
-    requirements: str = "",
+        project_path: str,
+        action: str,
+        component_type: str,
+        instance_name: str = "",
+        requirements: str = "",
 ) -> list[dict[str, Any]]:
     """配置仿真器件的工作流模板。
 
@@ -236,15 +238,24 @@ def prompt_configure_simulation_component(
     """
     act = action.lower().strip()
     if act not in ("create", "update"):
-        act = "create"
+        return [{"role": "user", "content": (
+            f"错误：action 必须是 'create' 或 'update'，收到 '{action}'。"
+        )}]
 
     ct = component_type.strip()
     if ct not in ("SParameter", "HarmonicBalance", "XDB"):
-        ct = "SParameter"
+        return [{"role": "user", "content": (
+            f"错误：component_type 必须是 SParameter / HarmonicBalance / XDB，收到 '{component_type}'。"
+        )}]
+
+    if act == "update" and not instance_name.strip():
+        return [{"role": "user", "content": (
+            "错误：action=update 时必须提供 instance_name。"
+        )}]
 
     steps: list[str] = [
         "1. 调用 `get_simulation_component_schema` 查询器件支持的参数、类型和单位。",
-        "2. 读取 `edi://reference/simulation-components` Resource 了解权限约束。",
+        "   （如果客户端支持 Resource，也可读取 edi://reference/simulation-components）",
     ]
 
     if act == "update":
@@ -268,7 +279,7 @@ def prompt_configure_simulation_component(
         "- 参数名必须与 `get_simulation_component_schema` 返回的一致。",
         "- 不要编造参数名、单位或 wire 字段。",
         "- 无单位参数不要传 unit 字段。",
-        "- 每次 create 都会创建新实例，EDM 自动分配实例名。",
+        "- 每次 create 都会创建新实例，EDI 自动分配实例名。",
         "- TIMEOUT 或 STREAM_DISCONNECTED 后禁止自动重试。",
     ]
 

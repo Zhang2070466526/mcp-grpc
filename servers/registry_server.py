@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（34 个，工作区配置后）：
+  已注册工具（35 个，配置工作区后 36 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -17,6 +17,7 @@
     start_simulation_async        启动异步仿真
     get_simulation_async_status   查询异步仿真状态
     get_simulation_async_result   获取异步仿真结果
+    list_eda_tasks                列出异步仿真任务
     simulate_netlist              仿真网表，返回 RAW 结果
     simulate_netlist_with_ads     调用 ADS 仿真控制器
     list_simulation_components    查询仿真器件
@@ -50,6 +51,7 @@
     copy_image_to_workspace       条件注册，复制到 media/edi/mcp-cache/（需配置工作区）
 
   图表：
+    list_result_curves            解析 RAW 返回可用曲线
     compare_simulation_results    多 RAW 结果对比叠图
     turbocharts_convert           ADS RAW → 曲线图 + CSV
 ═══════════════════════════════════════════════════════════
@@ -71,6 +73,7 @@ import servers.turbocharts.convert_raw   # noqa: F401
 import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
 import servers.image_tools                # noqa: F401
+import servers.vision_tools               # noqa: F401 — analyze_image
 
 # Resources & Prompts
 import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.prompt()

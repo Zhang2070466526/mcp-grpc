@@ -17,7 +17,7 @@ proto/                  # protobuf 协议文件
 servers/
   mcp_instance.py        # 全局 FastMCP 实例
   registry_server.py     # 工具注册 + Web 路由注册
-  image_tools.py         # 图片工具（show_image）
+  image_tools.py         # 图片工具（show_image + copy_image_to_workspace）
   eda/                   # EDI 工程工具（17 个）
     __init__.py           # 公共 API + 工具清单
     config.py             # 配置 + ProjectReader + S-expression
@@ -29,7 +29,7 @@ servers/
     edi_launcher.py       # 启动 EDI（1 工具）
   turbocharts/
     config.py             # run_turbocharts（信号量串行）
-    convert_raw.py        # RAW 转图（1 工具）
+    convert_raw.py        # RAW 转图 + 曲线查询（2 工具）
     compare_results.py    # 仿真对比（1 工具）
   ansys/                  # ANSYS HFSS 工具（6 个）
     config.py             # 进程检测/COM 附着/锁文件
@@ -42,7 +42,7 @@ servers/
 start_servers.py         # 一键启动入口
 tests/                   # 测试套件
 scripts/                 # 打包脚本 + PyInstaller 配置 + 启动脚本
-docs/                    # 文档（API 参考/交接/gRPC 协议）
+docs/                    # 文档（API 参考/实现原理/交接/gRPC 协议）
 .mcp.json                # Claude Code 配置
 .env                     # 环境变量（不提交 Git）
 pyproject.toml           # uv 项目配置 + PyPI 元数据
@@ -56,13 +56,13 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 
 PyPI: https://pypi.org/project/edi-mcp/
 
-## MCP 工具清单（33 个，配置 OPENCLAW_WORKSPACE 后 34 个）
+## MCP 工具清单（35 个，配置 OPENCLAW_WORKSPACE 后 36 个）
 
 **工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary, analyze_variables
 
 **仿真器件**：get_simulation_component_schema, list_simulation_components, create_simulation_component, update_simulation_component, delete_simulation_component, set_component_active_state, generate_schematic_from_netlist
 
-**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, simulate_netlist, simulate_netlist_with_ads
+**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, list_eda_tasks, simulate_netlist, simulate_netlist_with_ads
 
 **ANSYS**：open_hfss_project, close_hfss_project, launch_aedt, get_hfss_project_info, start_hfss_analysis_async, get_hfss_analysis_status
 
@@ -72,7 +72,7 @@ PyPI: https://pypi.org/project/edi-mcp/
 
 **图片**：show_image（MCP ImageContent）+ copy_image_to_workspace（需配置工作区，条件注册）
 
-**图表**：turbocharts_convert, compare_simulation_results
+**图表**：list_result_curves, turbocharts_convert, compare_simulation_results
 
 ## 配置说明
 

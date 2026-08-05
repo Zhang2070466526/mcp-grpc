@@ -29,14 +29,238 @@ turbocharts_convert   将 ADS 仿真 RAW 结果转为 PNG 曲线图和 CSV
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
 from servers.eda.config import validate_file, TURBOCHARTS_PATH
 from servers.turbocharts.config import run_turbocharts
 from servers.mcp_instance import mcp
+
+def _suggest_curves(var_name: str, var_type: str) -> list[str]:
+    """Generate TurboCharts-compatible curve names for a variable.
+
+    Rules:
+      - real type → only "real_{name}"
+      - complex S-param S[n,n] (reflection) → DB, real, phase, VSWR
+      - complex S-param S[n,m] (transmission) → DB, real, phase (no VSWR)
+      - S.delay[x,y] → real_delayS[x,y]
+      - Other complex → DB, real, phase
+    """
+    import re
+
+    curves: list[str] = []
+
+    # Detect special patterns first (before generic real/complex)
+    delay_m = re.match(r'S\.delay\[(\d+),(\d+)\]', var_name)
+    if delay_m:
+        curves.append(f"real_delayS[{delay_m.group(1)},{delay_m.group(2)}]")
+        return curves
+
+    if var_type == "real":
+        curves.append(f"real_{var_name}")
+        return curves
+
+    # Detect S[n,m] pattern
+    s_m = re.match(r'S\[(\d+),(\d+)\]', var_name)
+    if s_m:
+        i, j = s_m.group(1), s_m.group(2)
+        curves.append(f"DB_S[{i},{j}]")
+        curves.append(f"real_S[{i},{j}]")
+        curves.append(f"phase_S[{i},{j}]")
+        if i == j:  # reflection parameter
+            curves.append(f"VSWR_S[{i},{j}]")
+        return curves
+
+    # Other complex: DB, real, phase
+    curves.append(f"DB_{var_name}")
+    curves.append(f"real_{var_name}")
+    curves.append(f"phase_{var_name}")
+    return curves
+
+
+def _parse_mds_format(text: str) -> list[dict]:
+    """Parse MDS-format RAW file header.
+
+    Format:
+        File Format: MDS
+        Plotname: SP SP1[1]
+        No. Variables: 11
+        Variables:
+            0 freq frequency type=real indep=yes
+            1 S[1,1] s-param type=complex indep=no
+    """
+    import re
+    datasets: list[dict] = []
+    current: dict | None = None
+    in_variables = False
+
+    for line in text.splitlines():
+        line = line.strip()
+
+        if line.startswith("Plotname:"):
+            if current:
+                datasets.append(current)
+            plot_name = line.split(":", 1)[1].strip()
+            current = {
+                "plot_name": plot_name,
+                "dependencies": [],
+                "variables": [],
+                "suggested_curves": [],
+            }
+            # Extract freq= from plotname (e.g. "SP SP1[1] freq=(1 GHz->10 GHz)")
+            freq_m = re.search(r'freq\s*=\s*\(([^)]+)\)', plot_name, re.IGNORECASE)
+            if freq_m and "freq" not in current["dependencies"]:
+                current["dependencies"].append("freq")
+            in_variables = False
+            continue
+
+        if current is None:
+            continue
+
+        if line.startswith("No. Variables:"):
+            continue
+
+        if line.startswith("Variables:"):
+            in_variables = True
+            continue
+
+        if line.startswith("Values:"):
+            in_variables = False
+            continue
+
+        if in_variables and line and not line.startswith("File Format:") \
+                and not line.startswith("Plotname:"):
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            var_name = parts[1]
+            var_type = "complex"
+            is_indep = False
+            for p in parts[2:]:
+                if p.startswith("type="):
+                    var_type = p.split("=", 1)[1]
+                elif p.startswith("indep="):
+                    is_indep = p.split("=", 1)[1] == "yes"
+
+            entry = {"name": var_name, "type": var_type}
+            current["variables"].append(entry)
+
+            if is_indep:
+                if var_name not in current["dependencies"]:
+                    current["dependencies"].append(var_name)
+            else:
+                for c in _suggest_curves(var_name, var_type):
+                    if c not in current["suggested_curves"]:
+                        current["suggested_curves"].append(c)
+
+    if current:
+        datasets.append(current)
+    return datasets
+
+
+def _parse_raw_header(raw_path: str) -> dict:
+    """Parse ADS RAW file header and return structured curve info.
+
+    Returns {"format": str, "datasets": [...], "error": str|None}.
+    """
+    import re
+
+    try:
+        with open(raw_path, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read(65536)
+    except OSError as e:
+        return {"format": "unknown", "datasets": [], "error": str(e)}
+
+    reached_limit = len(text) >= 65536
+
+    # MDS format
+    if "File Format: MDS" in text or "Plotname:" in text:
+        datasets = _parse_mds_format(text)
+        if not datasets:
+            return {"format": "MDS", "datasets": [],
+                    "warning": "Found MDS header but no Plotname entries"}
+        has_vars = any(d["variables"] for d in datasets)
+        if not has_vars:
+            return {"format": "MDS", "datasets": datasets,
+                    "warning": "MDS format detected but no variables extracted"}
+        result = {"format": "MDS", "datasets": datasets}
+        if reached_limit:
+            result["warning"] = "RAW 文件头可能被截断，结果可能不完整"
+        return result
+
+    # XML-style: <Number name="freq"/> <Complex name="S(2,1)"/> <Real name="nf(1)"/>
+    xml_vars: list[dict] = []
+    xml_deps: list[str] = []
+    seen_xml = set()
+    for m in re.finditer(r'<(Number|Complex|Real)\s+[^>]*name="([^"]+)"', text):
+        tag = m.group(1)
+        name = m.group(2)
+        if name not in seen_xml:
+            seen_xml.add(name)
+            var_type = "complex" if tag == "Complex" else "real"
+            xml_vars.append({"name": name, "type": var_type})
+
+    if xml_vars:
+        dep_kw = {"freq", "frequency", "time", "power", "bias"}
+        for v in xml_vars[:]:
+            if v["name"].lower() in dep_kw or re.match(r'^freq', v["name"], re.IGNORECASE):
+                xml_deps.append(v["name"])
+                xml_vars.remove(v)
+        xml_curves: list[str] = []
+        for v in xml_vars:
+            for c in _suggest_curves(v["name"], v["type"]):
+                if c not in xml_curves:
+                    xml_curves.append(c)
+        result = {"format": "XML", "datasets": [{
+            "plot_name": "",
+            "dependencies": xml_deps,
+            "variables": xml_vars,
+            "suggested_curves": xml_curves,
+        }]}
+        if reached_limit:
+            result["warning"] = "RAW 文件头可能被截断，结果可能不完整"
+        return result
+
+    # Unknown
+    return {"format": "unknown", "datasets": [],
+            "error": "Unsupported RAW format. Expected MDS or XML."}
+
+
+@mcp.tool()
+def list_result_curves(result_path: str) -> dict[str, Any]:
+    """解析 ADS RAW 仿真结果文件，返回可用曲线名和依赖轴。
+
+    支持 MDS 和 XML 格式。画图前调用，避免猜测曲线名。
+    返回的 suggested_curves 可直接用于 turbocharts_convert 的 linename 参数。
+
+    Args:
+        result_path: RAW 结果文件路径（必须已存在）。
+    """
+    from servers.eda.config import validate_file
+    try:
+        resolved = validate_file(result_path)
+    except (FileNotFoundError, ValueError) as e:
+        return {"success": False, "error_code": "FILE_NOT_FOUND", "message": str(e)}
+
+    result = _parse_raw_header(resolved)
+
+    if result.get("error") and not result.get("datasets"):
+        return {"success": False,
+                "error_code": "UNSUPPORTED_RAW_FORMAT",
+                "message": result["error"],
+                "result_path": resolved,
+                "format": result.get("format", "unknown")}
+
+    response: dict = {
+        "success": True,
+        "result_path": resolved,
+        "format": result["format"],
+        "datasets": result["datasets"],
+    }
+    if result.get("warning"):
+        response["warning"] = result["warning"]
+    return response
+
 
 @mcp.tool()
 def turbocharts_convert(

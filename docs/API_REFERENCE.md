@@ -207,7 +207,7 @@ analyze_variables(project_path: str) -> dict
 
 ---
 
-## 仿真（6 个）
+## 仿真（7 个）
 
 ### `simulate_project`
 
@@ -381,6 +381,29 @@ simulate_netlist_with_ads(netlist_path: str, ads_path: str = "", timeout_seconds
 
 ---
 
+### `list_eda_tasks`
+
+```python
+from servers.eda.simulation import list_eda_tasks
+
+list_eda_tasks(status: str = "") -> dict
+```
+
+列出当前 MCP 进程中已提交的异步仿真任务。可按状态过滤。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `status` | str | 否 | "" | 按状态过滤：QUEUED / RUNNING / SUCCEEDED / FAILED / TIMEOUT 等 |
+
+返回：
+```python
+{"success": True, "total": 2, "tasks": [
+    {"task_id": "abc123", "status": "RUNNING", "project_path": "...", ...}
+]}
+```
+
+---
+
 ## 导出与分析（2 个）
 
 ### `export_project_netlist`
@@ -456,7 +479,32 @@ launch_edi(edi_path: str = "", wait_for_grpc: bool = True, wait_timeout: int = 3
 
 ---
 
-## 图表（2 个）
+## 图表（3 个）
+
+### `list_result_curves`
+
+```python
+from servers.turbocharts.convert_raw import list_result_curves
+
+list_result_curves(result_path: str) -> dict
+```
+
+解析 ADS RAW 仿真结果文件，返回可用曲线名和依赖轴。画图前调用避免猜测曲线名。
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `result_path` | str | 是 | RAW 文件路径 |
+
+返回：
+```python
+{"success": True, "format": "MDS", "datasets": [
+    {"plot_name": "SP SP1[1]", "dependencies": ["freq"],
+     "variables": [{"name": "S[2,1]", "type": "complex"}],
+     "suggested_curves": ["DB_S[2,1]", "real_S[2,1]", ...]}
+]}
+```
+
+---
 
 ### `turbocharts_convert`
 
@@ -660,6 +708,34 @@ generate_schematic_from_netlist(project_path: str, netlist_path: str, clear_befo
 ```
 
 从网表文件导入生成 main 原理图。默认追加模式。`clear_before_import=true` 会清空原理图，必须同时传 `confirm_clear=true` 确认。
+
+---
+
+## Resources & Prompts（协议 v2）
+
+除了 36 个 Tool，服务还注册了只读 Resource 和可复用 Prompt 工作流模板。
+
+### Resources（3 个）
+
+| URI | MIME | 说明 |
+|---|---|---|
+| `edi://service/overview` | `application/json` | 服务版本、协议版本、gRPC 目标、安全规则 |
+| `edi://reference/simulation-components` | `application/json` | 仿真器件参数目录（与 `get_simulation_component_schema` 同源） |
+| `edi://reference/operation-guide` | `text/markdown` | Markdown 操作规则：创建/删除/网表导入的安全约束 |
+
+> Resource 是只读上下文，由客户端主动拉取。标准 MCP 客户端可通过 `resources/list` 和 `resources/read` 访问。
+
+### Prompts（3 个）
+
+| Prompt | 参数 | 用途 |
+|---|---|---|
+| `inspect_edi_project` | `project_path`, `detail_level` | 只读检查工程（概览→变量→器件→仿真配置） |
+| `run_and_review_simulation` | `project_path`, `execution_mode`, `analyze_log` | 统一异步仿真流程 + 日志分析 |
+| `configure_simulation_component` | `project_path`, `action`, `component_type`, `instance_name`, `requirements` | Schema→参数→确认→创建/更新 |
+
+> Prompt 是用户主动选择的工作流模板。标准 MCP 客户端可通过 `prompts/list` 和 `prompts/get` 访问。
+
+> 注意：内置 EDI Chat (`/ui`) 当前主要消费 Tool，不自动拉取 Resources 或 Prompts。能否在客户端中显示取决于具体 MCP 客户端的实现。
 
 ---
 

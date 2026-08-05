@@ -213,6 +213,14 @@ def start_simulation_async(
     _prune_tasks()
 
     with _sim_lock:
+        # Queue limit: max 8 concurrent tasks (atomic check+insert)
+        pending = sum(1 for t in _sim_tasks.values()
+                      if t.get("status") in ("QUEUED", "ACCEPTED", "RUNNING"))
+        if pending >= 8:
+            return {"success": False,
+                    "error_code": "SIMULATION_QUEUE_FULL",
+                    "message": f"当前已有 {pending} 个仿真任务在进行或排队，请稍后重试"}
+
         _sim_tasks[task_id] = {
             "task_id": task_id,
             "client_uuid": client_uuid,
@@ -262,6 +270,7 @@ def get_simulation_async_status(task_id: str) -> dict[str, Any]:
             "success": False,
             "completed": True,
             "task_success": False,
+            "error_code": "TASK_NOT_FOUND",
             "task_id": task_id,
             "status": "UNKNOWN",
             "message": "仿真任务不存在、已经过期或服务已经重启",
@@ -304,6 +313,7 @@ def get_simulation_async_result(task_id: str) -> dict[str, Any]:
             "success": False,
             "completed": True,
             "task_success": False,
+            "error_code": "TASK_NOT_FOUND",
             "task_id": task_id,
             "status": "UNKNOWN",
             "message": "仿真任务不存在、已经过期或服务已经重启",
@@ -401,3 +411,52 @@ def simulate_netlist_with_ads(
         timeout_seconds,
         max_timeout_seconds=3600,
     )
+
+
+@mcp.tool()
+def list_eda_tasks(status: str = "") -> dict[str, Any]:
+    """列出当前 MCP 进程中已提交的异步仿真任务。
+
+    可用于查看长时间仿真进度、排查卡住的任务或确认任务是否还在运行。
+
+    Args:
+        status: 按状态过滤，为空返回全部。
+               可选：QUEUED / ACCEPTED / RUNNING / SUCCEEDED / FAILED /
+               TIMEOUT / STREAM_DISCONNECTED / REJECTED。
+    """
+    _VALID_STATUSES = {"", "QUEUED", "ACCEPTED", "RUNNING", "SUCCEEDED",
+                       "FAILED", "TIMEOUT", "STREAM_DISCONNECTED", "REJECTED",
+                       "PROTOCOL_MISMATCH", "GRPC_UNAVAILABLE"}
+    status_filter = status.strip().upper()
+    if status_filter and status_filter not in _VALID_STATUSES:
+        return {"success": False,
+                "error_code": "INVALID_STATUS",
+                "message": f"无效状态: {status}，可选: {sorted(s for s in _VALID_STATUSES if s)}"}
+    _prune_tasks()
+    snapshot_ids: list[str] = []
+    with _sim_lock:
+        snapshot_ids = list(_sim_tasks.keys())
+    tasks: list[dict] = []
+    for tid in snapshot_ids:
+        t = _get_task_snapshot(tid)
+        if t is None:
+            continue
+        st = t.get("status", "UNKNOWN")
+        if status_filter and st.upper() != status_filter:
+            continue
+        tasks.append({
+            "task_id": t["task_id"],
+            "status": st,
+            "operation": t.get("operation", ""),
+            "project_path": t.get("project_path", ""),
+            "message": t.get("message", ""),
+            "created_at": t.get("created_at"),
+            "started_at": t.get("started_at"),
+            "finished_at": t.get("finished_at"),
+            "error": t.get("error"),
+        })
+    return {
+        "success": True,
+        "total": len(tasks),
+        "tasks": tasks,
+    }

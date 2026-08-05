@@ -48,6 +48,7 @@ from servers.eda.simulation_components import (  # noqa: E402
 )
 from servers.eda.simulation import (  # noqa: E402
     start_simulation_async, get_simulation_async_status, get_simulation_async_result,
+    list_eda_tasks,
 )
 from servers.eda.design_export import (  # noqa: E402
     export_project_netlist, capture_schematic,
@@ -55,7 +56,7 @@ from servers.eda.design_export import (  # noqa: E402
 from servers.eda.model_replace import replace_models_from_csv  # noqa: E402
 from servers.eda.edi_launcher import launch_edi  # noqa: E402
 from servers.turbocharts.compare_results import compare_simulation_results  # noqa: E402
-from servers.turbocharts.convert_raw import turbocharts_convert  # noqa: E402
+from servers.turbocharts.convert_raw import turbocharts_convert, list_result_curves  # noqa: E402
 from servers.image_tools import show_image, copy_image_to_workspace, OPENCLAW_WORKSPACE_PATH  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -81,11 +82,13 @@ CHAT_TOOL_MAP: dict[str, Any] = {
     "start_simulation_async":         start_simulation_async,
     "get_simulation_async_status":    get_simulation_async_status,
     "get_simulation_async_result":    get_simulation_async_result,
+    "list_eda_tasks":                 list_eda_tasks,
     "capture_schematic":              capture_schematic,
     "export_project_netlist":         export_project_netlist,
     "replace_models_from_csv":        replace_models_from_csv,
     "launch_edi":                     launch_edi,
     "compare_simulation_results":     compare_simulation_results,
+    "list_result_curves":             list_result_curves,
     "turbocharts_convert":            turbocharts_convert,
     "show_image":                     show_image,
     "get_simulation_component_schema": get_simulation_component_schema,
@@ -134,11 +137,13 @@ def _build_tools_schema() -> list[dict]:
         _rtool("start_simulation_async", "异步启动 EDA 工程仿真，立即返回 task_id", {"project_path": "string"}, {"log_source": "string", "timeout_seconds": "integer"}),
         _rtool("get_simulation_async_status", "查询仿真状态及已实时接收的 ads_output 日志", {"task_id": "string"}),
         _rtool("get_simulation_async_result", "获取仿真结果；运行中返回当前日志，完成后返回完整 ads_output", {"task_id": "string"}),
+        _rtool("list_eda_tasks", "列出当前异步仿真任务列表", {}, {"status": "string"}),
         _rtool("capture_schematic", "截取原理图为图片", {"project_path": "string", "img_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("export_project_netlist", "查看/导出工程网表", {"project_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("replace_models_from_csv", "按 CSV 批量替换元件模型", {"project_path": "string", "csv_path": "string"}, {"timeout_seconds": "integer"}),
         _rtool("launch_edi", "启动 EDI 客户端并等待 gRPC 就绪", {}, {"edi_path": "string", "wait_for_grpc": "boolean", "wait_timeout": "integer"}),
         _rtool("compare_simulation_results", "多个 RAW 结果同一条曲线对比叠图", {"result_paths": "array", "curve": "string", "img_path": "string"}, {"chart_type": "string", "labels": "array", "dependency": "string", "csv_path": "string", "alignment": "string", "reference_index": "integer"}),
+        _rtool("list_result_curves", "解析 RAW 文件返回可用曲线名和依赖轴，画图前调用避免猜测曲线名", {"result_path": "string"}),
         _rtool("turbocharts_convert", "ADS RAW 文件转曲线图和 CSV", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
         _rtool("show_image", "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）", {"image_path": "string"}),
         _rtool("get_simulation_component_schema", "查询仿真控件支持的参数、类型和单位；配置控件前优先调用", {"component_type": "string"}, {"parameter_name": "string"}),
@@ -678,11 +683,13 @@ _TOOL_LABELS: dict[str, str] = {
     "start_simulation_async": "启动仿真",
     "get_simulation_async_status": "查询进度",
     "get_simulation_async_result": "获取结果",
+    "list_eda_tasks": "任务列表",
     "capture_schematic": "截图原理图",
     "export_project_netlist": "导出网表",
     "replace_models_from_csv": "替换模型",
     "launch_edi": "启动 EDI",
     "compare_simulation_results": "对比结果",
+    "list_result_curves": "RAW 曲线",
     "turbocharts_convert": "RAW 转图",
     "show_image": "显示图片",
     "get_simulation_component_schema": "控件参数",

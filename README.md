@@ -99,7 +99,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `set_component_active_state` | 设置 NORMAL / DISABLED / SHORTED |
 | `generate_schematic_from_netlist` | 从网表导入生成原理图 |
 
-### 仿真（6 个）
+### 仿真（7 个）
 
 | 工具 | 说明 |
 |---|---|
@@ -107,6 +107,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `start_simulation_async` | 启动异步仿真 |
 | `get_simulation_async_status` | 查询异步仿真进度 |
 | `get_simulation_async_result` | 获取异步仿真结果 |
+| `list_eda_tasks` | 列出当前仿真任务 |
 | `simulate_netlist` | 仿真网表文件 |
 | `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 |
 
@@ -139,6 +140,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 
 | 工具 | 说明 |
 |---|---|
+| `list_result_curves` | 解析 RAW 返回可用曲线名 |
 | `turbocharts_convert` | ADS RAW → 曲线图 + CSV |
 | `compare_simulation_results` | 多 RAW 同曲线对比叠图 |
 | `show_image` | 返回 MCP ImageContent |
@@ -162,7 +164,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 │   │   ├── config.py             配置 / S-expression 解析 / ProjectReader
 │   │   ├── grpc_client.py        gRPC 通信层（FetchEvent + PerformAction）
 │   │   ├── project_manage.py     工程管理（7 个工具）
-│   │   ├── simulation.py         仿真（6 个工具）
+│   │   ├── simulation.py         仿真（7 个工具）
 │   │   ├── simulation_components.py     仿真器件（7 个工具）
 │   │   ├── simulation_component_catalog.json  参数目录 v2.0
 │   │   ├── design_export.py      网表 / 截图
@@ -211,6 +213,7 @@ powershell -File scripts/build.ps1
 |---|---|
 | [部署指南](./docs/DEPLOY.md) | 打包产物使用、Claude Code / OpenClaw 配置 |
 | [API 参考](./docs/API_REFERENCE.md) | 全部工具的参数、返回值、使用示例 |
+| [实现原理](./docs/IMPLEMENTATION.md) | 每个工具的实现方式、通信流程、设计决策 |
 | [交接文档](./docs/HANDOVER.md) | 架构设计、技术栈、扩展开发 |
 | [gRPC 协议](./proto/grpc接口调用.md) | gRPC 接口调用说明 |
 | [EDI 接口汇总](./docs/EDI系统接口与外部调用汇总.md) | EDI 系统全量对外接口 |

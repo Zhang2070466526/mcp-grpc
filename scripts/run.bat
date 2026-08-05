@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 title EDI MCP
 echo =================================================
-echo   EDI MCP v0.1.3
+echo   EDI MCP v0.1.4
 echo   UI:  http://127.0.0.1:50026/ui
 echo   MCP: http://127.0.0.1:50026/sse
 echo   Close this window to stop the service

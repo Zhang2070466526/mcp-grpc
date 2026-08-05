@@ -98,12 +98,13 @@ class TestPromptsDirect:
         assert "HB1" in text
         assert "HarmonicBalance" in text
 
-    def test_configure_bad_action_falls_back(self):
-        """无效 action 应回退到 create。"""
+    def test_configure_bad_action_rejected(self):
+        """无效 action 必须拒绝，不能静默回退。"""
         from servers.mcp_content import prompt_configure_simulation_component
         msgs = prompt_configure_simulation_component(
             "C:/test.epp", "nonexistent", "")
-        assert "create_simulation_component" in msgs[0]["content"]
+        assert "错误" in msgs[0]["content"]
+        assert "nonexistent" in msgs[0]["content"]
 
 
 # ═══════════════════════════════════════════════════════════
