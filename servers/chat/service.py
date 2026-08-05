@@ -58,6 +58,7 @@ from servers.eda.edi_launcher import launch_edi  # noqa: E402
 from servers.turbocharts.compare_results import compare_simulation_results  # noqa: E402
 from servers.turbocharts.convert_raw import turbocharts_convert, list_result_curves  # noqa: E402
 from servers.multimodal_vision import show_image, copy_image_to_workspace, analyze_image, OPENCLAW_WORKSPACE_PATH  # noqa: E402
+from servers.report import generate_simulation_report  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 常量
@@ -67,6 +68,17 @@ _MAX_MESSAGES = 30       # 每个会话最多保留消息数
 _MAX_SESSIONS = 100      # 全局会话数上限
 _SESSION_TTL = 7200      # 会话有效期 2 小时（秒）
 _PRUNE_INTERVAL = 300    # 清理间隔 5 分钟
+_MAX_MESSAGE_CHARS = 20_000   # 单条消息最大字符数
+_MAX_SESSION_ID_CHARS = 128   # session_id 最大长度
+_MAX_TOOL_CALLS_PER_ROUND = 8 # 单轮最多工具调用数
+_MAX_TOOL_RESULT_CHARS = 100_000  # 工具返回最大字符数
+_PENDING_ACTION_TTL = 300      # 待确认操作有效期 5 分钟
+
+# 破坏性工具：Chat 层需用户确认后才执行
+_DESTRUCTIVE_CHAT_TOOLS = {
+    "delete_simulation_component",
+    "replace_models_from_csv",
+}
 
 # ---------------------------------------------------------------------------
 # 聊天工具注册表。不包含: simulate_project(同步阻塞)、ANSYS(COM依赖)、simulate_netlist(需本地网表文件)
@@ -92,6 +104,7 @@ CHAT_TOOL_MAP: dict[str, Any] = {
     "turbocharts_convert":            turbocharts_convert,
     "show_image":                     show_image,
     "analyze_image":                  analyze_image,
+    "generate_simulation_report":     generate_simulation_report,
     "get_simulation_component_schema": get_simulation_component_schema,
     "list_simulation_components": list_simulation_components,
     "create_simulation_component": create_simulation_component,
@@ -104,10 +117,19 @@ if OPENCLAW_WORKSPACE_PATH is not None:
     CHAT_TOOL_MAP["copy_image_to_workspace"] = copy_image_to_workspace
 
 def _rtool(name: str, desc: str, required: dict, optional: dict | None = None) -> dict:
-    """构建单个 OpenAI function-call 工具 schema。"""
+    """构建单个 OpenAI function-call 工具 schema。
+
+    Args:
+        name: 工具名。
+        desc: 工具描述。
+        required: 必填参数字典，值可以是类型字符串或完整 JSON Schema 属性定义。
+        optional: 可选参数字典，同上。
+    """
     props = {}
     for k, t in {**required, **(optional or {})}.items():
-        if t == "array":
+        if isinstance(t, dict):
+            props[k] = t  # 完整 JSON Schema 定义
+        elif t == "array":
             props[k] = {"type": "array", "items": {"type": "string"}}
         else:
             props[k] = {"type": t}
@@ -158,6 +180,16 @@ def _build_tools_schema() -> list[dict]:
     ]
     if OPENCLAW_WORKSPACE_PATH is not None:
         tools.append(_rtool("copy_image_to_workspace", "复制图片到工作区 media/edi，需配置 OPENCLAW_WORKSPACE", {"image_path": "string"}))
+    tools.append(_rtool("generate_simulation_report",
+        "生成本地仿真报告（PDF/DOCX）。只负责校验数据并调用渲染服务，不会自动仿真或编造数据",
+        {"output_path": "string", "model_name": "string"},
+        {
+            "description": "string", "conclusion": "string",
+            "spec_table": {"type": "array", "items": {"type": "array", "items": {}}},
+            "charts": {"type": "array", "items": {"type": "object", "properties": {"path": {"type": "string"}, "title": {"type": "string"}}, "required": ["path", "title"]}},
+            "components": {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "model": {"type": "string"}, "manufacturer": {"type": "string"}, "specs": {"type": "string"}}, "required": ["type", "model", "manufacturer", "specs"]}},
+            "schematic": "string", "overwrite": "boolean", "timeout_seconds": "integer",
+        }))
     return tools
 
 
@@ -181,6 +213,21 @@ class Activity:
 
 
 @dataclass
+class PendingAction:
+    """待确认的破坏性操作。"""
+    action_id: str
+    tool_name: str
+    arguments: dict[str, Any]
+    summary: str
+    created_at: float = field(default_factory=time.time)
+    expires_at: float = 0.0
+
+    def __post_init__(self):
+        if not self.expires_at:
+            self.expires_at = self.created_at + _PENDING_ACTION_TTL
+
+
+@dataclass
 class ChatSession:
     """会话状态。"""
     session_id: str
@@ -192,6 +239,8 @@ class ChatSession:
     last_simulation_task_id: str | None = None
     simulation_task_ids: list[str] = field(default_factory=list)
     updated_at: float = field(default_factory=time.time)
+    pending_action: PendingAction | None = None
+    chat_lock: Any = field(default_factory=lambda: asyncio.Lock())
 
 
 @dataclass
@@ -326,7 +375,7 @@ class ChatService:
         with self._session_lock:
             expired = [
                 sid for sid, s in self._sessions.items()
-                if now - s.updated_at > _SESSION_TTL
+                if not s.chat_lock.locked() and now - s.updated_at > _SESSION_TTL
             ]
             for sid in expired:
                 del self._sessions[sid]
@@ -343,7 +392,51 @@ class ChatService:
 
     async def chat(self, session_id: str, message: str) -> ChatResponse:
         request_id = uuid.uuid4().hex[:12]
+
+        # ── 输入校验 ──
+        if len(session_id) > _MAX_SESSION_ID_CHARS:
+            return ChatResponse(success=False, session_id="", request_id=request_id,
+                                reply="session_id 过长。")
+        if len(message) > _MAX_MESSAGE_CHARS:
+            return ChatResponse(success=False, session_id=session_id,
+                                request_id=request_id,
+                                reply=f"消息过长（最大 {_MAX_MESSAGE_CHARS} 字符）。")
+
         session = self._get_or_create(session_id)
+
+        # ── 会话锁：同 session 串行（先锁，再处理确认/正常消息）──
+        try:
+            await asyncio.wait_for(session.chat_lock.acquire(), timeout=10)
+        except asyncio.TimeoutError:
+            return ChatResponse(success=False, session_id=session.session_id,
+                                request_id=request_id,
+                                reply="当前会话正在处理上一条请求，请稍后重试。")
+
+        try:
+            # 确认处理：在锁内原子取走 pending
+            if session.pending_action:
+                pending = session.pending_action
+                msg_lower = _norm_confirmation(message)
+                if self._is_confirmation(msg_lower, pending):
+                    session.pending_action = None  # 原子取走
+                    return await self._execute_pending(session, pending, request_id)
+                if _is_cancel(msg_lower):
+                    session.pending_action = None
+                    return ChatResponse(success=True, session_id=session.session_id,
+                                        request_id=request_id, reply="已取消操作。")
+                # 有其他 pending 但消息不匹配 — 提示确认方式
+                return ChatResponse(success=True, session_id=session.session_id,
+                                    request_id=request_id,
+                                    reply=_confirmation_text(pending))
+            return await self._chat_locked(
+                session, message, request_id,
+            )
+        finally:
+            session.chat_lock.release()
+
+    async def _chat_locked(
+        self, session: ChatSession, message: str, request_id: str,
+    ) -> ChatResponse:
         activities: list[Activity] = []
         called_fingerprints: set[str] = set()
         media: list[dict] = []
@@ -419,7 +512,48 @@ class ChatService:
                             context=self._build_context(session),
                         )
 
-                    # 有 tool_calls → 执行工具
+                    # 单轮工具数上限
+                    if len(tool_calls) > _MAX_TOOL_CALLS_PER_ROUND:
+                        return ChatResponse(
+                            success=False, session_id=session.session_id,
+                            request_id=request_id,
+                            reply=f"模型一次请求了过多操作（{len(tool_calls)} 个），已停止。",
+                        )
+
+                    # 破坏性工具检查：必须是本轮唯一调用
+                    destructive = [tc for tc in tool_calls
+                                   if tc.get("function", {}).get("name", "") in _DESTRUCTIVE_CHAT_TOOLS]
+                    if destructive:
+                        if len(tool_calls) > 1:
+                            return ChatResponse(
+                                success=False, session_id=session.session_id,
+                                request_id=request_id,
+                                reply="破坏性操作（删除/批量替换）不能与其他操作同时执行，请单独请求。",
+                            )
+                        # 不写入 assistant tool_calls 消息（确认后再写摘要）
+                        tc = destructive[0]
+                        fn = tc.get("function", {})
+                        tool_name = fn.get("name", "")
+                        tool_args = _safe_json(fn.get("arguments", "{}"))
+                        is_valid, validation_result = self._validate(tool_name, tool_args, session)
+                        if not is_valid:
+                            tool_result = validation_result
+                            session.messages.append({"role": "tool", "tool_call_id": tc.get("id", ""),
+                                                     "name": tool_name, "content": _serialize_result(tool_result)})
+                            return ChatResponse(success=False, session_id=session.session_id,
+                                                request_id=request_id,
+                                                reply=f"参数校验失败: {validation_result.get('error', {}).get('detail', '')}",
+                                                context=self._build_context(session))
+                        pending = _create_pending(tool_name, validation_result)
+                        session.pending_action = pending
+                        return ChatResponse(
+                            success=True, session_id=session.session_id,
+                            request_id=request_id,
+                            reply=_confirmation_text(pending),
+                            context=self._build_context(session),
+                        )
+
+                    # 有 tool_calls → 写入历史并执行
                     session.messages.append({
                         "role": "assistant",
                         "content": assistant_text or "",
@@ -430,18 +564,6 @@ class ChatService:
                         fn = tc.get("function", {})
                         tool_name = fn.get("name", "")
                         tool_args = _safe_json(fn.get("arguments", "{}"))
-
-                        # 校验 + 自动补齐
-                        is_valid, validation_result = self._validate(
-                            tool_name, tool_args, session
-                        )
-
-                        act = Activity(
-                            tool=tool_name,
-                            label=_tool_label(tool_name),
-                            status="success" if is_valid else "error",
-                        )
-                        t0 = time.time()
 
                         if not is_valid:
                             act.error = validation_result.get("error", {}).get("detail", "")
@@ -491,16 +613,8 @@ class ChatService:
 
                         activities.append(act)
 
-                        # 工具结果交回模型
-                        serialized = tool_result
-                        if isinstance(tool_result, list):
-                            text_parts = []
-                            for item in tool_result:
-                                if hasattr(item, "text"):
-                                    text_parts.append(item.text)
-                            serialized = "\n".join(text_parts) if text_parts else _json.dumps(tool_result, ensure_ascii=False)
-                        else:
-                            serialized = _json.dumps(tool_result, ensure_ascii=False)
+                        # 工具结果交回模型（截断过长内容）
+                        serialized = _serialize_result(tool_result)
                         session.messages.append({
                             "role": "tool",
                             "tool_call_id": tc.get("id", ""),
@@ -558,6 +672,7 @@ class ChatService:
         # 自动补齐 project_path
         if tool_name not in ("list_epp_projects", "launch_edi", "compare_simulation_results",
                               "turbocharts_convert", "show_image", "analyze_image", "copy_image_to_workspace",
+                              "generate_simulation_report",
                               "get_simulation_async_status", "get_simulation_async_result"):
             if not args.get("project_path"):
                 if session.current_project_path:
@@ -606,6 +721,46 @@ class ChatService:
                 session.simulation_task_ids = session.simulation_task_ids[-20:]
 
     # ── 上下文导出 ──
+
+    # ── 破坏性工具确认（ChatService 方法）──
+
+    def _is_confirmation(self, text: str, pending: PendingAction) -> bool:
+        norm = _norm_confirmation(text)
+        return norm in _CONFIRM_WORDS or norm == f"确认 {pending.action_id}"
+
+    async def _execute_pending(
+        self, session: ChatSession, pending: PendingAction, request_id: str,
+    ) -> ChatResponse:
+        if time.time() > pending.expires_at:
+            return ChatResponse(success=False, session_id=session.session_id,
+                                request_id=request_id, reply="操作已过期，请重新发起。")
+        func = CHAT_TOOL_MAP.get(pending.tool_name)
+        if func is None:
+            return ChatResponse(success=False, session_id=session.session_id,
+                                request_id=request_id,
+                                reply=f"未知工具: {pending.tool_name}")
+        try:
+            result = await asyncio.to_thread(func, **pending.arguments)
+        except Exception as exc:
+            return ChatResponse(success=False, session_id=session.session_id,
+                                request_id=request_id, reply=f"执行失败: {exc}")
+
+        # 判断工具实际是否成功
+        tool_success = not (isinstance(result, dict) and result.get("success") is False)
+        result_text = _json.dumps(result, ensure_ascii=False)
+        if len(result_text) > 2000:
+            result_text = result_text[:2000] + "\n...[truncated]"
+        reply = f"操作已完成。\n\n```json\n{result_text}\n```" if tool_success \
+            else f"操作执行失败。\n\n```json\n{result_text}\n```"
+
+        # 更新上下文 + 记录活动
+        self._update_context(session, pending.tool_name, pending.arguments, result)
+
+        return ChatResponse(
+            success=tool_success, session_id=session.session_id,
+            request_id=request_id, reply=reply,
+            context=self._build_context(session),
+        )
 
     def _build_context(self, session: ChatSession) -> dict:
         sim_status = None
@@ -695,6 +850,7 @@ _TOOL_LABELS: dict[str, str] = {
     "turbocharts_convert": "RAW 转图",
     "show_image": "显示图片",
     "analyze_image": "分析图片",
+    "generate_simulation_report": "生成报告",
     "get_simulation_component_schema": "控件参数",
     "list_simulation_components": "查询器件",
     "create_simulation_component": "新增器件",
@@ -709,6 +865,61 @@ if OPENCLAW_WORKSPACE_PATH is not None:
 
 def _tool_label(name: str) -> str:
     return _TOOL_LABELS.get(name, name)
+
+
+# ── 破坏性工具确认（ChatService 方法）──
+
+_CONFIRM_WORDS: set[str] = set()  # 仅通过 action_id 匹配: "确认 a1b2c3d4"
+_CANCEL_WORDS: set[str] = {"取消", "不要执行", "no", "cancel"}
+
+
+def _norm_confirmation(text: str) -> str:
+    return " ".join(text.strip().lower().split())
+
+
+def _create_pending(tool_name: str, args: dict) -> PendingAction:
+    summary = {
+        "delete_simulation_component":
+            f"从工程中删除器件 {args.get('instance_name', '?')} 及其连接线",
+        "replace_models_from_csv":
+            f"使用 {args.get('csv_path', '?')} 批量替换工程模型",
+    }.get(tool_name, f"执行 {tool_name}")
+    return PendingAction(
+        action_id=uuid.uuid4().hex[:8],
+        tool_name=tool_name,
+        arguments=args,
+        summary=summary,
+    )
+
+
+def _confirmation_text(pending: PendingAction) -> str:
+    target = {
+        "delete_simulation_component": f"{pending.summary}。此操作无法由 MCP 自动恢复。",
+        "replace_models_from_csv": f"{pending.summary}。此操作将修改工程中的模型。",
+    }.get(pending.tool_name, pending.summary)
+    return (
+        f"⚠️ **确认操作**\n\n{target}\n\n"
+        f"请回复\"确认 {pending.action_id}\"继续，或回复\"取消\"放弃。"
+    )
+
+
+def _is_cancel(text: str) -> bool:
+    return _norm_confirmation(text) in _CANCEL_WORDS
+
+
+def _serialize_result(result: Any) -> str:
+    """序列化工具结果为字符串，超过限制截断。"""
+    if isinstance(result, list):
+        text_parts = []
+        for item in result:
+            if hasattr(item, "text"):
+                text_parts.append(item.text)
+        serialized = "\n".join(text_parts) if text_parts else _json.dumps(result, ensure_ascii=False)
+    else:
+        serialized = _json.dumps(result, ensure_ascii=False)
+    if len(serialized) > _MAX_TOOL_RESULT_CHARS:
+        serialized = serialized[:_MAX_TOOL_RESULT_CHARS] + "\n...[tool result truncated]"
+    return serialized
 
 
 def _result_summary(act: Activity) -> str:

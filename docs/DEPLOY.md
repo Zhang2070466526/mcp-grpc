@@ -44,6 +44,8 @@ LLM_MODEL=deepseek-chat
 VISION_API_KEY=
 VISION_BASE_URL=
 VISION_MODEL=
+# 可选：仿真报告渲染（默认 127.0.0.1:17867）
+REPORT_RENDER_URL=http://127.0.0.1:17867/api/v1/reports/render
 ```
 
 > 留空的字段走自动检测(除OPENCLAW_WORKSPACE)，一般只需确认 `EDA_GRPC_SERVER` 正确。

@@ -53,11 +53,13 @@ def _suggest_curves(var_name: str, var_type: str) -> list[str]:
     # Detect special patterns first (before generic real/complex)
     delay_m = re.match(r'S\.delay\[(\d+),(\d+)\]', var_name)
     if delay_m:
-        curves.append(f"real_delayS[{delay_m.group(1)},{delay_m.group(2)}]")
+        # Known turbocharts crash (0xC0000005) for real_delayS — skip suggestion
         return curves
 
     if var_type == "real":
-        curves.append(f"real_{var_name}")
+        # Normalize square brackets → round for nf[1] → nf(1)
+        safe_name = var_name.replace("[", "(").replace("]", ")")
+        curves.append(f"real_{safe_name}")
         return curves
 
     # Detect S[n,m] pattern
@@ -259,6 +261,14 @@ def list_result_curves(result_path: str) -> dict[str, Any]:
     }
     if result.get("warning"):
         response["warning"] = result["warning"]
+    # Multi-plot warning: turbocharts_app.exe currently only reads the first plot
+    if len(result["datasets"]) > 1:
+        response["warning"] = (
+            response.get("warning", "")
+            + f" RAW 包含 {len(result['datasets'])} 个 plot，turbocharts 当前只处理第一个"
+            f" ({result['datasets'][0].get('plot_name', '')})。"
+            + " 如需画其他 plot 的曲线，请手动提取对应的 plot 数据。"
+        ).strip()
     return response
 
 

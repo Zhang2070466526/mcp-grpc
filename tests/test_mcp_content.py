@@ -18,7 +18,7 @@ import pytest
 
 
 # ═══════════════════════════════════════════════════════════
-# 1. 直接调用测试 — 覆盖所有 3 Resources + 3 Prompts
+# 1. 直接调用测试 — 覆盖所有 3 Resources + 4 Prompts
 # ═══════════════════════════════════════════════════════════
 
 class TestResourcesDirect:
@@ -236,6 +236,7 @@ class TestMcpProtocolSmoke:
             assert "inspect_edi_project" in names
             assert "run_and_review_simulation" in names
             assert "configure_simulation_component" in names
+            assert "create_simulation_report" in names
         finally:
             _stop_server(proc)
 

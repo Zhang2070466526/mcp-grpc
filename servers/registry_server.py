@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（36 个，配置工作区后 37 个）：
+  已注册工具（37 个，配置工作区后 38 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -51,6 +51,9 @@
     analyze_image                 调用视觉模型分析图片内容
     copy_image_to_workspace       条件注册，复制到 media/edi/mcp-cache/（需配置工作区）
 
+  报告：
+    generate_simulation_report    生成本地仿真报告（PDF/DOCX）
+
   图表：
     list_result_curves            解析 RAW 返回可用曲线
     compare_simulation_results    多 RAW 结果对比叠图
@@ -74,6 +77,7 @@ import servers.turbocharts.convert_raw   # noqa: F401
 import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
 import servers.multimodal_vision          # noqa: F401 — show_image + copy + analyze
+import servers.report                     # noqa: F401 — generate_simulation_report
 
 # Resources & Prompts
 import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.prompt()

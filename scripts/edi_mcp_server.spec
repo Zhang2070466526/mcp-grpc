@@ -59,6 +59,14 @@ a = Analysis(
         'servers.multimodal_vision.workspace_copy',
         'servers.multimodal_vision.vision_analyzer',
 
+        # 报告渲染
+        'servers.report',
+        'servers.report.generator',
+
+        # 运行时配置
+        'servers.runtime_config',
+        'servers.settings',
+
         # Proto / gRPC
         'proto',
         'proto.ecserver_pb2',

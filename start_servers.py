@@ -2,7 +2,7 @@ r"""EDI MCP 一键启动 — 统一入口。
 
 ═══════════════════════════════════════════════════════════
   工具注册见：servers/registry_server.py
-  工具定义见：servers/eda/*_service.py
+  工具定义见：servers/eda/*.py
 
   启动方式：
     uv run python start_servers.py                          # sse（默认）
@@ -118,6 +118,8 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
 
     mcp.settings.host = host
     mcp.settings.port = port
+    from servers.runtime_config import set_server_address
+    set_server_address(host, port)
     mcp.run(transport=transport)
 
 

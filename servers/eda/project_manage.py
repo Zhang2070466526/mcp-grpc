@@ -32,7 +32,7 @@ from typing import Any
 
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
-from servers.eda.config import ProjectReader, parse_components, parse_paramsinfo, validate_project_path
+from servers.eda.config import ProjectReader, parse_components, validate_project_path
 from servers.mcp_instance import mcp
 
 
@@ -185,7 +185,7 @@ def get_component_parameters(
         if comp["component_id"] != component_id:
             continue
 
-        params_info = parse_paramsinfo(comp.get("paramsinfo", {}))
+        params_info = comp.get("paramsinfo", {})
         parameters = []
         for key, info in params_info.items():
             if key == "BasicParameters":
@@ -317,7 +317,7 @@ def analyze_variables(project_path: str) -> dict[str, Any]:
             continue
         for comp in parse_components(raw):
             ct = comp.get("type", "")
-            params = parse_paramsinfo(comp.get("paramsinfo", {}))
+            params = comp.get("paramsinfo", {})
 
             # Var 元件：变量定义
             if ct == "Var":
@@ -351,9 +351,15 @@ def analyze_variables(project_path: str) -> dict[str, Any]:
                 })
 
         # 查找参数值引用了变量的元件
-        var_names = {v["name"] for v in variables}
+        # 兼容两种引用方式：Var 实例名 和 Var 参数名
+        var_names = {
+            value
+            for v in variables
+            for value in (v["name"], v["parameter"])
+            if value
+        }
         for comp in parse_components(raw):
-            params = parse_paramsinfo(comp.get("paramsinfo", {}))
+            params = comp.get("paramsinfo", {})
             for pkey, pinfo in params.items():
                 val = pinfo.get("value", "")
                 if val and val in var_names:

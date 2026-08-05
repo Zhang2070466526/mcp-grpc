@@ -610,7 +610,7 @@ HFSS 任务队列：串行 worker 线程从 `queue.Queue(maxsize=10)` 取任务�
 
 ---
 
-## 六、图片工具（2 个）
+## 六、图片工具（3 个，1 个条件注册）
 
 ### 6.1 show_image
 
@@ -712,7 +712,7 @@ class ChatSession:
   ├─ system prompt（动态注入当前工程/任务上下文）
   ├─ 最多 5 轮:
   │   ├─ POST {LLM_BASE_URL}/v1/chat/completions
-  │   │   └─ tools: CHAT_TOOLS_SCHEMA（27 个工具，配置工作区后 28 个）
+  │   │   └─ tools: CHAT_TOOLS_SCHEMA（28 个工具，配置工作区后 29 个）
   │   ├─ 无 tool_calls → 返回最终回复
   │   └─ 有 tool_calls:
   │       ├─ _validate(tool_name, args, session):
@@ -741,6 +741,23 @@ class ChatSession:
 | `POST /chat` | `{session_id, message}` → `ChatResponse(reply, activities, media, context)` |
 | `GET /tools/list` | MCP 工具名和描述 JSON 列表 |
 | `GET /images/{token}` | 临时图片访问（10 分钟过期，inline 渲染） |
+
+### 7.5 安全加固
+
+**会话锁**：同 session 并发请求串行化（`asyncio.Lock`），10 秒超时返回提示。
+
+**输入限制**：
+- 单条消息最大 20K 字符
+- session_id 最大 128 字符
+- 单轮工具调用最多 8 个
+- 工具返回结果截断至 100K 字符
+
+**破坏性工具确认门**（`delete_simulation_component`、`replace_models_from_csv`）：
+- 模型请求执行破坏性工具时，Chat 层拦截并保存 `PendingAction`
+- 向用户展示操作摘要和影响范围
+- 用户需明确回复"确认"后才执行
+- 一次确认只能执行一次，5 分钟过期
+- 确认执行时使用原始保存参数，防止模型在确认前后篡改目标
 
 ---
 
@@ -780,7 +797,46 @@ workspace_enabled = OPENCLAW_WORKSPACE_PATH is not None
 
 ---
 
-## 九、跨层设计原则
+## 九、报告渲染（1 个工具）
+
+`generate_simulation_report` 生成本地仿真报告（PDF/DOCX）。核心实现在 `servers/report/generator.py`。
+
+**调用流程**：
+```
+1. 输出路径校验 → 绝对路径/后缀 .pdf .docx/父目录存在/overwrite 覆盖检查
+2. model_name 校验 → 非空，最长 200 字符
+3. spec_table 校验 → 二维数组/每行列数一致/单元格类型(string int float)
+4. charts 校验 → 每项含 path(绝对/PNG/JPG)+title，缺失图片记 warning
+5. components 校验 → 四项全字符串
+6. schematic 校验 → 绝对路径，缺失记 warning
+7. 构建 report payload → POST REPORT_RENDER_URL
+8. HTTP 状态映射 → 400(REPORT_VALIDATION_FAILED) 409(OUTPUT_FILE_BUSY) 500(REPORT_RENDER_FAILED)
+9. 服务不可用 → REPORT_SERVICE_UNAVAILABLE
+10. 验证输出文件存在 → REPORT_OUTPUT_NOT_FOUND
+```
+
+**配置**：
+```ini
+REPORT_RENDER_URL=http://127.0.0.1:17867/api/v1/reports/render
+REPORT_RENDER_TIMEOUT_SECONDS=45
+```
+
+**设计原则**：
+- 只校验数据并调用渲染 API，不自动执行仿真、生成曲线或编造指标
+- 默认禁止覆盖（`overwrite=false`），防止意外覆盖已有报告
+- 器件厂家和规格不得猜测，无来源时留空
+- 服务不可用时工具仍注册，返回 `REPORT_SERVICE_UNAVAILABLE`
+- `_rtool` 已扩展支持完整 JSON Schema 属性定义（对象数组、二维数组）
+
+**11 个错误码**：`INVALID_OUTPUT_PATH` `OUTPUT_DIRECTORY_NOT_FOUND`
+`OUTPUT_ALREADY_EXISTS` `INVALID_REPORT_PARAMETERS` `INVALID_CHART_PATH`
+`REPORT_SERVICE_UNAVAILABLE` `REPORT_RENDER_TIMEOUT` `REPORT_VALIDATION_FAILED`
+`OUTPUT_FILE_BUSY` `REPORT_RENDER_FAILED` `INVALID_REPORT_RESPONSE`
+`REPORT_OUTPUT_NOT_FOUND`
+
+---
+
+## 十、跨层设计原则
 
 ### 9.1 参数校验分层
 

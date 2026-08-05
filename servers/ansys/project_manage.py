@@ -201,22 +201,46 @@ def close_hfss_project(
     # 确定 lock 清理路径
     lock_path = project_path or _OPEN_PROJECT_PATHS.get(project_name, "")
 
-    if force and _LAST_PID is not None:
+    if force:
+        if _LAST_PID is None:
+            return {"success": False, "status": "no_managed_process",
+                    "message": "没有由当前 MCP 启动的 AEDT 进程"}
+
+        pid = _LAST_PID
         try:
-            subprocess.run(["taskkill", "-f", "-pid", str(_LAST_PID)],
-                           capture_output=True, timeout=10)
-            pid = _LAST_PID
+            import psutil
+            proc = psutil.Process(pid)
+            if not proc.is_running() or proc.name().lower() != "ansysedt.exe":
+                _LAST_PID = None
+                return {"success": False, "status": "managed_process_not_found",
+                        "message": "记录的 PID 已不存在或不再属于 AEDT，未执行终止"}
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            _LAST_PID = None
+            return {"success": False, "status": "managed_process_not_found",
+                    "message": "记录的 PID 已不存在，未执行终止"}
+
+        try:
+            completed = subprocess.run(
+                ["taskkill", "/F", "/PID", str(pid)],
+                capture_output=True, text=True, timeout=10, check=False,
+            )
+            if completed.returncode != 0:
+                return {"success": False, "status": "taskkill_failed",
+                        "message": completed.stderr.strip() or completed.stdout.strip(),
+                        "pid": pid}
+
+            try:
+                psutil.Process(pid).wait(timeout=10)
+            except psutil.NoSuchProcess:
+                pass
+            except psutil.TimeoutExpired:
+                return {"success": False, "status": "termination_timeout",
+                        "message": f"已发送终止信号，但 PID {pid} 未在 10s 内退出"}
+
             _LAST_PID = None
 
-            # 等待进程退出后清理锁
-            deadline = time.monotonic() + 10
-            while time.monotonic() < deadline:
-                if pid not in get_aedt_pids():
-                    break
-                time.sleep(1)
-
             lock_cleanup = {}
-            if lock_path and pid not in get_aedt_pids():
+            if lock_path:
                 result = cleanup_stale_project_lock(lock_path)
                 if result["removed"]:
                     lock_cleanup = {"lock_cleanup": result}
@@ -224,11 +248,8 @@ def close_hfss_project(
             if project_name in _OPEN_PROJECT_PATHS:
                 del _OPEN_PROJECT_PATHS[project_name]
 
-            return {
-                "success": True, "method": "taskkill",
-                "message": f"已终止 PID {pid}",
-                **lock_cleanup,
-            }
+            return {"success": True, "method": "taskkill",
+                    "message": f"已终止 PID {pid}", **lock_cleanup}
         except Exception as exc:
             return {"success": False, "message": str(exc)}
 

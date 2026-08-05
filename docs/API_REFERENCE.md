@@ -772,6 +772,53 @@ generate_schematic_from_netlist(project_path: str, netlist_path: str, clear_befo
 
 ---
 
+## 报告（1 个）
+
+### `generate_simulation_report`
+
+```python
+from servers.report import generate_simulation_report
+
+generate_simulation_report(
+    output_path: str,
+    model_name: str,
+    description: str = "",
+    conclusion: str = "",
+    spec_table: list | None = None,
+    charts: list | None = None,
+    components: list | None = None,
+    schematic: str = "",
+    overwrite: bool = False,
+    timeout_seconds: int = 45,
+) -> dict
+```
+
+生成本地仿真报告（PDF/DOCX），调用本地报告渲染服务 `POST /api/v1/reports/render`。只负责数据校验和渲染，不会自动执行仿真或编造数据。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `output_path` | str | 是 | — | 输出文件绝对路径，后缀决定格式（.pdf/.docx） |
+| `model_name` | str | 是 | — | 封面标题/型号名（最长 200 字符） |
+| `description` | str | 否 | "" | 产品简介（多行文本） |
+| `conclusion` | str | 否 | "" | 结论文字 |
+| `spec_table` | list | 否 | None | 电参数表二维数组（7 列，第一行表头） |
+| `charts` | list | 否 | None | 曲线图片 `[{"path":..., "title":...}]`，最多 50 张 |
+| `components` | list | 否 | None | 器件选型 `[{"type","model","manufacturer","specs"}]`，最多 500 条 |
+| `schematic` | str | 否 | "" | 原理图图片绝对路径 |
+| `overwrite` | bool | 否 | False | 输出文件已存在时是否覆盖 |
+| `timeout_seconds` | int | 否 | 45 | 请求超时秒数（5-120） |
+
+**重要规则**：
+- 默认禁止覆盖已存在文件（`overwrite=false`）
+- 器件厂家和规格不得根据型号名称猜测
+- 没有要求值时结果填"未判定"
+- 图片缺失不阻塞生成，返回中记录 warning
+- 报告服务不可用时返回 `REPORT_SERVICE_UNAVAILABLE`
+
+配置：`REPORT_RENDER_URL`（默认 `http://127.0.0.1:17867/api/v1/reports/render`）、`REPORT_RENDER_TIMEOUT_SECONDS`（默认 45）。
+
+---
+
 ## 辅助
 
 ### Chat 上下文

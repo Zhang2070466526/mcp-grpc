@@ -78,9 +78,24 @@ async def chat_endpoint(request: Request):
     请求: {"session_id": "...", "message": "..."}
     返回: {"success": bool, "reply": "...", "activities": [...], "context": {...}}
     """
-    body = await request.json()
-    session_id = body.get("session_id", "").strip()
-    message = body.get("message", "").strip()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON body"}, status_code=400)
+
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "body must be an object"}, status_code=400)
+
+    session_id = body.get("session_id", "")
+    message = body.get("message", "")
+
+    if not isinstance(session_id, str):
+        return JSONResponse({"error": "session_id must be a string"}, status_code=400)
+    if not isinstance(message, str):
+        return JSONResponse({"error": "message must be a string"}, status_code=400)
+
+    session_id = session_id.strip()
+    message = message.strip()
 
     if not message:
         return JSONResponse({"error": "message required"}, status_code=400)

@@ -146,6 +146,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `show_image` | 返回 MCP ImageContent |
 | `analyze_image` | 调用视觉模型分析图片内容 |
 | `copy_image_to_workspace`* | 复制到工作区（需 OPENCLAW_WORKSPACE） |
+| `generate_simulation_report` | 生成本地仿真报告（PDF/DOCX） |
 
 > *条件注册。完整参数说明见 [API 参考](./docs/API_REFERENCE.md)。
 
@@ -158,8 +159,11 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 ├── servers/
 │   ├── mcp_instance.py           FastMCP 全局实例
 │   ├── registry_server.py        工具 / Resource / Prompt 注册入口
-│   ├── mcp_content.py            3 个 Resource + 3 个 Prompt
+│   ├── runtime_config.py          运行时配置（端口/地址）
+│   ├── settings.py                统一配置加载
+│   ├── mcp_content.py            3 个 Resource + 4 个 Prompt
 │   ├── multimodal_vision/        图片显示 + 工作区复制 + 视觉分析
+│   ├── report/                    仿真报告生成
 │   ├── chat/                     聊天模块（LLM 多轮工具闭环）
 │   ├── eda/                      EDI gRPC 工具
 │   │   ├── config.py             配置 / S-expression 解析 / ProjectReader
@@ -174,7 +178,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 │   ├── turbocharts/              RAW 图表工具
 │   └── ansys/                     ANSYS HFSS 工具
 ├── docs/                         项目文档
-├── tests/                        测试套件（176 项）
+├── tests/                        测试套件（207 项）
 ├── scripts/                      打包 / 启动脚本
 ├── start_servers.py              入口
 └── pyproject.toml
@@ -185,7 +189,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 ## 测试
 
 ```powershell
-uv run pytest -q                 # 全量 176 项
+uv run pytest -q                 # 全量 207 项
 uv run pytest tests/ -v          # 详细输出
 ```
 

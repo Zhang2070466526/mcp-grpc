@@ -87,7 +87,7 @@ Write-Host ("EXE:        {0,7} MB" -f $exeSize)
 Write-Host ("Directory:  {0,7} MB" -f $dirSize)
 Write-Host ("ZIP:        {0,7} MB" -f $zipSize)
 Write-Host ("Files:      {0,7}"    -f $fileCount)
-Write-Host ("Tools:            variable (36 default, 37 with OPENCLAW_WORKSPACE)")
+Write-Host ("Tools:            variable (37 default, 38 with OPENCLAW_WORKSPACE)")
 Write-Host "--------------------------------" -ForegroundColor DarkGray
 
 if ($topFiles) {
@@ -116,4 +116,5 @@ if ($errors -gt 0) {
 }
 
 Write-Host "Done. Output: dist/edi-mcp/ + dist/edi-mcp.zip" -ForegroundColor Green
+Write-Host "Verify: Run edi_mcp_server.exe then check http://127.0.0.1:50026/health" -ForegroundColor DarkGray
 Pop-Location
