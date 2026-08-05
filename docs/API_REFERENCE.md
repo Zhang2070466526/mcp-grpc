@@ -596,12 +596,12 @@ compare_simulation_results(
 
 ---
 
-## 图片（2 个）
+## 图片（3 个，1 个条件注册）
 
 ### `show_image`
 
 ```python
-from servers.image_tools import show_image
+from servers.multimodal_vision import show_image
 
 show_image(image_path: str) -> list
 ```
@@ -617,12 +617,45 @@ show_image(image_path: str) -> list
 
 ---
 
+### `analyze_image`
+
+```python
+from servers.multimodal_vision import analyze_image
+
+analyze_image(image_path: str, prompt: str = "请描述图片中的主要内容。", detail: str = "auto", max_tokens: int = 2048) -> dict
+```
+
+调用视觉模型分析本地图片内容，返回结构化文字结果。**本工具会把图片上传到第三方视觉模型**。
+
+与 `show_image` 的区别：`show_image` 返回图片给客户端渲染；`analyze_image` 调用视觉模型识别、理解图片内容。
+
+> **注意**：仅用户明确要求分析图片时才调用，AI 不应主动触发。配置 `VISION_API_KEY` + `VISION_BASE_URL` + `VISION_MODEL` 三项后自动开启。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `image_path` | str | 是 | — | 本地图片绝对路径（PNG/JPEG/WebP） |
+| `prompt` | str | 否 | "请描述图片中的主要内容。" | 分析需求 |
+| `detail` | str | 否 | "auto" | auto / low / high |
+| `max_tokens` | int | 否 | 2048 | 分析结果最大长度（128-4096） |
+
+返回：
+```python
+{"success": True, "model": "gpt-4o", "analysis": "图片显示...",
+ "image": {"name": "result.png", "mime_type": "image/png", "size_bytes": 15231},
+ "usage": {"prompt_tokens": 1200, "completion_tokens": 320, "total_tokens": 1520},
+ "content_is_untrusted": True}
+```
+
+常见错误码：`VISION_NOT_CONFIGURED`、`IMAGE_NOT_FOUND`、`UNSUPPORTED_IMAGE_FORMAT`、`IMAGE_TOO_LARGE`、`VISION_TIMEOUT`、`VISION_AUTH_FAILED`、`VISION_RATE_LIMITED`、`VISION_BUSY`。
+
+---
+
 ### `copy_image_to_workspace`（条件注册）
 
 仅在 `OPENCLAW_WORKSPACE` 配置有效时注册。负责将图片复制到 `media/edi/`，返回绝对路径和 `openclaw_attachment.filePath`。显示由 OpenClaw Agent 的消息工具负责。
 
 ```python
-from servers.image_tools import copy_image_to_workspace
+from servers.multimodal_vision import copy_image_to_workspace
 
 copy_image_to_workspace(image_path: str) -> dict
 ```

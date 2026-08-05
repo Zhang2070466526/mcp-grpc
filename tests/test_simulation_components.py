@@ -564,7 +564,7 @@ class TestGrpcTerminalResult:
 class TestToolCount:
     def test_default_tool_count(self):
         from servers.mcp_instance import mcp
-        from servers.image_tools import OPENCLAW_WORKSPACE_PATH
+        from servers.multimodal_vision import OPENCLAW_WORKSPACE_PATH
         tools = [t.name for t in mcp._tool_manager._tools.values()]
         # Base tools should be at least 33 (without workspace copy tool)
         if OPENCLAW_WORKSPACE_PATH:

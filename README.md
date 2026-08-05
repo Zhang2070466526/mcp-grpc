@@ -144,6 +144,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `turbocharts_convert` | ADS RAW → 曲线图 + CSV |
 | `compare_simulation_results` | 多 RAW 同曲线对比叠图 |
 | `show_image` | 返回 MCP ImageContent |
+| `analyze_image` | 调用视觉模型分析图片内容 |
 | `copy_image_to_workspace`* | 复制到工作区（需 OPENCLAW_WORKSPACE） |
 
 > *条件注册。完整参数说明见 [API 参考](./docs/API_REFERENCE.md)。
@@ -158,7 +159,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 │   ├── mcp_instance.py           FastMCP 全局实例
 │   ├── registry_server.py        工具 / Resource / Prompt 注册入口
 │   ├── mcp_content.py            3 个 Resource + 3 个 Prompt
-│   ├── image_tools.py            图片工具
+│   ├── multimodal_vision/        图片显示 + 工作区复制 + 视觉分析
 │   ├── chat/                     聊天模块（LLM 多轮工具闭环）
 │   ├── eda/                      EDI gRPC 工具
 │   │   ├── config.py             配置 / S-expression 解析 / ProjectReader
@@ -217,3 +218,30 @@ powershell -File scripts/build.ps1
 | [交接文档](./docs/HANDOVER.md) | 架构设计、技术栈、扩展开发 |
 | [gRPC 协议](./proto/grpc接口调用.md) | gRPC 接口调用说明 |
 | [EDI 接口汇总](./docs/EDI系统接口与外部调用汇总.md) | EDI 系统全量对外接口 |
+
+---
+
+## 常见问题
+
+### 端口被占用
+
+```powershell
+netstat -ano | findstr 50026         # 查找占用进程的 PID
+taskkill -f -pid <PID>               # 强制结束
+taskkill -f -im edi_mcp_server.exe   # EXE 版按名称结束
+```
+
+### 检查服务状态
+
+```powershell
+netstat -ano | findstr 50055         # gRPC：有 LISTENING = EDI 运行中
+netstat -ano | findstr 50026         # MCP：有 LISTENING = 服务运行中
+curl http://127.0.0.1:50026/health   # 健康检查
+```
+
+### analyze_image 注意事项
+
+- **不会自动触发**：只有用户明确要求分析图片时才调用，AI 不应主动使用
+- **显示给我看 ≠ 上传分析**：展示图片用 `show_image`，识别内容用 `analyze_image`
+- **会上传到第三方**：图片会发送到配置的视觉模型服务
+- **未配置不可用**：需配置 `VISION_API_KEY` + `VISION_BASE_URL` + `VISION_MODEL`

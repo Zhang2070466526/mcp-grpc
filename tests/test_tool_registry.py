@@ -18,7 +18,7 @@ def test_all_tools_registered():
         "export_project_netlist", "capture_schematic",
         "replace_models_from_csv", "launch_edi",
         "list_result_curves", "turbocharts_convert",
-        "show_image", "analyze_variables",
+        "show_image", "analyze_image", "analyze_variables",
         "get_simulation_component_schema",
         "list_simulation_components", "create_simulation_component",
         "update_simulation_component", "delete_simulation_component",
@@ -27,7 +27,7 @@ def test_all_tools_registered():
         "start_hfss_analysis_async", "get_hfss_analysis_status",
     ]
     # copy_image_to_workspace is conditional
-    from servers.image_tools import OPENCLAW_WORKSPACE_PATH
+    from servers.multimodal_vision import OPENCLAW_WORKSPACE_PATH
     if OPENCLAW_WORKSPACE_PATH is not None:
         required.append("copy_image_to_workspace")
     assert len(tools) == len(required), f"expected {len(required)} tools, got {len(tools)} ({sorted(tools)})"

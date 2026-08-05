@@ -57,7 +57,7 @@ from servers.eda.model_replace import replace_models_from_csv  # noqa: E402
 from servers.eda.edi_launcher import launch_edi  # noqa: E402
 from servers.turbocharts.compare_results import compare_simulation_results  # noqa: E402
 from servers.turbocharts.convert_raw import turbocharts_convert, list_result_curves  # noqa: E402
-from servers.image_tools import show_image, copy_image_to_workspace, OPENCLAW_WORKSPACE_PATH  # noqa: E402
+from servers.multimodal_vision import show_image, copy_image_to_workspace, analyze_image, OPENCLAW_WORKSPACE_PATH  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 常量
@@ -69,7 +69,7 @@ _SESSION_TTL = 7200      # 会话有效期 2 小时（秒）
 _PRUNE_INTERVAL = 300    # 清理间隔 5 分钟
 
 # ---------------------------------------------------------------------------
-# 聊天工具注册表（不含同步仿真 simulate_project）
+# 聊天工具注册表。不包含: simulate_project(同步阻塞)、ANSYS(COM依赖)、simulate_netlist(需本地网表文件)
 # ---------------------------------------------------------------------------
 CHAT_TOOL_MAP: dict[str, Any] = {
     "analyze_variables":               analyze_variables,
@@ -91,6 +91,7 @@ CHAT_TOOL_MAP: dict[str, Any] = {
     "list_result_curves":             list_result_curves,
     "turbocharts_convert":            turbocharts_convert,
     "show_image":                     show_image,
+    "analyze_image":                  analyze_image,
     "get_simulation_component_schema": get_simulation_component_schema,
     "list_simulation_components": list_simulation_components,
     "create_simulation_component": create_simulation_component,
@@ -146,6 +147,7 @@ def _build_tools_schema() -> list[dict]:
         _rtool("list_result_curves", "解析 RAW 文件返回可用曲线名和依赖轴，画图前调用避免猜测曲线名", {"result_path": "string"}),
         _rtool("turbocharts_convert", "ADS RAW 文件转曲线图和 CSV", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
         _rtool("show_image", "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）", {"image_path": "string"}),
+        _rtool("analyze_image", "调用视觉模型分析图片内容（会上传到第三方）。仅用户明确要求分析时调用，不得自动触发。显示图片用 show_image", {"image_path": "string"}, {"prompt": "string", "detail": "string", "max_tokens": "integer"}),
         _rtool("get_simulation_component_schema", "查询仿真控件支持的参数、类型和单位；配置控件前优先调用", {"component_type": "string"}, {"parameter_name": "string"}),
         _rtool("list_simulation_components", "查询工程中的仿真器件", {"project_path": "string"}, {"component_type": "string"}),
         _rtool("create_simulation_component", "创建新的 SP/HB/XDB 实例；每次调用都会新增。配置参数前先调用 get_simulation_component_schema", {"project_path": "string", "component_type": "string"}, {"parameters": "object", "timeout_seconds": "integer"}),
@@ -482,7 +484,7 @@ class ChatService:
                         if tool_name == "show_image" and act.status == "success":
                             img_path = validation_result.get("image_path", "")
                             if img_path:
-                                from servers.image_tools import register_image_url
+                                from servers.multimodal_vision import register_image_url
                                 image_url = register_image_url(img_path)
                                 if image_url:
                                     media.append({"type": "image", "url": image_url, "name": Path(img_path).name})
@@ -555,7 +557,7 @@ class ChatService:
 
         # 自动补齐 project_path
         if tool_name not in ("list_epp_projects", "launch_edi", "compare_simulation_results",
-                              "turbocharts_convert", "show_image", "copy_image_to_workspace", "simulate_netlist_with_ads",
+                              "turbocharts_convert", "show_image", "analyze_image", "copy_image_to_workspace",
                               "get_simulation_async_status", "get_simulation_async_result"):
             if not args.get("project_path"):
                 if session.current_project_path:
@@ -692,6 +694,7 @@ _TOOL_LABELS: dict[str, str] = {
     "list_result_curves": "RAW 曲线",
     "turbocharts_convert": "RAW 转图",
     "show_image": "显示图片",
+    "analyze_image": "分析图片",
     "get_simulation_component_schema": "控件参数",
     "list_simulation_components": "查询器件",
     "create_simulation_component": "新增器件",

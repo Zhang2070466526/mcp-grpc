@@ -51,21 +51,22 @@ def compare_simulation_results(
     if not Path(TURBOCHARTS_PATH).is_file():
         return {
             "success": False,
+            "error_code": "FILE_NOT_FOUND",
             "message": f"turbocharts_app.exe 不存在: {TURBOCHARTS_PATH}",
         }
 
     n = len(result_paths)
     if n < 2 or n > 8:
-        return {"success": False, "message": "result_paths 需要 2-8 个文件"}
+        return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "result_paths 需要 2-8 个文件"}
 
     for rp in result_paths:
         if not Path(rp).is_file():
-            return {"success": False, "message": f"RAW 文件不存在: {rp}"}
+            return {"success": False, "error_code": "FILE_NOT_FOUND", "message": f"RAW 文件不存在: {rp}"}
 
     if labels is None:
         labels = [Path(rp).stem for rp in result_paths]
     if len(labels) != n:
-        return {"success": False, "message": "labels 数量与 result_paths 不一致"}
+        return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "labels 数量与 result_paths 不一致"}
 
     # Step 1: export each RAW to temp CSV (serialized via runner)
     dep_key = dependency
@@ -88,12 +89,13 @@ def compare_simulation_results(
             if result_proc.returncode != 0:
                 return {
                     "success": False,
+                    "error_code": "TOOL_EXECUTION_FAILED",
                     "message": f"turbocharts 导出 {rp} 失败: {result_proc.stderr[:200]}",
                 }
 
             x_vals, y_vals = _read_curve_csv_xy(tmp_csv)
             if not x_vals:
-                return {"success": False, "message": f"无法解析 {rp} 的 CSV 数据"}
+                return {"success": False, "error_code": "INVALID_RAW_DATA", "message": f"无法解析 {rp} 的 CSV 数据"}
             raw_curves.append((x_vals, y_vals))
 
     # Step 2: align data (preserve original index order)
@@ -104,7 +106,7 @@ def compare_simulation_results(
         x_sets = [set(xv) for xv, _ in raw_curves]
         common_x = sorted(x_sets[reference_index] & set.intersection(*x_sets))
         if not common_x:
-            return {"success": False, "message": "所有 RAW 文件没有共同的依赖轴数据点"}
+            return {"success": False, "error_code": "INVALID_RAW_DATA", "message": "所有 RAW 文件没有共同的依赖轴数据点"}
         for i, (xv, yv) in enumerate(raw_curves):
             x_to_y = dict(zip(xv, yv))
             curves_aligned[i] = [x_to_y.get(p, 0.0) for p in common_x]

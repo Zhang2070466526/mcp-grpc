@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（35 个，配置工作区后 36 个）：
+  已注册工具（36 个，配置工作区后 37 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -48,6 +48,7 @@
 
   图片：
     show_image                    读取本地图片，返回 MCP ImageContent
+    analyze_image                 调用视觉模型分析图片内容
     copy_image_to_workspace       条件注册，复制到 media/edi/mcp-cache/（需配置工作区）
 
   图表：
@@ -72,15 +73,14 @@ import servers.turbocharts.compare_results  # noqa: F401
 import servers.turbocharts.convert_raw   # noqa: F401
 import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
-import servers.image_tools                # noqa: F401
-import servers.vision_tools               # noqa: F401 — analyze_image
+import servers.multimodal_vision          # noqa: F401 — show_image + copy + analyze
 
 # Resources & Prompts
 import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.prompt()
 
 # Web 路由
 from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
-from servers.image_tools import serve_image  # noqa: E402
+from servers.multimodal_vision import serve_image  # noqa: E402
 
 mcp.custom_route("/", methods=["GET"])(ui_page)
 mcp.custom_route("/ui", methods=["GET"])(ui_page)

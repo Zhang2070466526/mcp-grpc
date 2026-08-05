@@ -87,7 +87,7 @@ Write-Host ("EXE:        {0,7} MB" -f $exeSize)
 Write-Host ("Directory:  {0,7} MB" -f $dirSize)
 Write-Host ("ZIP:        {0,7} MB" -f $zipSize)
 Write-Host ("Files:      {0,7}"    -f $fileCount)
-Write-Host ("Tools:            variable (35 default, 36 with OPENCLAW_WORKSPACE)")
+Write-Host ("Tools:            variable (36 default, 37 with OPENCLAW_WORKSPACE)")
 Write-Host "--------------------------------" -ForegroundColor DarkGray
 
 if ($topFiles) {

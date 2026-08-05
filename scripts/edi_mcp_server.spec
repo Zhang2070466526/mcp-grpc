@@ -54,7 +54,10 @@ a = Analysis(
         'servers.ansys.run_analysis',
 
         # 图片工具
-        'servers.image_tools',
+        'servers.multimodal_vision',
+        'servers.multimodal_vision.image_display',
+        'servers.multimodal_vision.workspace_copy',
+        'servers.multimodal_vision.vision_analyzer',
 
         # Proto / gRPC
         'proto',

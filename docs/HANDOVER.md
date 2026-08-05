@@ -17,13 +17,13 @@ proto/                  # protobuf 协议文件
 servers/
   mcp_instance.py        # 全局 FastMCP 实例
   registry_server.py     # 工具注册 + Web 路由注册
-  image_tools.py         # 图片工具（show_image + copy_image_to_workspace）
+  multimodal_vision/      # 图片工具（show_image + copy_image_to_workspace + analyze_image）
   eda/                   # EDI 工程工具（17 个）
     __init__.py           # 公共 API + 工具清单
     config.py             # 配置 + ProjectReader + S-expression
     grpc_client.py        # gRPC 通信层（FetchEvent → PerformAction）
     project_manage.py     # 工程管理（7 工具）
-    simulation.py         # 仿真（6 工具）
+    simulation.py         # 仿真（7 工具）
     design_export.py      # 网表/截图（2 工具）
     model_replace.py      # 模型替换（1 工具）
     edi_launcher.py       # 启动 EDI（1 工具）
@@ -56,7 +56,7 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 
 PyPI: https://pypi.org/project/edi-mcp/
 
-## MCP 工具清单（35 个，配置 OPENCLAW_WORKSPACE 后 36 个）
+## MCP 工具清单（36 个，配置 OPENCLAW_WORKSPACE 后 37 个）
 
 **工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary, analyze_variables
 
@@ -70,7 +70,7 @@ PyPI: https://pypi.org/project/edi-mcp/
 
 **模型/启动**：replace_models_from_csv, launch_edi
 
-**图片**：show_image（MCP ImageContent）+ copy_image_to_workspace（需配置工作区，条件注册）
+**图片**：show_image（MCP ImageContent）+ analyze_image（视觉模型分析，默认关闭）+ copy_image_to_workspace（需配置工作区，条件注册）
 
 **图表**：list_result_curves, turbocharts_convert, compare_simulation_results
 

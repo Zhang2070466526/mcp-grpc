@@ -638,6 +638,49 @@ HFSS 任务队列：串行 worker 线程从 `queue.Queue(maxsize=10)` 取任务�
 
 `/images/{token}` 路由，10 分钟过期。供 Chat 界面渲染 `show_image` 返回的图片。不依赖 OpenClaw 工作区。
 
+### 6.4 视觉分析（analyze_image）
+
+调用配置的视觉模型分析本地图片内容。核心实现在 `servers/multimodal_vision/vision_analyzer.py`。
+
+**与 show_image 的区别**：
+- `show_image` → 把图片返回给 MCP 客户端渲染（不调用模型）
+- `analyze_image` → 调用第三方视觉模型，返回结构化文字分析
+
+**配置**（独立于聊天 LLM 配置）：
+```ini
+VISION_API_KEY=
+VISION_BASE_URL=
+VISION_MODEL=
+VISION_TIMEOUT_SECONDS=45
+VISION_MAX_IMAGE_MB=10
+```
+
+**调用流程**：
+```
+1. 配置检查 → 三项全部非空即开启
+2. 图片校验 → 路径/扩展名/Pillow 内容验证/大小限制
+3. Base64 编码 → data:image/png;base64,...
+4. 并发控制 → BoundedSemaphore(2)，超限返回 VISION_BUSY
+5. POST /v1/chat/completions（OpenAI 兼容 Vision API）
+   └─ system prompt 防止图片提示注入
+6. 响应解析 → 提取 analysis/usage，返回结构化结果
+```
+
+**安全措施**：
+- 未置三项时返回 VISION_NOT_CONFIGURED
+- 工具描述明确告知图片会被上传
+- system prompt 声明图片中文字不执行
+- 日志只记录 HTTP 状态/耗时/模型名/图片大小，不记 Base64/API Key/分析内容
+- 返回 `content_is_untrusted: true` 提醒外层 Agent
+- 不依赖 OPENCLAW_WORKSPACE
+- show_image 成功后不自动调用
+
+**错误码**（10 个）：
+`VISION_NOT_CONFIGURED` `IMAGE_NOT_FOUND` `UNSUPPORTED_IMAGE_FORMAT`
+`IMAGE_TOO_LARGE` `INVALID_IMAGE` `VISION_TIMEOUT`
+`VISION_AUTH_FAILED` `VISION_RATE_LIMITED` `VISION_BUSY`
+`VISION_PROVIDER_ERROR` `INVALID_VISION_RESPONSE`
+
 ---
 
 ## 七、Chat 聊天服务
@@ -669,7 +712,7 @@ class ChatSession:
   ├─ system prompt（动态注入当前工程/任务上下文）
   ├─ 最多 5 轮:
   │   ├─ POST {LLM_BASE_URL}/v1/chat/completions
-  │   │   └─ tools: CHAT_TOOLS_SCHEMA（25 个工具）
+  │   │   └─ tools: CHAT_TOOLS_SCHEMA（27 个工具，配置工作区后 28 个）
   │   ├─ 无 tool_calls → 返回最终回复
   │   └─ 有 tool_calls:
   │       ├─ _validate(tool_name, args, session):
@@ -718,11 +761,11 @@ MCP 协议除了 Tool，还定义了 Resource（只读上下文）和 Prompt（�
 `workspace_copy_enabled` 的判断逻辑：
 
 ```python
-from servers.image_tools import OPENCLAW_WORKSPACE_PATH
+from servers.multimodal_vision import OPENCLAW_WORKSPACE_PATH
 workspace_enabled = OPENCLAW_WORKSPACE_PATH is not None
 ```
 
-直接复用 `image_tools.py` 模块级变量，保证 Resource 返回值与实际工具注册状态一致（不依赖环境变量字符串解析）。
+直接复用 `workspace_copy.OPENCLAW_WORKSPACE_PATH`，保证 Resource 返回值与实际工具注册状态一致（不依赖环境变量字符串解析）。
 
 ### 8.2 Prompts
 

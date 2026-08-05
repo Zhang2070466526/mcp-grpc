@@ -222,7 +222,7 @@ class TestShowImage:
         img = Image.new("RGB", (10, 10), color="red")
         src = tmp_path / "test.png"
         img.save(str(src))
-        from servers.image_tools import show_image
+        from servers.multimodal_vision import show_image
         result = show_image(str(src))
         assert len(result) == 2
         assert getattr(result[1], "type") == "image"
@@ -233,12 +233,12 @@ class TestShowImage:
         img = Image.new("RGB", (10, 10), color="red")
         src = tmp_path / "img.png"
         img.save(str(src))
-        from servers.image_tools import show_image
+        from servers.multimodal_vision import show_image
         result = show_image(str(src))
         assert len(result) == 2
 
     def test_rejects_invalid_extension(self, tmp_path):
-        from servers.image_tools import show_image
+        from servers.multimodal_vision import show_image
         txt = tmp_path / "t.txt"
         txt.write_text("x")
         try:
@@ -248,8 +248,9 @@ class TestShowImage:
             pass
 
     def test_oversized_text_only(self, tmp_path, monkeypatch):
-        import servers.image_tools as it
-        monkeypatch.setattr(it, "_MAX_NATIVE_IMAGE_SIZE", 10)
+        import servers.multimodal_vision.image_display as dsp
+        monkeypatch.setattr(dsp, "_MAX_NATIVE_IMAGE_SIZE", 10)
+        import servers.multimodal_vision as it
         big = tmp_path / "big.png"
         big.write_bytes(b"\x00" * 100)
         result = it.show_image(str(big))
@@ -261,9 +262,9 @@ class TestCopyToWorkspace:
     """copy_image_to_workspace 测试。"""
 
     def test_with_workspace(self, tmp_path, monkeypatch):
-        from servers import image_tools as it
+        from servers import multimodal_vision as it
         ws = tmp_path / "ws"; ws.mkdir()
-        monkeypatch.setattr(it, "OPENCLAW_WORKSPACE_PATH", ws)
+        monkeypatch.setattr("servers.multimodal_vision.workspace_copy.OPENCLAW_WORKSPACE_PATH", ws)
         from PIL import Image
         img = Image.new("RGB", (10, 10), color="red")
         src = tmp_path / "img.png"; img.save(str(src))
@@ -271,8 +272,8 @@ class TestCopyToWorkspace:
         assert r["copied"] and "mcp-cache" in r["image_path"].replace("\\", "/")
 
     def test_no_workspace_copied_false(self, tmp_path, monkeypatch):
-        from servers import image_tools as it
-        monkeypatch.setattr(it, "OPENCLAW_WORKSPACE_PATH", None)
+        from servers import multimodal_vision as it
+        monkeypatch.setattr("servers.multimodal_vision.workspace_copy.OPENCLAW_WORKSPACE_PATH", None)
         from PIL import Image
         img = Image.new("RGB", (10, 10), color="red")
         src = tmp_path / "img.png"; img.save(str(src))
@@ -280,9 +281,9 @@ class TestCopyToWorkspace:
         assert r["success"] and not r["copied"]
 
     def test_same_source_overwrites(self, tmp_path, monkeypatch):
-        from servers import image_tools as it
+        from servers import multimodal_vision as it
         ws = tmp_path / "ws"; ws.mkdir()
-        monkeypatch.setattr(it, "OPENCLAW_WORKSPACE_PATH", ws)
+        monkeypatch.setattr("servers.multimodal_vision.workspace_copy.OPENCLAW_WORKSPACE_PATH", ws)
         from PIL import Image
         img = Image.new("RGB", (10, 10), color="red")
         src = tmp_path / "img.png"; img.save(str(src))
@@ -291,9 +292,9 @@ class TestCopyToWorkspace:
         assert r1["image_path"] == r2["image_path"]
 
     def test_different_dirs_no_conflict(self, tmp_path, monkeypatch):
-        from servers import image_tools as it
+        from servers import multimodal_vision as it
         ws = tmp_path / "ws"; ws.mkdir()
-        monkeypatch.setattr(it, "OPENCLAW_WORKSPACE_PATH", ws)
+        monkeypatch.setattr("servers.multimodal_vision.workspace_copy.OPENCLAW_WORKSPACE_PATH", ws)
         d1 = tmp_path / "d1"; d1.mkdir()
         d2 = tmp_path / "d2"; d2.mkdir()
         from PIL import Image

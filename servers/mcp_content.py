@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 from servers.mcp_instance import mcp
 from servers.eda.simulation_components import _load_catalog
 from servers.eda.config import EDA_GRPC_SERVER
-from servers.image_tools import OPENCLAW_WORKSPACE_PATH
+from servers.multimodal_vision import OPENCLAW_WORKSPACE_PATH
 
 load_dotenv()
 

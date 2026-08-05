@@ -40,6 +40,10 @@ OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace  # copy_image_to_workspace �
 LLM_API_KEY=sk-xxx                   # 可选：聊天 AI 功能
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
+# 可选：图片视觉分析（配置三项后自动开启）
+VISION_API_KEY=
+VISION_BASE_URL=
+VISION_MODEL=
 ```
 
 > 留空的字段走自动检测(除OPENCLAW_WORKSPACE)，一般只需确认 `EDA_GRPC_SERVER` 正确。
@@ -127,7 +131,7 @@ http://127.0.0.1:50026/health
 
 ## OpenClaw 图片显示
 
-`show_image` 始终可用，返回 MCP ImageContent。`copy_image_to_workspace` 仅在 `OPENCLAW_WORKSPACE` 有效时注册，复制到 `media/edi/`，显示由 OpenClaw Agent 消息工具负责。
+`show_image` 始终可用，返回 MCP ImageContent。`analyze_image` 调用视觉模型分析图片（配置 VISION_API_KEY 后自动开启，仅用户明确要求时使用，会上传到第三方）。`copy_image_to_workspace` 仅在 `OPENCLAW_WORKSPACE` 有效时注册。
 
 > 不需要修改 `openclaw.json`，不需要 TOOLS.md，不需要 `[embed]`。
 
@@ -141,18 +145,31 @@ http://127.0.0.1:50026/health
 
 **端口被占用？**
 
+MCP 服务默认监听 50026，如果端口已被上一个未退出的进程占用会导致启动失败。
+
+1. 查找占用端口的进程：
 ```powershell
 netstat -ano | findstr 50026
-taskkill -f -pid <PID>
+```
+输出示例：`TCP  127.0.0.1:50026  0.0.0.0:0  LISTENING  12345`
+
+2. 最后一列 `12345` 就是 PID，强制结束：
+```powershell
+taskkill -f -pid 12345
+```
+
+3. 如果是 EXE 打包版，也可以直接按进程名杀：
+```powershell
+taskkill -f -im edi_mcp_server.exe
 ```
 
 **gRPC 未就绪？**
 
-确认 EDI 已启动且 50055 在监听：
-
+确认 EDI 已启动且 50055 在监听。检查方法同上：
 ```powershell
 netstat -ano | findstr 50055
 ```
+没有 LISTENING 状态说明 EDI 未启动或 gRPC 服务未开启。
 
 **图片显示"不在聊天中显示"？**
 
@@ -160,7 +177,7 @@ netstat -ano | findstr 50055
 
 **图片显示白屏或 Outside allowed folders？**
 
-不要使用 `[embed]` 或直接发送本地路径。让 Agent 调用 `show_image`（返回 ImageContent）或 `copy_image_to_workspace`（复制到工作区 media/edi/）。
+不要使用 `[embed]` 或直接发送本地路径。显示图片用 `show_image`，分析图片内容用 `analyze_image`。
 
 **如何停止服务？**
 

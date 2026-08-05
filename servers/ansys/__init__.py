@@ -5,10 +5,10 @@ project_manage.py   工程管理（open / close / launch）
 run_analysis.py     异步仿真（单 Worker 队列）
 """
 
-from servers.ansys.project_manage import open_hfss_project, close_hfss_project, launch_aedt
+from servers.ansys.project_manage import open_hfss_project, close_hfss_project, launch_aedt, get_hfss_project_info
 from servers.ansys.run_analysis import start_hfss_analysis_async, get_hfss_analysis_status
 
 __all__ = [
-    "open_hfss_project", "close_hfss_project", "launch_aedt",
+    "open_hfss_project", "close_hfss_project", "launch_aedt", "get_hfss_project_info",
     "start_hfss_analysis_async", "get_hfss_analysis_status",
 ]
