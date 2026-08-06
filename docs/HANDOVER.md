@@ -15,20 +15,19 @@ D:\GitLabCode\mcp-grpc
 ```
 proto/                  # protobuf 协议文件
 servers/
-  mcp_instance.py        # 全局 FastMCP 实例
+  __init__.py            # 全局 FastMCP 实例 + 版本号
   registry_server.py     # 工具注册 + Web 路由注册
   runtime_config.py       # 运行时配置（端口/地址）
   settings.py             # 统一配置加载
-  multimodal_vision/      # 图片工具（show_image + copy_image_to_workspace + analyze_image）
+  multimodal_vision/      # 图片 + 视觉分析 + 文档工具
   report/                 # 仿真报告生成
-  document_tools.py       # 文档工具（临时链接 + 本地打开）
   eda/                   # EDI 工程工具（25 个）
     __init__.py           # 公共 API + 工具清单
     config.py             # 配置 + ProjectReader + S-expression
     grpc_client.py        # gRPC 通信层（FetchEvent → PerformAction）
     project_manage.py     # 工程管理（7 工具）
     simulation.py         # 仿真（7 工具）
-    simulation_components.py  # 仿真器件（7 工具）
+    simulation_components.py  # 仿真器件（8 工具）
     simulation_component_catalog.json  # 参数目录 v2.0
     design_export.py      # 网表/截图（2 工具）
     model_replace.py      # 模型替换（1 工具）
@@ -62,11 +61,11 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 
 PyPI: https://pypi.org/project/edi-mcp/
 
-## MCP 工具清单（39 个，配置 OPENCLAW_WORKSPACE 后 40 个）
+## MCP 工具清单（启动时动态统计，配置 OPENCLAW_WORKSPACE 后多 1 个）
 
 **工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary, analyze_variables
 
-**仿真器件**：get_simulation_component_schema, list_simulation_components, create_simulation_component, update_simulation_component, delete_simulation_component, set_component_active_state, generate_schematic_from_netlist
+**仿真器件**：get_simulation_component_schema, list_simulation_components, create_simulation_component, update_simulation_component, delete_simulation_component, set_component_active_state, generate_schematic_from_netlist, replace_port_component
 
 **仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, list_eda_tasks, simulate_netlist, simulate_netlist_with_ads
 
@@ -153,11 +152,11 @@ powershell -File scripts/build.ps1
 
 ## 工具注册机制
 
-所有工具函数为纯函数（无 MCP 装饰器），定义在 `servers/eda/*.py` 中，由 `servers/registry_server.py` 统一导入并注册到 FastMCP 实例。`servers/eda/__init__.py` 作为公共 API 入口 re-export 所有工具函数。
+所有工具函数通过 `@mcp.tool()` 装饰器定义在 `servers/` 各子包中（eda/、ansys/、turbocharts/、multimodal_vision/、report/），由 `servers/registry_server.py` 统一导入触发注册。各子包的 `__init__.py` 作为公共 API re-export 所有工具函数。
 
 ```
-project_manage.py  ->  __init__.py  ->  registry_server.py  ->  start_servers.py
-  (定义纯函数)          (re-export)      (mcp.tool() 注册)      (解析参数, 启动)
+project_manage.py  ->  eda/__init__.py  ->  registry_server.py  ->  start_servers.py
+  (定义 @mcp.tool())     (re-export)           (import 触发注册)        (解析参数, 启动)
 ```
 
 ## 扩展开发
@@ -192,7 +191,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 18. 打包时自动过滤 LLM_API_KEY 等敏感配置，强制 MCP_TRANSPORT=sse
 19. ANSYS COM 支持多 ProgID 回退（AnsoftHfss.HfssScriptInterface / Ansoft.ElectronicsDesktop）
 20. AEDT 工程锁文件管理：打开前检查/清理失效锁，关闭后安全删除，PID 活跃时绝不删除
-21. `/tools/list` 端点返回全部 MCP 工具列表（39/40 个），`chat_client.html` 动态加载面板
+21. `/tools/list` 端点返回全部 MCP 工具列表（40/41 个），`chat_client.html` 动态加载面板
 22. EXE 使用 `exclude_binaries=True`，DLL/Pyd 统一放 `_internal/`，不再重复打包（预计减 45~50 MB）
 23. `matplotlib.use("Agg")` 必须在 `import matplotlib.pyplot` 之前调用，否则 GUI 后端被意外加载
 24. UPX 压缩已关闭（某些原生 DLL 压缩后兼容性问题），目录模式依赖 `_internal/` 不可单独分发 EXE
@@ -208,6 +207,6 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 ## 维护人
 
 - 负责人：--
-- 更新时间：2026-08-05
+- 更新时间：2026-08-06
 
 

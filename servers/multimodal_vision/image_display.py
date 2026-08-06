@@ -15,7 +15,8 @@ from mcp.types import ImageContent, TextContent
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 
-from servers.mcp_instance import mcp
+from servers import mcp
+from servers.runtime_config import get_server_base_url
 from servers.multimodal_vision.validators import validate_image_path
 
 load_dotenv()
@@ -85,7 +86,6 @@ def show_image(image_path: str) -> list[Any]:
 # ═══════════════════════════════════════════════════════════
 
 def _base_url() -> str:
-    from servers.runtime_config import get_server_base_url
     return get_server_base_url()
 
 

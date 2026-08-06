@@ -33,7 +33,7 @@ from typing import Any
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
 from servers.eda.config import validate_file, validate_project_path
-from servers.mcp_instance import mcp
+from servers import mcp
 
 # -- 异步仿真任务注册表 --
 _sim_tasks: dict[str, dict] = {}
@@ -269,7 +269,8 @@ def get_simulation_async_status(task_id: str) -> dict[str, Any]:
         return {
             "success": False,
             "completed": True,
-            "task_success": False,
+            "task_success": None,
+            "outcome_known": False,
             "error_code": "TASK_NOT_FOUND",
             "task_id": task_id,
             "status": "UNKNOWN",
@@ -280,10 +281,18 @@ def get_simulation_async_status(task_id: str) -> dict[str, Any]:
 
     completed = _task_completed(task)
 
+    gprc_outcome_known = bool(
+        completed and task.get("result") is not None
+        and isinstance(task["result"], dict)
+        and task["result"].get("outcome_known", False)
+    )
+    gprc_task_success = task["result"].get("task_success") if gprc_outcome_known else None
+
     return {
         "success": True,
         "completed": completed,
-        "task_success": task["status"] == "SUCCEEDED" if completed else None,
+        "task_success": gprc_task_success,
+        "outcome_known": gprc_outcome_known,
         "task_id": task_id,
         "client_uuid": task["client_uuid"],
         "status": task["status"],
@@ -312,7 +321,8 @@ def get_simulation_async_result(task_id: str) -> dict[str, Any]:
         return {
             "success": False,
             "completed": True,
-            "task_success": False,
+            "task_success": None,
+            "outcome_known": False,
             "error_code": "TASK_NOT_FOUND",
             "task_id": task_id,
             "status": "UNKNOWN",

@@ -16,8 +16,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from servers.eda.config import TURBOCHARTS_PATH
+from servers.runtime_config import build_file_link
 from servers.turbocharts.config import run_turbocharts
-from servers.mcp_instance import mcp
+from servers import mcp
 
 
 @mcp.tool()
@@ -59,6 +60,14 @@ def compare_simulation_results(
     if n < 2 or n > 8:
         return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "result_paths 需要 2-8 个文件"}
 
+    if alignment not in ("intersection", "interpolation"):
+        return {"success": False, "error_code": "INVALID_PARAMETERS",
+                "message": "alignment 必须是 intersection 或 interpolation"}
+
+    if reference_index < 0 or reference_index >= n:
+        return {"success": False, "error_code": "INVALID_PARAMETERS",
+                "message": f"reference_index={reference_index} 超出范围（0-{n - 1}）"}
+
     for rp in result_paths:
         if not Path(rp).is_file():
             return {"success": False, "error_code": "FILE_NOT_FOUND", "message": f"RAW 文件不存在: {rp}"}
@@ -67,6 +76,13 @@ def compare_simulation_results(
         labels = [Path(rp).stem for rp in result_paths]
     if len(labels) != n:
         return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "labels 数量与 result_paths 不一致"}
+    if not all(isinstance(lb, str) for lb in labels):
+        return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "labels 每个元素必须是字符串"}
+
+    # 规范化输出路径
+    img_path = str(Path(img_path).expanduser().resolve())
+    if csv_path:
+        csv_path = str(Path(csv_path).expanduser().resolve())
 
     # Step 1: export each RAW to temp CSV (serialized via runner)
     dep_key = dependency
@@ -108,11 +124,18 @@ def compare_simulation_results(
         if not common_x:
             return {"success": False, "error_code": "INVALID_RAW_DATA", "message": "所有 RAW 文件没有共同的依赖轴数据点"}
         for i, (xv, yv) in enumerate(raw_curves):
-            x_to_y = dict(zip(xv, yv))
-            curves_aligned[i] = [x_to_y.get(p, 0.0) for p in common_x]
+            # 使用 last-wins 去重：重复 X 值取最后一个（与 zip→dict 行为一致）
+            x_to_y: dict[float, float] = {}
+            for x, y in zip(xv, yv):
+                x_to_y[x] = y
+            curves_aligned[i] = [x_to_y[float(p)] for p in common_x]
     else:
-        # interpolation
+        # interpolation — 检查参考 X 轴是否严格递增（np.interp 要求）
         ref_x, ref_y = raw_curves[reference_index]
+        if not all(ref_x[j] < ref_x[j + 1] for j in range(len(ref_x) - 1)):
+            return {"success": False, "error_code": "INVALID_RAW_DATA",
+                    "message": f"interpolation 模式要求参考文件 X 轴严格递增，"
+                               f"但 {labels[reference_index]} 中存在无序或重复的依赖轴值"}
         common_x = ref_x
         curves_aligned[reference_index] = ref_y
         for i, (xv, yv) in enumerate(raw_curves):
@@ -171,7 +194,7 @@ def compare_simulation_results(
                 f.write(",".join(row) + "\n")
         csv_ok = Path(csv_path).exists()
 
-    return {
+    result = {
         "success": img_ok,
         "image_path": img_path,
         "csv_path": csv_path if csv_ok else "",
@@ -180,6 +203,9 @@ def compare_simulation_results(
         "series": series,
         "metrics": metrics,
     }
+    if img_ok and result.get("success"):
+        result.update(build_file_link(img_path, "打开对比图"))
+    return result
 
 
 def _read_curve_csv_xy(path: str) -> tuple[list[float], list[float]]:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import psutil
 import subprocess
 import time
 from pathlib import Path
@@ -16,7 +17,7 @@ from servers.ansys.config import (
     _attach_aedt, logger,
 )
 from servers.eda.config import validate_file
-from servers.mcp_instance import mcp
+from servers import mcp
 
 _OPEN_PROJECT_PATHS: dict[str, str] = {}  # project_name -> project_path
 
@@ -208,7 +209,6 @@ def close_hfss_project(
 
         pid = _LAST_PID
         try:
-            import psutil
             proc = psutil.Process(pid)
             if not proc.is_running() or proc.name().lower() != "ansysedt.exe":
                 _LAST_PID = None

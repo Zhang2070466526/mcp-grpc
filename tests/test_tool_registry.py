@@ -26,6 +26,7 @@ def test_all_tools_registered():
         "list_simulation_components", "create_simulation_component",
         "update_simulation_component", "delete_simulation_component",
         "generate_schematic_from_netlist", "set_component_active_state",
+        "replace_port_component",
         "open_hfss_project", "close_hfss_project", "launch_aedt", "get_hfss_project_info",
         "start_hfss_analysis_async", "get_hfss_analysis_status",
     ]
@@ -57,8 +58,76 @@ def test_single_instance_check():
         s.close()
 
 
+def test_chat_tool_map_consistency():
+    """CHAT_TOOL_MAP 的每个工具都已在 MCP 注册，且与 CHAT_TOOLS_SCHEMA 一致。"""
+    from start_servers import mcp
+    mcp_tools = set(t.name for t in mcp._tool_manager._tools.values())
+
+    from servers.chat.service import CHAT_TOOL_MAP, CHAT_TOOLS_SCHEMA
+    schema_names = set(t["function"]["name"] for t in CHAT_TOOLS_SCHEMA)
+    map_names = set(CHAT_TOOL_MAP.keys())
+
+    # MAP ⊂ MCP
+    only_in_map = map_names - mcp_tools
+    assert not only_in_map, f"Chat MAP 中有未在 MCP 注册的工具: {sorted(only_in_map)}"
+
+    # MAP ↔ SCHEMA 必须一致
+    only_in_map_vs_schema = map_names - schema_names
+    only_in_schema = schema_names - map_names
+    assert not only_in_map_vs_schema, f"MAP 中有 SCHEMA 没有的工具: {sorted(only_in_map_vs_schema)}"
+    assert not only_in_schema, f"SCHEMA 中有 MAP 没有的工具: {sorted(only_in_schema)}"
+
+
+def test_mcp_only_tools_are_expected():
+    """MCP 独有的工具应该是已知的非 Chat 工具（同步仿真、ANSYS COM 等）。"""
+    from start_servers import mcp
+    mcp_tools = set(t.name for t in mcp._tool_manager._tools.values())
+
+    from servers.chat.service import CHAT_TOOL_MAP
+    chat_tools = set(CHAT_TOOL_MAP.keys())
+
+    mcp_only = mcp_tools - chat_tools
+    expected = {
+        "simulate_project",           # 同步阻塞
+        "simulate_netlist",           # 需要本地网表文件
+        "simulate_netlist_with_ads",  # 需要 ADS 安装
+        "open_hfss_project",          # ANSYS COM 依赖
+        "close_hfss_project",
+        "launch_aedt",
+        "get_hfss_project_info",
+        "start_hfss_analysis_async",
+        "get_hfss_analysis_status",
+    }
+    unexpected = mcp_only - expected
+    assert not unexpected, (
+        f"MCP 独有的非预期工具（需要在 Chat 中注册或添加到 expected 列表）: "
+        f"{sorted(unexpected)}"
+    )
+
+
+def test_tool_count_dynamic():
+    """工具数量应为动态统计，不为零即可。"""
+    from start_servers import mcp
+    count = len(mcp._tool_manager._tools)
+    assert count > 30, f"工具数量异常少: {count}"
+
+
+def test_destructive_tools_in_map():
+    """破坏性工具必须同时在 MCP 和 Chat MAP 中。"""
+    from start_servers import mcp
+    mcp_tools = set(t.name for t in mcp._tool_manager._tools.values())
+
+    from servers.chat.service import _DESTRUCTIVE_CHAT_TOOLS
+    missing = _DESTRUCTIVE_CHAT_TOOLS - mcp_tools
+    assert not missing, f"破坏性工具未在 MCP 注册: {sorted(missing)}"
+
+
 if __name__ == "__main__":
     test_all_tools_registered()
     test_grpc_timeout_limits()
     test_single_instance_check()
+    test_chat_tool_map_consistency()
+    test_mcp_only_tools_are_expected()
+    test_tool_count_dynamic()
+    test_destructive_tools_in_map()
     print("test_tool_registry.py: all passed")

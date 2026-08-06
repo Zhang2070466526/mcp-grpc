@@ -29,8 +29,10 @@ if getattr(_sys, "frozen", False):
 else:
     load_dotenv()
 
-EDA_GRPC_SERVER = os.getenv("EDA_GRPC_SERVER", "127.0.0.1:50055")
-MCP_TRANSPORT = os.getenv("MCP_TRANSPORT")
+from servers.settings import get_settings as _get_settings
+_settings = _get_settings()
+EDA_GRPC_SERVER = _settings.eda_grpc_server
+MCP_TRANSPORT = _settings.mcp_transport if _settings.mcp_transport else None
 
 # ── 应用根目录检测 ──
 
@@ -55,8 +57,8 @@ def _find_first(*candidates: str) -> str:
     return str(_PARENT / candidates[0])
 
 
-EDI_PATH = os.getenv("EDI_PATH") or _find_first(*_EDI_CANDIDATES)
-TURBOCHARTS_PATH = os.getenv("TURBOCHARTS_PATH") or _find_first(*_TC_CANDIDATES)
+EDI_PATH = _settings.edi_path or _find_first(*_EDI_CANDIDATES)
+TURBOCHARTS_PATH = _settings.turbocharts_path or _find_first(*_TC_CANDIDATES)
 
 
 def validate_file(path: str, extensions: tuple[str, ...] = ()) -> str:

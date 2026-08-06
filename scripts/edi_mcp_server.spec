@@ -19,7 +19,7 @@ a = Analysis(
     ],
     hiddenimports=[
         # MCP 核心
-        'servers.mcp_instance',
+        'servers',
         'servers.registry_server',
 
         # Chat 模块
@@ -53,18 +53,17 @@ a = Analysis(
         'servers.ansys.project_manage',
         'servers.ansys.run_analysis',
 
-        # 图片工具
+        # 图片 / 视觉 / 文档工具
         'servers.multimodal_vision',
         'servers.multimodal_vision.image_display',
         'servers.multimodal_vision.workspace_copy',
         'servers.multimodal_vision.vision_analyzer',
+        'servers.multimodal_vision.document',
+        'servers.multimodal_vision.validators',
 
         # 报告渲染
         'servers.report',
         'servers.report.generator',
-
-        # 文档工具
-        'servers.document_tools',
 
         # 运行时配置
         'servers.runtime_config',

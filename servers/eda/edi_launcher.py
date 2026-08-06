@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from servers.eda.config import EDA_GRPC_SERVER, EDI_PATH
-from servers.mcp_instance import mcp
+from servers import mcp
 
 
 @mcp.tool()

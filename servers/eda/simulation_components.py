@@ -1,4 +1,4 @@
-r"""仿真器件管理工具 — 协议 v2。
+r"""仿真器件管理工具 — 工具 API v3，gRPC 协议 v2。
 
 get_simulation_component_schema  查询器件支持的参数、类型、单位和权限
 list_simulation_components       查询工程中的仿真器件及其参数
@@ -33,7 +33,7 @@ from servers.eda.config import (
     validate_project_path,
 )
 from servers.eda.grpc_client import call_grpc
-from servers.mcp_instance import mcp
+from servers import mcp
 
 _logger = logging.getLogger("sim_components")
 
@@ -362,9 +362,12 @@ def _find_component_by_instance(
 
     try:
         reader = ProjectReader(project_path)
-    except (FileNotFoundError, ValueError) as exc:
-        return None, _component_error("COMPONENT_NOT_FOUND",
-                                       f"无法读取工程: {exc}")
+    except FileNotFoundError:
+        return None, _component_error("PROJECT_NOT_FOUND",
+                                       "工程文件不存在")
+    except ValueError:
+        return None, _component_error("INVALID_PROJECT_PATH",
+                                       "project_path 必须是 .epp 文件")
 
     matches: list[dict] = []
     for sname in reader.list_schematics() or []:
@@ -457,7 +460,7 @@ def _component_error(code: str, message: str, **extra) -> dict:
 
 
 def _find_sim_components(project_path: str, component_type: str = "") -> list[dict]:
-    """Local lookup of simulation components from saved project files."""
+    """Local lookup of all components from saved project files."""
     reader = ProjectReader(project_path)
     results: list[dict] = []
     for sname in reader.list_schematics() or []:
@@ -466,18 +469,21 @@ def _find_sim_components(project_path: str, component_type: str = "") -> list[di
             continue
         for comp in parse_components(raw):
             ct = comp.get("type", "")
-            if ct not in _COMPONENT_TYPES:
-                continue
             if component_type and ct != component_type:
                 continue
-            # Use parsed paramsinfo directly — don't double-parse
             params = comp.get("paramsinfo", {})
+            # SP/HB/XDB: format with wire→public name mapping
+            # Other types (Var, Sweep, P_nToneG, etc.): raw paramsinfo
+            if ct in _COMPONENT_TYPES:
+                formatted = _format_component_parameters(ct, params)
+            else:
+                formatted = params
             results.append({
                 "component_type": ct,
                 "instance_name": comp.get("name", ""),
                 "component_id": comp.get("component_id", ""),
                 "schematic": sname,
-                "parameters": _format_component_parameters(ct, params),
+                "parameters": formatted,
             })
     return results
 
@@ -491,10 +497,10 @@ def get_simulation_component_schema(
     component_type: str,
     parameter_name: str = "",
 ) -> dict[str, Any]:
-    """查询仿真控件支持的参数、值类型、单位和创建/更新权限。
+    """查询已建模器件类型的参数 Schema 和权限。
 
-    创建或修改控件前优先调用，了解哪些参数可用、格式要求和权限限制。
-    返回中包含 schema_version、protocol_version 和 parameter_patterns。
+    仅支持 SParameter / HarmonicBalance / XDB 的参数目录。
+    其他类型可通过 list_simulation_components 读取但无本地 Schema。
 
     Args:
         component_type: "SParameter" / "HarmonicBalance" / "XDB"。
@@ -543,25 +549,36 @@ def list_simulation_components(
     project_path: str,
     component_type: str = "",
 ) -> dict[str, Any]:
-    """查询工程中已有的仿真器件及其当前参数。
+    """读取已保存工程中的全部可解析器件及参数。
 
-    适合以下场景：查看当前控件配置、确认实例名后再更新或删除、
-    查找多音参数的实际值。
+    可列出所有器件（SP/HB/XDB/Var/Sweep/P_nToneG/TermG 等）。
+    已知类型做 wire→public 映射；其他类型返回原始 paramsinfo。
+    读取磁盘文件，EDI 未保存的修改不会反映到结果中。
+
+    修改器件后建议先保存工程再调用本工具确认。
 
     Args:
         project_path: .epp 工程文件绝对路径。
         component_type: 按类型过滤（可选）。
     """
-    if component_type and component_type not in _COMPONENT_TYPES:
-        return {"success": False,
-                "error_code": "UNSUPPORTED_COMPONENT_TYPE",
-                "message": f"不支持的器件类型: {component_type}",
-                "supported_component_types": sorted(_COMPONENT_TYPES)}
-    reader = ProjectReader(project_path)
+    try:
+        reader = ProjectReader(project_path)
+    except FileNotFoundError:
+        return {"success": False, "error_code": "PROJECT_NOT_FOUND",
+                "message": "工程文件不存在"}
+    except ValueError:
+        return {"success": False, "error_code": "INVALID_PROJECT_PATH",
+                "message": "project_path 必须是 .epp 文件"}
+    components = _find_sim_components(project_path, component_type)
+    type_counts: dict[str, int] = {}
+    for c in components:
+        type_counts[c["component_type"]] = type_counts.get(c["component_type"], 0) + 1
     return {
         "success": True,
         "project_path": str(reader.epp_path.resolve()),
-        "components": _find_sim_components(project_path, component_type),
+        "count": len(components),
+        "component_type_counts": type_counts,
+        "components": components,
     }
 
 
@@ -573,42 +590,28 @@ def list_simulation_components(
 def create_simulation_component(
     project_path: str,
     component_type: str,
-    parameters: dict | None = None,
     timeout_seconds: int = 120,
 ) -> dict[str, Any]:
-    """新增一个仿真器件。每次调用都会创建新实例，服务端自动分配实例名。
+    """使用 EDI 器件工厂默认参数创建器件。
 
-    配置参数前建议先调用 get_simulation_component_schema 了解可用参数。
-    未提供的参数使用 EDI 默认值。
+    不传自定义参数，创建后根据返回的 instance_name 调用 update 设参。
+    component_type 是否支持由 EDI 服务决定，MCP 不做类型限制。
 
     Args:
         project_path: .epp 工程文件绝对路径。
-        component_type: "SParameter" / "HarmonicBalance" / "XDB"。
-        parameters: 参数字典（可选，为空则全部使用默认值）。
+        component_type: EDI 器件工厂类型名。
         timeout_seconds: 最长等待秒数。
     """
     resolved = validate_project_path(project_path)
-
-    if component_type not in _COMPONENT_TYPES:
+    ct = component_type.strip()
+    if not ct:
         return {"success": False,
-                "error_code": "UNSUPPORTED_COMPONENT_TYPE",
-                "message": f"不支持的器件类型: {component_type}",
-                "supported_component_types": sorted(_COMPONENT_TYPES)}
-
-    params = {} if parameters is None else parameters
-    wire_params, error = _prepare_parameters(
-        component_type, params,
-        operation="create",
-        allow_empty=True,
-    )
-    if error:
-        return error
+                "error_code": "INVALID_PARAMETERS",
+                "message": "component_type 不能为空"}
 
     return call_grpc(
         ecserver_pb2.CREATE_SIMULATION_COMPONENT,
-        {"project_path": resolved,
-         "component_type": component_type,
-         "parameters": wire_params},
+        {"project_path": resolved, "component_type": ct},
         timeout_seconds,
         max_timeout_seconds=300,
     )
@@ -626,11 +629,11 @@ def update_simulation_component(
     component_type: str = "",
     timeout_seconds: int = 120,
 ) -> dict[str, Any]:
-    """按实例名更新仿真器件参数。只更新传入的参数，其余保持原值。
+    """按实例名更新器件参数。
 
+    SParameter/HarmonicBalance/XDB：执行 MCP 参数校验和 wire 转换。
+    其他器件类型：基本格式检查后透传给 EDI 校验。
     建议先调用 list_simulation_components 确认实例名和类型。
-    如果提供 component_type，MCP 会进行参数校验和 wire 转换；
-    如果不提供，MCP 会尝试从已保存工程自动识别。
 
     示例：
       {"project_path": "...", "instance_name": "HB1",
@@ -670,11 +673,6 @@ def update_simulation_component(
     elif explicit_type:
         # Not on disk but explicit type given — e.g. newly created, not yet saved
         ct = explicit_type
-        if ct not in _COMPONENT_TYPES:
-            return {"success": False,
-                    "error_code": "UNSUPPORTED_COMPONENT_TYPE",
-                    "message": f"不支持的控件类型: {ct}",
-                    "supported_component_types": sorted(_COMPONENT_TYPES)}
 
     else:
         return {"success": False,
@@ -684,14 +682,26 @@ def update_simulation_component(
                     "请先保存工程，或显式提供 component_type"
                 )}
 
-    # Always validate + wire-convert with known type
-    wire_params, prepare_error = _prepare_parameters(
-        ct, parameters,
-        operation="update",
-        allow_empty=False,
-    )
-    if prepare_error:
-        return prepare_error
+    # Catalog types (SP/HB/XDB): do wire-conversion via _prepare_parameters
+    # Other types (Sweep, P_nToneG, Var, etc.): send as-is, EDI validates
+    if ct in _COMPONENT_TYPES:
+        wire_params, prepare_error = _prepare_parameters(
+            ct, parameters, operation="update", allow_empty=False,
+        )
+        if prepare_error:
+            return prepare_error
+    else:
+        # Basic validation — EDI handles business rules for non-catalog types
+        if not isinstance(parameters, dict) or not parameters:
+            return {"success": False,
+                    "error_code": "INVALID_PARAMETERS",
+                    "message": "parameters 必须是非空对象"}
+        for k, v in parameters.items():
+            if not isinstance(v, dict) or "value" not in v:
+                return {"success": False,
+                        "error_code": "INVALID_PARAMETERS",
+                        "message": f"参数 {k} 必须是 {{\"value\": ...}} 格式"}
+        wire_params = parameters
 
     return call_grpc(
         ecserver_pb2.UPDATE_SIMULATION_COMPONENT,
@@ -704,7 +714,61 @@ def update_simulation_component(
 
 
 # ═══════════════════════════════════════════════════════════
-# 5. delete_simulation_component
+# 5. replace_port_component
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool()
+def replace_port_component(
+    project_path: str,
+    target_instance_name: str,
+    replacement_component_type: str,
+    parameters: dict | None = None,
+    timeout_seconds: int = 300,
+) -> dict[str, Any]:
+    """将原理图中的端口器件替换为另一种类型。
+
+    目前仅支持 TermG ↔ P_nToneG 之间的替换。
+    服务端保留位置、状态和外部连线，生成新实例名。
+
+    Args:
+        project_path: .epp 工程文件绝对路径。
+        target_instance_name: 要替换的端口实例名（如 "TermG1"）。
+        replacement_component_type: 目标器件类型（TermG / P_nToneG）。
+        parameters: 可选参数字典。
+        timeout_seconds: 最长等待秒数（默认 300）。
+    """
+    resolved = validate_project_path(project_path)
+
+    if not target_instance_name.strip():
+        return {"success": False,
+                "error_code": "EMPTY_INSTANCE_NAME",
+                "message": "target_instance_name 不能为空"}
+
+    rct = replacement_component_type.strip()
+    if rct not in ("TermG", "P_nToneG"):
+        return {"success": False,
+                "error_code": "UNSUPPORTED_COMPONENT_TYPE",
+                "message": f"replacement_component_type 仅支持 TermG / P_nToneG"}
+
+    params = {} if parameters is None else parameters
+    if not isinstance(params, dict):
+        return {"success": False,
+                "error_code": "INVALID_PARAMETERS",
+                "message": "parameters 必须是对象"}
+
+    return call_grpc(
+        ecserver_pb2.REPLACE_PORT_COMPONENT,
+        {"project_path": resolved,
+         "target_instance_name": target_instance_name.strip(),
+         "replacement_component_type": rct,
+         "parameters": params},
+        timeout_seconds,
+        max_timeout_seconds=600,
+    )
+
+
+# ═══════════════════════════════════════════════════════════
+# 6. delete_simulation_component
 # ═══════════════════════════════════════════════════════════
 
 @mcp.tool()

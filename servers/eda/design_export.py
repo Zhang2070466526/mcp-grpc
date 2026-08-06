@@ -22,7 +22,8 @@ from typing import Any
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
 from servers.eda.config import validate_project_path
-from servers.mcp_instance import mcp
+from servers.runtime_config import build_file_link
+from servers import mcp
 
 
 @mcp.tool()
@@ -74,6 +75,7 @@ def capture_schematic(
         max_timeout_seconds=300,
     )
     img_ok = Path(img_resolved).is_file()
-    if img_ok:
+    if result.get("success") and img_ok:
         result["img_generated"] = True
+        result.update(build_file_link(img_resolved, "打开原理图"))
     return result

@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（39 个，配置工作区后 40 个）：
+  已注册工具（数量由实际模块加载决定，配置工作区后 +1）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -27,6 +27,7 @@
     delete_simulation_component   按实例名删除器件
     set_component_active_state    设置器件状态（NORMAL/DISABLED/SHORTED）
     generate_schematic_from_netlist  从网表生成原理图
+    replace_port_component          替换端口器件类型
 
   分析：
     export_project_netlist        查看/导出工程网表
@@ -67,7 +68,7 @@
 
 from __future__ import annotations
 
-from servers.mcp_instance import mcp  # noqa: E402 — 全局 MCP 实例
+from servers import mcp  # noqa: E402 — 全局 MCP 实例
 
 # 导入工具模块即可触发 @mcp.tool() 装饰器注册
 import servers.eda.project_manage       # noqa: F401
@@ -80,9 +81,8 @@ import servers.turbocharts.compare_results  # noqa: F401
 import servers.turbocharts.convert_raw   # noqa: F401
 import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
-import servers.multimodal_vision          # noqa: F401 — show_image + copy + analyze
+import servers.multimodal_vision          # noqa: F401 — show_image + copy + analyze + open_document + open_local_document
 import servers.report                     # noqa: F401 — generate_simulation_report
-import servers.document_tools              # noqa: F401 — open_document + open_local_document
 
 # Resources & Prompts
 import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.prompt()
@@ -90,7 +90,7 @@ import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.pr
 # Web 路由
 from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
 from servers.multimodal_vision import serve_image  # noqa: E402
-from servers.document_tools import serve_document  # noqa: E402
+from servers.multimodal_vision import serve_document  # noqa: E402
 
 mcp.custom_route("/", methods=["GET"])(ui_page)
 mcp.custom_route("/ui", methods=["GET"])(ui_page)

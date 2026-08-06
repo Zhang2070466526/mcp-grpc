@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PIL import Image
+
 # 允许的图片扩展名
 _ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 
@@ -38,7 +40,6 @@ def validate_image_content(path: Path) -> None:
         ValueError: 不是有效图片。
     """
     try:
-        from PIL import Image
         with Image.open(path) as img:
             img.verify()
     except Exception as e:

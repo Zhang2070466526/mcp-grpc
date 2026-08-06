@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json as _json
 import logging
-import os
 import time
 from pathlib import Path
 from typing import Any
@@ -12,33 +11,21 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 
-from servers.mcp_instance import mcp
+from servers import mcp
+from servers.settings import get_settings
+from servers.runtime_config import build_file_link
 
 load_dotenv()
 _logger = logging.getLogger("report.generator")
 
-# ── 配置 ──
-_REPORT_URL = os.getenv("REPORT_RENDER_URL", "http://127.0.0.1:17867/api/v1/reports/render")
-
+_settings = get_settings()
+_REPORT_URL = _settings.report_render_url
+_REPORT_TIMEOUT = _settings.report_timeout
 _ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 _EXPECTED_SPEC_COLUMNS = 7
 _MAX_CELL_LENGTH = 10_000
 _MAX_FIELD_LENGTHS = {"description": 50_000, "conclusion": 50_000}
-
-
-def _read_int_env(name: str, default: int, minimum: int, maximum: int) -> int:
-    raw = os.getenv(name, "").strip()
-    if not raw:
-        return default
-    try:
-        return max(minimum, min(int(raw), maximum))
-    except ValueError:
-        _logger.warning("%s is invalid; using %d", name, default)
-        return default
-
-
-_REPORT_TIMEOUT = _read_int_env("REPORT_RENDER_TIMEOUT_SECONDS", 45, 5, 120)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -279,7 +266,10 @@ def generate_simulation_report(
     # 10. Call report service
     t0 = time.monotonic()
     body = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    _logger.info("REPORT_REQ: %s", body.decode("utf-8"))
+    _logger.info("report_render request: file_type=%s output_path=%s request_size=%d",
+                 file_type, str(expected_output), len(body))
+    if _logger.isEnabledFor(logging.DEBUG):
+        _logger.debug("REPORT_REQ payload: %s", body.decode("utf-8"))
     try:
         with httpx.Client(timeout=effective_timeout) as client:
             resp = client.post(
@@ -344,7 +334,7 @@ def generate_simulation_report(
     if schematic_missing:
         warnings.append("原理图文件未找到，已跳过链路拓扑章节")
 
-    return {
+    result = {
         "success": True,
         "file_path": str(expected_output),
         "file_type": data.get("file_type", file_type),
@@ -357,6 +347,8 @@ def generate_simulation_report(
         "warnings": warnings,
         "output_verified": True,
     }
+    result.update(build_file_link(str(expected_output), f"打开{file_type.upper()}报告"))
+    return result
 
 
 # ═══════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-r"""MCP Resources & Prompts — 协议 v2。
+r"""MCP Resources & Prompts。
 
 Resources（只读上下文，客户端主动获取）:
   edi://service/overview                 服务能力概览
@@ -14,11 +14,12 @@ Prompts（可复用工作流，用户主动选择）:
 from __future__ import annotations
 
 import os as _os
+from pathlib import Path as _Path
 from typing import Any
 
 from dotenv import load_dotenv
 
-from servers.mcp_instance import mcp
+from servers import mcp
 from servers.eda.simulation_components import _load_catalog
 from servers.eda.config import EDA_GRPC_SERVER
 from servers.multimodal_vision import OPENCLAW_WORKSPACE_PATH
@@ -50,7 +51,8 @@ def resource_service_overview() -> dict[str, Any]:
     return {
         "server_name": "EDI MCP",
         "server_version": SERVER_VERSION,
-        "protocol_version": "2",
+        "protocol_version": "2",     # gRPC 协议版本
+        "tool_api_version": "3",    # 仿真器件工具 API 版本
         "mode": "local",
         "grpc_target": grpc_host,
         "workspace_copy_enabled": workspace_enabled,
@@ -243,10 +245,8 @@ def prompt_configure_simulation_component(
         )}]
 
     ct = component_type.strip()
-    if ct not in ("SParameter", "HarmonicBalance", "XDB"):
-        return [{"role": "user", "content": (
-            f"错误：component_type 必须是 SParameter / HarmonicBalance / XDB，收到 '{component_type}'。"
-        )}]
+    if not ct:
+        return [{"role": "user", "content": "错误：component_type 不能为空。"}]
 
     if act == "update" and not instance_name.strip():
         return [{"role": "user", "content": (
@@ -308,7 +308,6 @@ def prompt_create_simulation_report(
         output_path: 输出文件绝对路径（.pdf 或 .docx）。
         overwrite: 输出文件已存在时是否覆盖。
     """
-    from pathlib import Path as _Path
     ext = _Path(output_path).suffix.lower() if output_path else ".pdf"
     file_type = ext.lstrip(".")
 

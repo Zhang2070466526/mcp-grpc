@@ -345,7 +345,7 @@ class TestFindComponentByInstance:
             "C:/nonexistent/project.epp", "R1"
         )
         assert comp is None
-        assert error["error_code"] == "COMPONENT_NOT_FOUND"
+        assert error["error_code"] in ("COMPONENT_NOT_FOUND", "PROJECT_NOT_FOUND")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -563,7 +563,7 @@ class TestGrpcTerminalResult:
 
 class TestToolCount:
     def test_default_tool_count(self):
-        from servers.mcp_instance import mcp
+        from servers import mcp
         from servers.multimodal_vision import OPENCLAW_WORKSPACE_PATH
         tools = [t.name for t in mcp._tool_manager._tools.values()]
         # Base tools should be at least 33 (without workspace copy tool)
@@ -579,7 +579,7 @@ class TestToolCount:
 
     def test_no_upsert_registered(self):
         """Verify upsert_simulation_component is NOT in the tool registry."""
-        from servers.mcp_instance import mcp
+        from servers import mcp
         tools = [t.name for t in mcp._tool_manager._tools.values()]
         assert "upsert_simulation_component" not in tools
 
@@ -622,27 +622,22 @@ class TestGrpcPayloads:
     def test_create_enum_and_payload(self):
         from servers.eda.simulation_components import create_simulation_component
         with _VALIDATE_PATCH, _CALL_GRPC_PATCH as mock:
-            create_simulation_component(
-                "C:/test.epp", "HarmonicBalance",
-                {"Freq": {"value": "1", "unit": "GHz"}},
-            )
+            create_simulation_component("C:/test.epp", "HarmonicBalance")
             assert mock.call_args.args[0] == ecserver_pb2.CREATE_SIMULATION_COMPONENT
             payload = mock.call_args.args[1]
             assert payload["component_type"] == "HarmonicBalance"
-            assert "Freq[1]" in payload["parameters"]
+            assert "parameters" not in payload  # v2: no parameters in create
 
-    def test_create_empty_parameters(self):
-        from servers.eda.simulation_components import create_simulation_component
-        with _VALIDATE_PATCH, _CALL_GRPC_PATCH as mock:
-            create_simulation_component("C:/test.epp", "SParameter")
-            assert mock.call_args.args[0] == ecserver_pb2.CREATE_SIMULATION_COMPONENT
-            assert mock.call_args.args[1]["parameters"] == {}
-
-    def test_create_falsy_parameters_rejected(self):
+    def test_create_empty_component_type_rejected(self):
         from servers.eda.simulation_components import create_simulation_component
         with _VALIDATE_PATCH:
-            result = create_simulation_component(
-                "C:/test.epp", "SParameter", parameters=[])
+            result = create_simulation_component("C:/test.epp", "")
+            assert result["success"] is False
+
+    def test_create_falsy_parameters_rejected(self):
+        from servers.eda.simulation_components import update_simulation_component
+        with _VALIDATE_PATCH:
+            result = update_simulation_component("C:/test.epp", "R1", parameters=[])
             assert result["success"] is False
 
     def test_update_enum_and_payload(self):

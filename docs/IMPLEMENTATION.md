@@ -149,7 +149,7 @@ return STREAM_DISCONNECTED
 
 ### 1.3 仿真器件参数校验
 
-`_prepare_parameters()` 是 7 个仿真器件工具共享的校验管线。它执行 11 步校验，任何一步失败都返回带 `error_code` 的结构化错误：
+`_prepare_parameters()` 是仿真器件工具共享的校验管线。它执行 11 步校验，任何一步失败都返回带 `error_code` 的结构化错误：
 
 ```
 1. 类型检查         parameters 必须是 dict（拒绝 None/[]/"" ）
@@ -223,15 +223,16 @@ QUEUED → ACCEPTED → RUNNING → SUCCEEDED / FAILED
 
 `simulate_netlist_with_ads`：直接调用 ADS 仿真控制器（`CALL_SIMULATION_CONTROLLER`）。
 
-### 1.6 仿真器件管理（协议 v2）
+### 1.6 仿真器件管理（协议 v3）
 
 | 工具 | EventType | 关键实现 |
 |---|---|---|
-| `create_simulation_component` | CREATE(11) | `_prepare_parameters(op="create", allow_empty=True)` → 校验 + wire 转换 → gRPC。每次创建新实例，EDI 返回 instance_name |
+| `create_simulation_component` | CREATE(11) | **v3 不传 parameters**。使用 EDI 工厂默认值创建，创建后根据 `instance_name` 调用 `update_simulation_component` 设参 |
 | `update_simulation_component` | UPDATE(15) | **三路类型推断**：显式 component_type > 磁盘查找 > `COMPONENT_TYPE_REQUIRED` 错误。显式类型与实际磁盘类型不一致返回 `COMPONENT_TYPE_MISMATCH` |
 | `delete_simulation_component` | DELETE(12) | **不做本地预检查**。直接由 EDI 按 instance_name 执行。通用删除，不限器件类型 |
 | `set_component_active_state` | SET_ACTIVE_STATE(14) | 状态规范化 `.strip().upper()`。确定性设置（非切换），重复调用具有幂等性 |
 | `generate_schematic_from_netlist` | GENERATE(13) | **双重确认**：`clear_before_import=true` 必须同时 `confirm_clear=true`。`confirm_clear` 不进入 gRPC payload。默认追加到 main 原理图 |
+| `replace_port_component` | REPLACE_PORT_COMPONENT(16) | payload: `project_path`, `target_instance_name`, `replacement_component_type`(TermG/P_nToneG), `parameters`。Chat 层需确认 |
 
 **update 类型推断的完整流程**：
 
@@ -799,7 +800,7 @@ workspace_enabled = OPENCLAW_WORKSPACE_PATH is not None
 
 ## 九、文档工具（2 个工具）
 
-`open_document` 和 `open_local_document` 实现在 `servers/document_tools.py`。
+`open_document` 和 `open_local_document` 实现在 `servers/multimodal_vision/document.py`。
 
 **`open_document`**：为本地 PDF/DOCX 生成临时 HTTP 链接。
 - Token 映射 `/documents/{token}`，10 分钟过期

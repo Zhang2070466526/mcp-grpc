@@ -16,13 +16,26 @@ from servers.ansys.config import (
     _attach_aedt, logger,
 )
 from servers.eda.config import validate_file
-from servers.mcp_instance import mcp
+from servers import mcp
 
 _HFSS_TASKS: dict[str, dict] = {}
 _HFSS_TASKS_LOCK = threading.RLock()
 _HFSS_QUEUE: queue.Queue = queue.Queue(maxsize=10)
 _HFSS_WORKER_STARTED = False
 _HFSS_WORKER_LOCK = threading.Lock()
+_HFSS_TASK_TTL = 7200        # 过期任务保留 2 小时
+_MAX_HFSS_TASKS = 50          # 最大任务数（含历史和排队）
+
+def _prune_hfss_tasks() -> None:
+    """清理过期的已完成/失败任务。"""
+    now = time.time()
+    with _HFSS_TASKS_LOCK:
+        expired = [
+            tid for tid, t in _HFSS_TASKS.items()
+            if t.get("finished_at") is not None and now - t["finished_at"] > _HFSS_TASK_TTL
+        ]
+        for tid in expired:
+            del _HFSS_TASKS[tid]
 
 
 def _start_hfss_worker() -> None:
@@ -82,16 +95,24 @@ def _run_hfss_analysis_task(task_id: str) -> None:
         except Exception:
             pass
 
-        final_status = "SUCCEEDED" if (result_verified and not still_running) else "UNKNOWN"
+        outcome_ok = result_verified and not still_running
+        final_status = "SUCCEEDED" if outcome_ok else "UNKNOWN"
         with _HFSS_TASKS_LOCK:
             _HFSS_TASKS[task_id].update(
                 status=final_status, result_directory=result_dir,
-                result_verified=result_verified, finished_at=time.time(),
+                result_verified=result_verified,
+                outcome_known=outcome_ok,
+                task_success=True if outcome_ok else None,
+                finished_at=time.time(),
             )
     except Exception as exc:
         logger.exception("HFSS analysis failed")
         with _HFSS_TASKS_LOCK:
-            _HFSS_TASKS[task_id].update(status="FAILED", error=str(exc), finished_at=time.time())
+            _HFSS_TASKS[task_id].update(
+                status="FAILED", error=str(exc),
+                outcome_known=True, task_success=False,
+                finished_at=time.time(),
+            )
     finally:
         pythoncom.CoUninitialize()
 
@@ -165,9 +186,15 @@ def start_hfss_analysis_async(
     task_id = f"hfss-{uuid.uuid4().hex[:12]}"
 
     with _HFSS_TASKS_LOCK:
+        _prune_hfss_tasks()
+
         if _any_hfss_running():
             return {"success": False, "status": "analysis_busy",
                     "message": "当前已有 HFSS 仿真正在运行或排队"}
+
+        if len(_HFSS_TASKS) >= _MAX_HFSS_TASKS:
+            return {"success": False, "status": "task_limit_reached",
+                    "message": f"HFSS 任务数已达上限 ({_MAX_HFSS_TASKS})，请稍后重试"}
 
         _HFSS_TASKS[task_id] = {
             "task_id": task_id, "operation": "hfss_analysis",
@@ -177,6 +204,7 @@ def start_hfss_analysis_async(
             "status": "QUEUED", "created_at": time.time(),
             "started_at": None, "finished_at": None,
             "result_directory": "", "error": "",
+            "outcome_known": False, "task_success": None,
         }
         _start_hfss_worker()
         try:
@@ -203,15 +231,28 @@ def get_hfss_analysis_status(
         task = _HFSS_TASKS.get(task_id)
 
     if task is None:
-        return {"task_id": task_id, "status": "UNKNOWN", "message": "任务未找到"}
+        return {
+            "success": False,
+            "task_id": task_id,
+            "status": "UNKNOWN",
+            "task_success": None,
+            "outcome_known": False,
+            "error_code": "TASK_NOT_FOUND",
+            "message": "HFSS 仿真任务不存在、已过期或服务已重启",
+        }
 
+    completed = task.get("finished_at") is not None
     result: dict[str, Any] = {
         "success": True, "task_id": task["task_id"], "status": task["status"],
+        "completed": completed,
+        "task_success": task.get("task_success"),
+        "outcome_known": task.get("outcome_known", False),
         "project_path": task["project_path"], "project_name": task["project_name"],
         "design_name": task["design_name"], "setup_name": task["setup_name"],
         "created_at": task["created_at"], "started_at": task["started_at"],
         "finished_at": task["finished_at"],
         "result_directory": task.get("result_directory", ""),
+        "result_verified": task.get("result_verified"),
         "error": task.get("error", ""),
     }
     if task["started_at"] is not None:

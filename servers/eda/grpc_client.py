@@ -85,10 +85,19 @@ def _terminal_result(
     ads_output: str,
     log_complete: bool,
     latest_details: dict[str, Any],
+    *,
+    outcome_known: bool = False,
 ) -> dict[str, Any]:
+    """构建终端结果字典。
+
+    outcome_known=True 表示已收到 EDI 的最终事件（SUCCEEDED/FAILED），
+    此时 task_success 有意义；False 表示 EDI 任务结果未知（超时/断连等）。
+    """
     return {
         "success": success,
         "completed": True,
+        "outcome_known": outcome_known,
+        "task_success": success if outcome_known else None,
         "client_uuid": client_uuid,
         "task_id": task_id,
         "task_type": task_type_name,
@@ -201,6 +210,7 @@ def _call_grpc_unlocked(
     _given_timeout = max(0.0, deadline - started_at)
     latest_details: dict[str, Any] = {}
     event_stream = None
+    action_accepted = False
 
     def remaining() -> float:
         return max(0.1, deadline - time.monotonic())
@@ -247,6 +257,7 @@ def _call_grpc_unlocked(
                     project_path=payload.get("project_path", ""),
                     result_path="", ads_output="", log_complete=True,
                     latest_details={},
+                    outcome_known=True,
                 )
 
             # ── 4. 回显校验 ──
@@ -302,7 +313,9 @@ def _call_grpc_unlocked(
 
             # ── 6. 消费已建立的事件流 ──
             chunk_count = 0
+            action_accepted = response.code == 0
             for event in event_stream:
+                chunk = ""  # 初始化，防止终态事件先到达时 UnboundLocalError
                 if event.client_uuid != client_uuid:
                     continue
                 if event.task_id != task_id:
@@ -312,14 +325,25 @@ def _call_grpc_unlocked(
 
                 details, parse_error = _parse_payload_json(event.payload_json)
 
-                chunk = details.get("ads_output", "")
-                if chunk is None:
-                    chunk = ""
-                elif not isinstance(chunk, str):
-                    chunk = str(chunk)
-                if chunk:
-                    ads_output_chunks.append(chunk)
-                    chunk_count += 1
+                is_terminal = event.status in (
+                    ecserver_pb2.RESULT_STATUS_SUCCESS,
+                    ecserver_pb2.RESULT_STATUS_FAILED,
+                )
+
+                if is_terminal:
+                    # 终态：使用完整日志
+                    final_output = details.get("ads_output", "")
+                    ads_output = final_output if isinstance(final_output, str) and final_output \
+                        else "".join(ads_output_chunks)
+                else:
+                    chunk = details.get("ads_output", "")
+                    if chunk is None:
+                        chunk = ""
+                    elif not isinstance(chunk, str):
+                        chunk = str(chunk)
+                    if chunk:
+                        ads_output_chunks.append(chunk)
+                        chunk_count += 1
 
                 for key, value in details.items():
                     if key != "ads_output":
@@ -343,7 +367,6 @@ def _call_grpc_unlocked(
                 result_path = latest_details.get("result_path", "")
 
                 if event.status == ecserver_pb2.RESULT_STATUS_SUCCESS:
-                    ads_output = "".join(ads_output_chunks)
                     _logger.info("task=%s phase=COMPLETED status=SUCCEEDED duration=%.1fs chunks=%d",
                                  task_id[:12], time.monotonic() - started_at, chunk_count)
                     # Verify payload integrity: SUCCESS must have parseable payload
@@ -367,10 +390,10 @@ def _call_grpc_unlocked(
                         project_path=project_path, result_path=result_path,
                         ads_output=ads_output, log_complete=True,
                         latest_details=latest_details,
+                        outcome_known=True,
                     )
 
                 if event.status == ecserver_pb2.RESULT_STATUS_FAILED:
-                    ads_output = "".join(ads_output_chunks)
                     _logger.info("task=%s phase=COMPLETED status=FAILED duration=%.1fs chunks=%d",
                                  task_id[:12], time.monotonic() - started_at, chunk_count)
                     return _terminal_result(
@@ -381,6 +404,7 @@ def _call_grpc_unlocked(
                         project_path=project_path, result_path=result_path,
                         ads_output=ads_output, log_complete=True,
                         latest_details=latest_details,
+                        outcome_known=True,
                     )
 
             # ── 流结束但无终态 ──
@@ -410,8 +434,8 @@ def _call_grpc_unlocked(
                 ads_output="".join(ads_output_chunks), log_complete=False,
                 latest_details=latest_details,
             )
-        # 已有事件流时保留已收日志，返回 STREAM_DISCONNECTED
-        if event_stream is not None:
+        # 任务已受理后断开 → STREAM_DISCONNECTED；未受理 → GRPC_UNAVAILABLE
+        if action_accepted:
             _logger.error("task=%s phase=STREAM_DISCONNECTED code=%s", task_id[:12], code)
             return _terminal_result(
                 success=False, status="STREAM_DISCONNECTED",

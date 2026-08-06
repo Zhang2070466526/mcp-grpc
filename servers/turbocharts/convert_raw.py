@@ -29,12 +29,14 @@ turbocharts_convert   将 ADS 仿真 RAW 结果转为 PNG 曲线图和 CSV
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
 from servers.eda.config import validate_file, TURBOCHARTS_PATH
+from servers.runtime_config import build_file_link
 from servers.turbocharts.config import run_turbocharts
-from servers.mcp_instance import mcp
+from servers import mcp
 
 def _suggest_curves(var_name: str, var_type: str) -> list[str]:
     """Generate TurboCharts-compatible curve names for a variable.
@@ -46,8 +48,6 @@ def _suggest_curves(var_name: str, var_type: str) -> list[str]:
       - S.delay[x,y] → real_delayS[x,y]
       - Other complex → DB, real, phase
     """
-    import re
-
     curves: list[str] = []
 
     # Detect special patterns first (before generic real/complex)
@@ -95,7 +95,6 @@ def _parse_mds_format(text: str) -> list[dict]:
             0 freq frequency type=real indep=yes
             1 S[1,1] s-param type=complex indep=no
     """
-    import re
     datasets: list[dict] = []
     current: dict | None = None
     in_variables = False
@@ -170,8 +169,6 @@ def _parse_raw_header(raw_path: str) -> dict:
 
     Returns {"format": str, "datasets": [...], "error": str|None}.
     """
-    import re
-
     try:
         with open(raw_path, "r", encoding="utf-8", errors="ignore") as f:
             text = f.read(65536)
@@ -243,7 +240,6 @@ def list_result_curves(result_path: str) -> dict[str, Any]:
     Args:
         result_path: RAW 结果文件路径（必须已存在）。
     """
-    from servers.eda.config import validate_file
     try:
         resolved = validate_file(result_path)
     except (FileNotFoundError, ValueError) as e:
@@ -357,7 +353,7 @@ def turbocharts_convert(
     img_generated = Path(img_path).exists()
     csv_generated = bool(csv_path) and Path(csv_path).exists()
 
-    return {
+    resp = {
         "success": result.returncode == 0,
         "return_code": result.returncode,
         "command": " ".join(cmd),
@@ -367,5 +363,8 @@ def turbocharts_convert(
         "csv_generated": csv_generated,
         "output_paths": {"img": img_path} | ({"csv": csv_path} if csv_path else {}),
     }
+    if result.returncode == 0 and img_generated:
+        resp.update(build_file_link(img_path, "打开曲线图"))
+    return resp
 
 

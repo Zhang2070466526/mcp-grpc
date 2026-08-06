@@ -45,6 +45,7 @@ from servers.eda.simulation_components import (  # noqa: E402
     create_simulation_component, update_simulation_component,
     delete_simulation_component, set_component_active_state,
     generate_schematic_from_netlist,
+    replace_port_component,
 )
 from servers.eda.simulation import (  # noqa: E402
     start_simulation_async, get_simulation_async_status, get_simulation_async_result,
@@ -57,9 +58,9 @@ from servers.eda.model_replace import replace_models_from_csv  # noqa: E402
 from servers.eda.edi_launcher import launch_edi  # noqa: E402
 from servers.turbocharts.compare_results import compare_simulation_results  # noqa: E402
 from servers.turbocharts.convert_raw import turbocharts_convert, list_result_curves  # noqa: E402
-from servers.multimodal_vision import show_image, copy_image_to_workspace, analyze_image, OPENCLAW_WORKSPACE_PATH  # noqa: E402
+from servers.multimodal_vision import show_image, copy_image_to_workspace, analyze_image, OPENCLAW_WORKSPACE_PATH, open_document, open_local_document, register_image_url  # noqa: E402
 from servers.report import generate_simulation_report  # noqa: E402
-from servers.document_tools import open_document, open_local_document  # noqa: E402
+from servers.settings import get_settings  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 常量
@@ -79,6 +80,7 @@ _PENDING_ACTION_TTL = 300      # 待确认操作有效期 5 分钟
 _DESTRUCTIVE_CHAT_TOOLS = {
     "delete_simulation_component",
     "replace_models_from_csv",
+    "replace_port_component",
 }
 
 # ---------------------------------------------------------------------------
@@ -115,6 +117,7 @@ CHAT_TOOL_MAP: dict[str, Any] = {
     "delete_simulation_component": delete_simulation_component,
     "set_component_active_state": set_component_active_state,
     "generate_schematic_from_netlist": generate_schematic_from_netlist,
+    "replace_port_component": replace_port_component,
 }
 if OPENCLAW_WORKSPACE_PATH is not None:
     CHAT_TOOL_MAP["copy_image_to_workspace"] = copy_image_to_workspace
@@ -177,8 +180,9 @@ def _build_tools_schema() -> list[dict]:
         _rtool("open_local_document", "使用系统默认程序打开本地文档。仅用户明确要求时调用，生成报告后不得自动打开", {"file_path": "string"}),
         _rtool("get_simulation_component_schema", "查询仿真控件支持的参数、类型和单位；配置控件前优先调用", {"component_type": "string"}, {"parameter_name": "string"}),
         _rtool("list_simulation_components", "查询工程中的仿真器件", {"project_path": "string"}, {"component_type": "string"}),
-        _rtool("create_simulation_component", "创建新的 SP/HB/XDB 实例；每次调用都会新增。配置参数前先调用 get_simulation_component_schema", {"project_path": "string", "component_type": "string"}, {"parameters": "object", "timeout_seconds": "integer"}),
-        _rtool("update_simulation_component", "按实例名更新 SP/HB/XDB 的部分参数；建议先查类型再传 component_type", {"project_path": "string", "instance_name": "string", "parameters": "object"}, {"component_type": "string", "timeout_seconds": "integer"}),
+        _rtool("create_simulation_component", "使用 EDI 器件工厂默认参数创建器件。创建后根据 instance_name 调用 update 设置参数。支持任意 EDI 工厂类型", {"project_path": "string", "component_type": "string"}, {"timeout_seconds": "integer"}),
+        _rtool("update_simulation_component", "按实例名更新器件参数。SP/HB/XDB 支持校验，其他类型参数原样发送", {"project_path": "string", "instance_name": "string", "parameters": "object"}, {"component_type": "string", "timeout_seconds": "integer"}),
+        _rtool("replace_port_component", "替换端口器件类型（TermG↔P_nToneG），服务端保留位置和连线", {"project_path": "string", "target_instance_name": "string", "replacement_component_type": "string"}, {"parameters": "object", "timeout_seconds": "integer"}),
         _rtool("delete_simulation_component", "按实例名删除任意原理图器件及其连接线；删除直接由 EDI 执行", {"project_path": "string", "instance_name": "string"}, {"timeout_seconds": "integer"}),
         _rtool("set_component_active_state", "确定性设置器件状态为 NORMAL、DISABLED 或 SHORTED，不是状态切换", {"project_path": "string", "instance_name": "string", "state": "string"}, {"timeout_seconds": "integer"}),
         _rtool("generate_schematic_from_netlist", "从网表追加或重建 main 原理图；clear_before_import=true 会清空原理图，必须同时确认", {"project_path": "string", "netlist_path": "string"}, {"clear_before_import": "boolean", "confirm_clear": "boolean", "timeout_seconds": "integer"}),
@@ -458,9 +462,10 @@ class ChatService:
             session.messages[0]["content"] = system_content
         session.messages.append({"role": "user", "content": message})
 
-        api_key = _os.getenv("LLM_API_KEY")
-        base_url = _os.getenv("LLM_BASE_URL")
-        model = _os.getenv("LLM_MODEL")
+        llm_cfg = get_settings()
+        api_key = llm_cfg.llm_api_key
+        base_url = llm_cfg.llm_base_url
+        model = llm_cfg.llm_model
 
         if not all([api_key, base_url, model]):
             return ChatResponse(
@@ -625,7 +630,6 @@ class ChatService:
                         if tool_name == "show_image" and act.status == "success":
                             img_path = validation_result.get("image_path", "")
                             if img_path:
-                                from servers.multimodal_vision import register_image_url
                                 image_url = register_image_url(img_path)
                                 if image_url:
                                     media.append({"type": "image", "url": image_url, "name": Path(img_path).name})
@@ -700,6 +704,7 @@ class ChatService:
             "delete_simulation_component", "set_component_active_state",
             "generate_schematic_from_netlist",
             "replace_models_from_csv",
+            "replace_port_component",
         }
         if tool_name in _PROJECT_PATH_TOOLS:
             if not args.get("project_path"):
@@ -888,6 +893,7 @@ _TOOL_LABELS: dict[str, str] = {
     "delete_simulation_component": "删除器件",
     "set_component_active_state": "设置状态",
     "generate_schematic_from_netlist": "生成原理图",
+    "replace_port_component": "替换端口",
 }
 if OPENCLAW_WORKSPACE_PATH is not None:
     _TOOL_LABELS["copy_image_to_workspace"] = "复制到工作区"

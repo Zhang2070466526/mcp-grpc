@@ -14,6 +14,8 @@ from pathlib import Path
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 
+from servers import mcp, __version__ as _ver
+from servers.chat.service import ChatService
 from servers.eda.config import EDA_GRPC_SERVER, TURBOCHARTS_PATH
 
 import sys as _sys
@@ -48,7 +50,6 @@ async def ui_page(request: Request):
 # ── 工具列表 ──
 
 async def tool_list(request: Request):
-    from servers.mcp_instance import mcp
     tools = [{"name": t.name, "description": t.description or ""}
              for t in mcp._tool_manager._tools.values()]
     return JSONResponse(tools)
@@ -59,7 +60,6 @@ async def tool_list(request: Request):
 async def health_check(request: Request):
     eda_ready = await _check_tcp(EDA_GRPC_SERVER)
     turbocharts_ready = bool(TURBOCHARTS_PATH) and Path(TURBOCHARTS_PATH).is_file()
-    from servers import __version__ as _ver
     return JSONResponse({
         "status": "ok" if eda_ready else "degraded",
         "version": _ver,
@@ -100,6 +100,5 @@ async def chat_endpoint(request: Request):
     if not message:
         return JSONResponse({"error": "message required"}, status_code=400)
 
-    from servers.chat.service import ChatService
     response = await ChatService.instance().chat(session_id, message)
     return JSONResponse(response.to_dict())

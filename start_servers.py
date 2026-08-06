@@ -33,13 +33,14 @@ if getattr(sys, "frozen", False):
 else:
     load_dotenv()
 
-# -- 配置 --
-DEFAULT_TRANSPORT = os.getenv("MCP_TRANSPORT","sse")
-# FastMCP 暴露的配置接口，底层用的 uvicorn.run(host="0.0.0.0")，0.0.0.0 = 这样就会监听本机所有网卡的所有 IP。
-DEFAULT_HOST = os.getenv("MCP_HOST","127.0.0.1")
-DEFAULT_PORT = int(os.getenv("MCP_PORT", "50026"))
+# -- 配置（从统一配置读取）--
+from servers.settings import get_settings
+_cfg = get_settings()
+DEFAULT_TRANSPORT = _cfg.mcp_transport
+DEFAULT_HOST = _cfg.mcp_host
+DEFAULT_PORT = _cfg.mcp_port
 
-from servers.mcp_instance import mcp
+from servers import mcp
 import servers.registry_server  #  — 触发工具注册
 
 

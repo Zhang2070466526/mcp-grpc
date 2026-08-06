@@ -33,7 +33,7 @@ from typing import Any
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
 from servers.eda.config import ProjectReader, parse_components, validate_project_path
-from servers.mcp_instance import mcp
+from servers import mcp
 
 
 @mcp.tool()

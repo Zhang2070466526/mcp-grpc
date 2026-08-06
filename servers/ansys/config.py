@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import psutil
 import subprocess
 import threading
 import time
@@ -16,6 +17,7 @@ from dotenv import load_dotenv
 from win32com.client import GetActiveObject
 
 load_dotenv()
+from servers.settings import get_settings  # noqa: E402 — 必须在 load_dotenv 之后
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ _LAST_PID: int | None = None
 
 # -- 路径 --
 def _find_aedt() -> str:
-    from_env = os.getenv("AEDT_PATH")
+    from_env = get_settings().aedt_path
     if from_env and Path(from_env).is_file():
         return from_env
     try:
@@ -60,7 +62,6 @@ AEDT_PATH = _find_aedt()
 # -- 进程 --
 def get_aedt_pids() -> list[int]:
     try:
-        import psutil
         return [p.pid for p in psutil.process_iter(["name"]) if p.info["name"] == "ansysedt.exe"]
     except Exception:
         return []

@@ -13,18 +13,21 @@ from typing import Any
 import httpx
 from dotenv import load_dotenv
 
-from servers.mcp_instance import mcp
+from servers import mcp
 from servers.multimodal_vision.validators import validate_image_path, validate_image_content
+
+from servers.settings import get_settings
 
 load_dotenv()
 _logger = logging.getLogger("multimodal.analyze")
 
-# ── 配置 ──
-VISION_API_KEY = os.getenv("VISION_API_KEY", "").strip()
-VISION_BASE_URL = os.getenv("VISION_BASE_URL", "").strip()
-VISION_MODEL = os.getenv("VISION_MODEL", "").strip()
-VISION_TIMEOUT = int(os.getenv("VISION_TIMEOUT_SECONDS", "45"))
-VISION_MAX_MB = int(os.getenv("VISION_MAX_IMAGE_MB", "10"))
+# ── 配置（模块加载时从统一配置读取一次）──
+_cfg = get_settings()
+VISION_API_KEY = _cfg.vision_api_key
+VISION_BASE_URL = _cfg.vision_base_url
+VISION_MODEL = _cfg.vision_model
+VISION_TIMEOUT = _cfg.vision_timeout
+VISION_MAX_MB = _cfg.vision_max_mb
 
 _VISION_ALLOWED = {".png", ".jpg", ".jpeg", ".webp"}
 _MIME_MAP: dict[str, str] = {

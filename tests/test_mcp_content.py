@@ -27,6 +27,7 @@ class TestResourcesDirect:
         data = resource_service_overview()
         assert data["server_name"] == "EDI MCP"
         assert data["protocol_version"] == "2"
+        assert data.get("tool_api_version") == "3"
         assert "server_version" in data
         for ct in ["SParameter", "HarmonicBalance", "XDB"]:
             assert ct in data["simulation_components"]

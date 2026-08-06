@@ -12,7 +12,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from servers.mcp_instance import mcp
+from servers import mcp
+from servers.settings import get_settings
 from servers.multimodal_vision.validators import validate_image_path
 
 load_dotenv()
@@ -28,7 +29,7 @@ _ALLOWED_CACHE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 # ═══════════════════════════════════════════════════════════
 
 def _get_openclaw_workspace() -> Path | None:
-    value = os.getenv("OPENCLAW_WORKSPACE", "").strip()
+    value = get_settings().openclaw_workspace
     if not value:
         return None
     try:

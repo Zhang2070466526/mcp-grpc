@@ -87,13 +87,14 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `get_project_summary` | 工程概览（元数据/原理图/仿真配置） |
 | `analyze_variables` | 分析变量定义、引用和 Sweep 配置 |
 
-### 仿真器件（7 个）— 协议 v2
+### 仿真器件（8 个）— 协议 v3
 
 | 工具 | 说明 |
 |---|---|
 | `get_simulation_component_schema` | 查询 SP/HB/XDB 支持的参数和权限 |
 | `list_simulation_components` | 查询工程中的仿真器件 |
-| `create_simulation_component` | 新增器件（每次创建新实例） |
+| `create_simulation_component` | 新增器件（EDI 默认参数，创建后 update 设参） |
+| `replace_port_component` | 替换端口器件类型（TermG↔P_nToneG） |
 | `update_simulation_component` | 按实例名更新参数（自动识别类型） |
 | `delete_simulation_component` | 按实例名删除器件 |
 | `set_component_active_state` | 设置 NORMAL / DISABLED / SHORTED |
@@ -159,13 +160,12 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 ```
 ├── proto/                        protobuf 协议及生成代码
 ├── servers/
-│   ├── mcp_instance.py           FastMCP 全局实例
+│   ├── __init__.py               FastMCP 全局实例 + 版本号
 │   ├── registry_server.py        工具 / Resource / Prompt 注册入口
 │   ├── runtime_config.py          运行时配置（端口/地址）
 │   ├── settings.py                统一配置加载
 │   ├── mcp_content.py            3 个 Resource + 4 个 Prompt
-│   ├── multimodal_vision/        图片显示 + 工作区复制 + 视觉分析
-│   ├── document_tools.py           文档工具（临时链接 + 本地打开）
+│   ├── multimodal_vision/        图片显示 + 工作区复制 + 视觉分析 + 文档工具
 │   ├── report/                    仿真报告生成
 │   ├── chat/                     聊天模块（LLM 多轮工具闭环）
 │   ├── eda/                      EDI gRPC 工具
@@ -173,7 +173,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 │   │   ├── grpc_client.py        gRPC 通信层（FetchEvent + PerformAction）
 │   │   ├── project_manage.py     工程管理（7 个工具）
 │   │   ├── simulation.py         仿真（7 个工具）
-│   │   ├── simulation_components.py     仿真器件（7 个工具）
+│   │   ├── simulation_components.py     仿真器件（8 个工具）
 │   │   ├── simulation_component_catalog.json  参数目录 v2.0
 │   │   ├── design_export.py      网表 / 截图
 │   │   ├── model_replace.py      模型替换
@@ -181,7 +181,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 │   ├── turbocharts/              RAW 图表工具
 │   └── ansys/                     ANSYS HFSS 工具
 ├── docs/                         项目文档
-├── tests/                        测试套件（207 项）
+├── tests/                        测试套件（211 项）
 ├── scripts/                      打包 / 启动脚本
 ├── start_servers.py              入口
 └── pyproject.toml
@@ -192,7 +192,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 ## 测试
 
 ```powershell
-uv run pytest -q                 # 全量 207 项
+uv run pytest -q                 # 全量 211 项
 uv run pytest tests/ -v          # 详细输出
 ```
 

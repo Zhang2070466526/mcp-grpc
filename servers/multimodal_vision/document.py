@@ -18,10 +18,11 @@ from dotenv import load_dotenv
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 
-from servers.mcp_instance import mcp
+from servers import mcp
+from servers.runtime_config import get_server_base_url
 
 load_dotenv()
-_logger = logging.getLogger("document_tools")
+_logger = logging.getLogger("multimodal.document")
 
 _LINK_EXTENSIONS = {".pdf", ".docx"}
 _LOCAL_EXTENSIONS = {
@@ -69,7 +70,6 @@ def _cleanup_expired() -> None:
 
 
 def _base_url() -> str:
-    from servers.runtime_config import get_server_base_url
     return get_server_base_url()
 
 

@@ -668,7 +668,7 @@ copy_image_to_workspace(image_path: str) -> dict
 
 ---
 
-## 仿真器件管理（7 个）— 协议 v2
+## 仿真器件管理（8 个）— 协议 v3
 
 ### `get_simulation_component_schema`
 
@@ -695,10 +695,10 @@ list_simulation_components(project_path: str, component_type: str = "") -> dict
 ```python
 from servers.eda.simulation_components import create_simulation_component
 
-create_simulation_component(project_path: str, component_type: str, parameters: dict | None = None, timeout_seconds: int = 120) -> dict
+create_simulation_component(project_path: str, component_type: str, timeout_seconds: int = 120) -> dict
 ```
 
-新增仿真器件。每次调用创建新实例，服务端自动分配实例名。parameters 可选，未提供的参数使用 EDI 默认值。
+新增器件（使用 EDI 器件工厂默认参数）。创建后如需设置参数，根据返回的 `instance_name` 调用 `update_simulation_component`。`component_type` 支持任意 EDI 工厂类型（SParameter / HarmonicBalance / XDB / Sweep / Var 等）。
 
 参数格式：`{"Start": {"value": "1", "unit": "GHz"}, "Pts": {"value": "101"}}`
 
@@ -732,6 +732,24 @@ set_component_active_state(project_path: str, instance_name: str, state: str, ti
 
 确定性设置器件状态。state 接受 NORMAL / DISABLED / SHORTED（大小写不敏感）。不是状态切换，重复调用具有幂等性。
 
+### `replace_port_component`
+
+```python
+from servers.eda.simulation_components import replace_port_component
+
+replace_port_component(project_path: str, target_instance_name: str, replacement_component_type: str, parameters: dict | None = None, timeout_seconds: int = 300) -> dict
+```
+
+替换端口器件类型（TermG ↔ P_nToneG）。服务端保留位置、状态和外部连线。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `project_path` | str | 是 | — | `.epp` 绝对路径 |
+| `target_instance_name` | str | 是 | — | 要替换的端口实例名 |
+| `replacement_component_type` | str | 是 | — | TermG / P_nToneG |
+| `parameters` | dict | 否 | None | 可选参数字典 |
+| `timeout_seconds` | int | 否 | 300 | 最长等待秒数 |
+
 ### `generate_schematic_from_netlist`
 
 ```python
@@ -744,7 +762,7 @@ generate_schematic_from_netlist(project_path: str, netlist_path: str, clear_befo
 
 ---
 
-## Resources & Prompts（协议 v2）
+## Resources & Prompts
 
 除了 36 个 Tool，服务还注册了只读 Resource 和可复用 Prompt 工作流模板。
 
@@ -777,7 +795,7 @@ generate_schematic_from_netlist(project_path: str, netlist_path: str, clear_befo
 ### `open_document`
 
 ```python
-from servers.document_tools import open_document
+from servers.multimodal_vision import open_document
 
 open_document(file_path: str, disposition: str = "inline") -> dict
 ```
@@ -794,7 +812,7 @@ open_document(file_path: str, disposition: str = "inline") -> dict
 ### `open_local_document`
 
 ```python
-from servers.document_tools import open_local_document
+from servers.multimodal_vision import open_local_document
 
 open_local_document(file_path: str) -> dict
 ```

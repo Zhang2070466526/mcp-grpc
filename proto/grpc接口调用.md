@@ -54,6 +54,7 @@ enum EventType {
   GENERATE_SCHEMATIC_FROM_NETLIST = 13;
   SET_COMPONENT_ACTIVE_STATE = 14;
   UPDATE_SIMULATION_COMPONENT = 15;
+  REPLACE_PORT_COMPONENT = 16;
 }
 ```
 
@@ -67,11 +68,13 @@ enum EventType {
 - `CLOSE_PROJECT`：关闭工程，可选择是否保存工程。
 - `CALL_SIMULATION_CONTROLLER`：直接调用 ADS 仿真器。
 - `SIMULATE_NETLIST`：仿真指定的 `netlist.log`，返回 RAW 结果和仿真器输出日志。
-- `CREATE_SIMULATION_COMPONENT`：新增一个 `SParameter`、`HarmonicBalance` 或 `XDB` 器件。
+- `CREATE_SIMULATION_COMPONENT`：按 `component_type` 通过器件工厂新增器件，使用工厂默认参数。
 - `DELETE_SIMULATION_COMPONENT`：按器件实例名删除原理图上的通用器件。
 - `GENERATE_SCHEMATIC_FROM_NETLIST`：将指定网表导入工程的唯一原理图。
 - `SET_COMPONENT_ACTIVE_STATE`：按器件实例名确定性设置正常、禁用或短路状态。
-- `UPDATE_SIMULATION_COMPONENT`：按器件实例名更新仿真器件参数。
+- `UPDATE_SIMULATION_COMPONENT`：按器件实例名更新任意普通器件的已有参数；指定器件类型额外支持动态参数或变量新增。
+- `REPLACE_PORT_COMPONENT`：将原理图上的 `TermG` 与 `P_nToneG` 相互替换，并保留原有外部引脚连线。
+
 ## 4. payload_json 示例
 
 ### OPEN_PROJECT
@@ -156,20 +159,15 @@ enum EventType {
 ```json
 {
   "project_path": "C:/path/to/project.epp",
-  "component_type": "SParameter",
-  "parameters": {
-    "Start": {
-      "value": "1",
-      "unit": "GHz"
-    }
-  }
+  "component_type": "SParameter"
 }
 ```
 
-- `component_type` 只支持 `SParameter`、`HarmonicBalance`、`XDB`，区分大小写。
-- `parameters` 可省略、传空对象或只提供部分初始化参数；未提供的参数使用器件默认值。
-- 每个参数包含标量字段 `value`，可选字符串字段 `unit`，不能包含其他字段。
-- 每次调用都创建新器件，同类型器件可以存在多个。服务端自动分配未占用的实例名，并在最终事件的 `instance_name` 中返回。
+- `component_type` 为器件工厂注册的类型名，区分大小写，不能为空。
+- 该任务只负责创建器件，不接收 `parameters`；器件使用工厂提供的全部默认参数。
+- 参数更新或动态参数新增统一使用 `UPDATE_SIMULATION_COMPONENT`。
+- 每次调用都创建新器件，同类型器件可以存在多个。服务端根据工厂默认器件名自动分配未占用的实例名，并在最终事件的 `instance_name` 中返回。
+- 工厂无法创建指定类型时，最终事件返回失败原因，原理图不会新增器件。
 
 ### UPDATE_SIMULATION_COMPONENT
 
@@ -190,9 +188,17 @@ enum EventType {
 ```
 
 - `instance_name` 为原理图上的器件实例名，精确匹配。
-- 仅支持更新 `SParameter`、`HarmonicBalance`、`XDB`。
+- 支持更新原理图上任意普通器件；不属于下述特殊类型的器件只能更新其 `paramsInfo_` 中已经存在的参数，不能新增参数。
 - `parameters` 必须为非空对象；只更新请求中提供的参数，其他参数保持原值。
-- 保存失败时恢复修改前参数。
+- `HarmonicBalance` 和 `XDB` 支持根据 `Freq[1]`、`Order[1]` 模板新增更大下标的 `Freq[x]`、`Order[x]` 参数；频率与阶数必须同下标成对存在，且下标从 1 开始连续。
+- `P_nToneG` 和 `P_nTone` 支持根据 `Freq[1]`、`P[1]` 模板独立新增 `Freq[x]` 或 `P[x]`；两类参数不要求成对或连续。
+- 更新 `SweepVar` 时，原理图中必须存在 `Var` 器件，且至少一个 `Var` 器件包含与其 `value` 完全相同的变量名。
+- 更新 `SimInstanceName[1]`～`SimInstanceName[6]` 时，其 `value` 必须与原理图中已有器件实例名完全相同，且目标器件类型只能为 `HarmonicBalance` 或 `XDB`。
+- 任一参数或引用校验失败时，不修改器件；保存失败时恢复修改前参数。
+- 更新 `Var` 时，`parameters` 的每个一级 key 表示变量名：已有同名变量时更新，不存在时新增。
+- `Var` 变量必须提供 `value`，可选提供 `min`、`max`、`status`、`tunable`，不支持 `unit`。
+- 新增变量未提供可选字段时，默认 `Min=""`、`Max=""`、`Status="Disable"`、`Tunable="false"`。
+- `status` 只接受 `min/max`、`+/- Delta %`、`Disable`；`tunable` 只接受布尔值或字符串 `"true"`、`"false"`。
 
 ### DELETE_SIMULATION_COMPONENT
 
@@ -222,6 +228,48 @@ enum EventType {
 - `SHORTED`：短路。
 
 该任务直接设置目标状态，不执行状态切换；保存失败时恢复原状态。
+
+### REPLACE_PORT_COMPONENT
+
+```json
+{
+  "project_path": "C:/path/to/project.epp",
+  "target_instance_name": "TermG1",
+  "replacement_component_type": "P_nToneG",
+  "parameters": {
+    "Z0": {
+      "value": "50",
+      "unit": "Ohm"
+    },
+    "Num": {
+      "value": "1"
+    },
+    "Freq[1]": {
+      "value": "1",
+      "unit": "GHz"
+    },
+    "P[1]": {
+      "value": "polar(dbmtow(0),0)"
+    },
+    "Freq[2]": {
+      "value": "2",
+      "unit": "GHz"
+    },
+    "P[2]": {
+      "value": "polar(dbmtow(-10),0)"
+    }
+  }
+}
+```
+
+- `target_instance_name` 为原理图上待替换的器件实例名，目标类型必须是 `TermG` 或 `P_nToneG`。
+- `replacement_component_type` 只接受 `TermG` 或 `P_nToneG`，并且必须与原器件类型不同。
+- `parameters` 必须提供 JSON 对象，可以为空对象；未被客户端替换的参数使用新器件默认值。
+- 创建 `TermG` 时，仅更新默认参数表中已经存在的参数；不存在的参数直接忽略。
+- 创建 `P_nToneG` 时，普通参数遵循相同规则；`Freq[x]` 和 `P[x]` 即使不在默认参数表中，也会分别复制 `Freq[1]`、`P[1]` 的参数结构后新增，其中 `x` 为数字。
+- 参数单位存在时必须属于该参数支持的单位列表；`P[x]` 不支持 `unit`。
+- 新器件继承旧器件的位置、旋转、翻转和活动状态。旧器件外部引脚上的连线会重新连接到新器件外部引脚，同时保留线宽和手工布线路径。
+- 服务端自动生成未占用的新实例名，并通过最终事件的 `new_instance_name` 返回。
 
 ### GENERATE_SCHEMATIC_FROM_NETLIST
 
@@ -315,7 +363,9 @@ enum ResultStatus {
 - `UPDATE_SIMULATION_COMPONENT`：`project_path`、`instance_name`
 - `DELETE_SIMULATION_COMPONENT`：`project_path`、`instance_name`
 - `SET_COMPONENT_ACTIVE_STATE`：`project_path`、`instance_name`、`state`
+- `REPLACE_PORT_COMPONENT`：`project_path`、`target_instance_name`、`old_component_type`、`new_component_type`、`new_instance_name`
 - `GENERATE_SCHEMATIC_FROM_NETLIST`：`project_path`、`netlist_path`、`schematic_path`、`clear_before_import`、`symbols_added`、`nets_added`、`lines_added`、`net_points_added`
+
 ## 8. SIMULATE_NETLIST 完整调用示例
 
 建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction` 提交任务。两次调用的 `client_uuid` 必须一致。
@@ -404,18 +454,31 @@ enum ResultStatus {
 
 建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction`。以下请求使用相同的 `client_uuid`。
 
-### 9.1 新增 SParameter
+### 9.1 使用默认参数新增器件
+
+以下请求新增一个使用工厂默认参数的 `SParameter` 器件。创建其他器件时只需替换 `component_type`。
 
 ```json
 {
   "client_uuid": "postman-test-client-001",
   "task_id": "postman-create-sp-001",
   "type": "CREATE_SIMULATION_COMPONENT",
-  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"SParameter\",\"parameters\":{\"Start\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Stop\":{\"value\":\"10.0\",\"unit\":\"GHz\"},\"Step\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Pts\":{\"value\":\"10\"},\"NoiseInputPort\":{\"value\":\"1\"},\"NoiseOutputPort\":{\"value\":\"2\"},\"BandwidthForNoise\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"CalcNoise\":{\"value\":\"no\"},\"CalcS\":{\"value\":\"yes\"},\"CalcGroupDelay\":{\"value\":\"no\"},\"EnforcePassivity\":{\"value\":\"no\"},\"GroupDelayAperture\":{\"value\":\"1e-4\"},\"FreqConversion\":{\"value\":\"no\"},\"FreqConversionPort\":{\"value\":\"1\"}}}"
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"SParameter\"}"
 }
 ```
-该请求包含 SParameter 当前全部可设置属性。注意：`BandwidthForNoise` 为 EDI 内部参数，MCP 层禁止手动设置（create_allowed=false, update_allowed=false），EDI 使用默认值。界面中显示的 `Bandwidth` 对应接口字段 `BandwidthForNoise`，不能传 `Bandwidth`。
 
+创建 `Sweep` 的请求示例：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-create-sweep-001",
+  "type": "CREATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"Sweep\"}"
+}
+```
+
+创建请求不能包含 `parameters`。如需设置参数，应在创建成功并取得 `instance_name` 后调用 `UPDATE_SIMULATION_COMPONENT`。
 
 如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `11`。
 
@@ -432,37 +495,9 @@ enum ResultStatus {
 }
 ```
 
-`CREATE_SIMULATION_COMPONENT` 每次都创建新器件，`action` 固定为 `created`；实际分配名称见 `instance_name`。
+`action` 固定为 `created`；实际分配名称见 `instance_name`。
 
-### 9.2 新增 HarmonicBalance
-
-下面的请求包含 HarmonicBalance 默认初始化时的全部属性：
-
-```json
-{
-  "client_uuid": "postman-test-client-001",
-  "task_id": "postman-create-hb-001",
-  "type": "CREATE_SIMULATION_COMPONENT",
-  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"HarmonicBalance\",\"parameters\":{\"Freq[1]\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Order[1]\":{\"value\":\"5\"}}}"
-}
-```
-
-需要多音设置时，可以继续增加成对的 `Freq[2]`、`Order[2]`、`Freq[3]`、`Order[3]` 等动态参数。
-
-### 9.3 新增 XDB
-
-下面的请求包含 XDB 当前全部可设置属性：
-
-```json
-{
-  "client_uuid": "postman-test-client-001",
-  "task_id": "postman-create-xdb-001",
-  "type": "CREATE_SIMULATION_COMPONENT",
-  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_type\":\"XDB\",\"parameters\":{\"Freq[1]\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"Order[1]\":{\"value\":\"5\"},\"GC_XdB\":{\"value\":\"1\"},\"GC_InputPort\":{\"value\":\"1\"},\"GC_OutputPort\":{\"value\":\"2\"},\"GC_InputFreq\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"GC_OutputFreq\":{\"value\":\"1.0\",\"unit\":\"GHz\"},\"GC_InputPowerTol\":{\"value\":\"1e-3\"},\"GC_OutputPowerTol\":{\"value\":\"1e-3\"},\"GC_MaxInputPowerTol\":{\"value\":\"100\"},\"StatusLevel\":{\"value\":\"2\"}}}"
-}
-```
-
-### 9.4 删除指定名称的器件
+### 9.2 删除指定名称的器件
 
 ```json
 {
@@ -490,7 +525,9 @@ enum ResultStatus {
 
 该任务不限于三种仿真器件，可以按名称删除普通原理图器件及其连接线。
 
-### 9.5 按器件名更新参数
+### 9.3 按器件名更新参数
+
+更新 SParameter 的部分参数：
 
 ```json
 {
@@ -500,6 +537,106 @@ enum ResultStatus {
   "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"SP2\",\"parameters\":{\"Stop\":{\"value\":\"20\",\"unit\":\"GHz\"},\"Pts\":{\"value\":\"201\"}}}"
 }
 ```
+
+其他普通器件同样可以更新已有参数。例如更新电阻 `R1` 的阻值：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-update-r-001",
+  "type": "UPDATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"R1\",\"parameters\":{\"R\":{\"value\":\"75\",\"unit\":\"Ohm\"}}}"
+}
+```
+
+对于此类普通器件，如果请求的参数名不在器件现有 `paramsInfo_` 中，任务失败并返回 `unsupported parameter`，已有参数不会被修改。
+
+更新 Sweep 的变量与仿真实例引用。以下示例要求原理图中已有包含变量 `Vbias` 的 `Var` 器件，以及实例名为 `HB1` 的 `HarmonicBalance` 器件：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-update-sweep-001",
+  "type": "UPDATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"Sweep1\",\"parameters\":{\"SweepVar\":{\"value\":\"Vbias\"},\"SimInstanceName[1]\":{\"value\":\"HB1\"},\"Start\":{\"value\":\"1\"},\"Stop\":{\"value\":\"10\"},\"Step\":{\"value\":\"1\"},\"Pts\":{\"value\":\"10\"}}}"
+}
+```
+
+#### HarmonicBalance/XDB 新增频率
+
+`HarmonicBalanceSetting` 和 `XDBSetting` 在界面中将每一行频率保存为同下标的一对参数：
+
+- `Freq[x]`：内部包含 `Value`、`Unit`、`CurrentUnit`、`DefaultUnit`，接口使用 `value` 和可选的 `unit` 设置。
+- `Order[x]`：内部包含 `Value`，接口使用 `value` 设置，不接受 `unit`。
+- 新增频率时，`Freq[x]` 和 `Order[x]` 必须成对提供；`x` 必须紧接现有最大下标，不能跳号。也可以在一次请求中连续新增多组。
+- 网表按 `Freq[1]` 开始连续读取，先输出全部 `Freq[x]`，再输出全部 `Order[x]`。例如 `Freq[2]` 最终写为 `Freq[2]=2.4 GHz`。
+
+以下示例为 `HB1` 新增第二组和第三组频率；XDB 使用相同结构，只需将 `instance_name` 改为对应的 XDB 实例名：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-update-hb-freq-001",
+  "type": "UPDATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"HB1\",\"parameters\":{\"Freq[2]\":{\"value\":\"2.4\",\"unit\":\"GHz\"},\"Order[2]\":{\"value\":\"5\"},\"Freq[3]\":{\"value\":\"4.8\",\"unit\":\"GHz\"},\"Order[3]\":{\"value\":\"3\"}}}"
+}
+```
+
+#### P_nToneG/P_nTone 新增 Freq[x] 或 P[x]
+
+该行为与 `EditInstanceParameter` 的 Add 操作保持一致：
+
+- 新增 `Freq[x]` 时复制 `Freq[1]` 的内部结构，包含 `Value`、`Unit`、`CurrentUnit`、`DefaultUnit`、`Addable`、`Cutable`；新项的 `Cutable` 固定为 `true`。
+- 新增 `P[x]` 时复制 `P[1]` 的内部结构，包含 `Value`、`Addable`、`Cutable`；新项的 `Cutable` 固定为 `true`。
+- `Freq[x]` 和 `P[x]` 可单独新增，不要求同下标成对，也允许下标不连续。
+- `Freq[x]` 接收 `value` 和可选的 `unit`；`P[x]` 只接收 `value`，不支持 `unit`。
+- 网表生成时遍历全部参数，分别直接输出为 `Freq[x]=值 单位` 和 `P[x]=值`。
+
+以下示例同时新增 `Freq[2]` 和 `P[3]`；如果只需新增其中一种，删除另一项即可：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-update-pntoneg-tone-001",
+  "type": "UPDATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"PORT1\",\"parameters\":{\"Freq[2]\":{\"value\":\"2.4\",\"unit\":\"GHz\"},\"P[3]\":{\"value\":\"polar(dbmtow(-10),45)\"}}}"
+}
+```
+
+`instance_name` 可以是 `P_nToneG` 或 `P_nTone` 器件的实际实例名。
+
+`SimInstanceName[x]` 只支持 Sweep 默认参数表中的 `x=1..6`；目标名称精确匹配，目标类型只能为 `HarmonicBalance` 或 `XDB`。
+
+#### Var 器件变量更新与新增
+
+`Var` 器件的变量名直接存放在 `paramsInfo_` 的一级 key 中。接口字段与内部字段对应关系如下：
+
+| 请求字段 | `paramsInfo_` 字段 | 是否必填 | 说明 |
+|---|---|---|---|
+| `value` | `Initial` | 是 | 原理图页面显示和仿真读取的变量初始值 |
+| `min` | `Min` | 否 | 变量最小值 |
+| `max` | `Max` | 否 | 变量最大值 |
+| `status` | `Status` | 否 | 只接受 `min/max`、`+/- Delta %`、`Disable` |
+| `tunable` | `Tunable` | 否 | 只接受布尔值或字符串 `"true"`、`"false"` |
+
+下面的请求针对实例名为 `Var1` 的器件：如果 `Vbias` 已存在则更新它；如果 `InFreq` 不存在则新增它。
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-update-var-001",
+  "type": "UPDATE_SIMULATION_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"Var1\",\"parameters\":{\"Vbias\":{\"value\":\"1.5\",\"min\":\"0\",\"max\":\"3\",\"status\":\"min/max\",\"tunable\":true},\"InFreq\":{\"value\":\"2.4e9\",\"status\":\"Disable\"}}}"
+}
+```
+
+规则说明：
+
+- 变量名区分大小写并按一级 key 精确匹配；名称为空或使用保留 key `BasicParameters` 时失败。
+- 已有变量只覆盖请求中提供的字段；由于 `value` 必填，每次都会更新 `Initial`，其他未提供字段保持原值。
+- 新增变量会创建完整内部结构；未提供的 `Min`、`Max` 为空，`Status` 为 `Disable`，`Tunable` 为 `false`。
+- 调用 `setItemParamsInfo()` 后，`SGI_VarEqn` 会读取每个变量的 `Initial` 并刷新到原理图页面。
+- 任一变量校验失败时，整次更新不生效；工程保存失败时恢复更新前的全部变量。
 
 最终成功事件示例：
 
@@ -514,7 +651,7 @@ enum ResultStatus {
 }
 ```
 
-### 9.6 设置器件正常、禁用或短路状态
+### 9.4 设置器件正常、禁用或短路状态
 
 ```json
 {
@@ -526,6 +663,37 @@ enum ResultStatus {
 ```
 
 最终成功事件中的 `payload_json` 返回 `project_path`、`instance_name` 和已经设置的 `state`。
+
+### 9.5 替换 TermG 或 P_nToneG 并继承连线
+
+将原理图中的 `TermG1` 替换为 `P_nToneG`：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-replace-port-001",
+  "type": "REPLACE_PORT_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"target_instance_name\":\"TermG1\",\"replacement_component_type\":\"P_nToneG\",\"parameters\":{\"Z0\":{\"value\":\"50\",\"unit\":\"Ohm\"},\"Num\":{\"value\":\"1\"},\"Freq[1]\":{\"value\":\"1\",\"unit\":\"GHz\"},\"P[1]\":{\"value\":\"polar(dbmtow(0),0)\"},\"Freq[2]\":{\"value\":\"2\",\"unit\":\"GHz\"},\"P[2]\":{\"value\":\"polar(dbmtow(-10),0)\"}}}"
+}
+```
+
+如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `16`。
+
+最终成功事件示例：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-replace-port-001",
+  "event_type": "REPLACE_PORT_COMPONENT",
+  "status": "RESULT_STATUS_SUCCESS",
+  "message": "port component replaced",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"target_instance_name\":\"TermG1\",\"old_component_type\":\"TermG\",\"new_component_type\":\"P_nToneG\",\"new_instance_name\":\"PORT2\"}"
+}
+```
+
+替换操作在同一个原理图撤销命令组中完成。器件创建、参数应用、连线恢复、连接数量检查或工程保存失败时，服务端会撤销本次替换。
+
 ## 10. 网表生成链路完整调用示例
 
 建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction` 提交任务。两次调用的 `client_uuid` 必须一致。
@@ -585,10 +753,11 @@ enum ResultStatus {
 - `client_uuid`、`task_id`、`type` 必须填写。
 - `payload_json` 必须是合法 JSON 对象字符串。
 - 涉及工程的任务中，`project_path` 必须指向已存在的 `.epp` 文件。
-- `CREATE_SIMULATION_COMPONENT` 的 `component_type` 只接受 `SParameter`、`HarmonicBalance`、`XDB`；`parameters` 可省略或只提供部分参数。
-- `UPDATE_SIMULATION_COMPONENT` 必须提供器件 `instance_name` 和非空 `parameters`，目标必须是上述三种仿真器件之一。
+- `CREATE_SIMULATION_COMPONENT` 只接收 `project_path` 和非空 `component_type`，按工厂默认参数创建器件；携带 `parameters` 会被拒绝。
+- `UPDATE_SIMULATION_COMPONENT` 必须提供器件 `instance_name` 和非空 `parameters`；任意普通器件均可更新已有参数，只有 `HarmonicBalance`、`XDB`、`P_nToneG`、`P_nTone` 和 `Var` 支持按各自规则新增参数或变量；Sweep 引用参数必须通过对应校验。
 - `DELETE_SIMULATION_COMPONENT` 和 `SET_COMPONENT_ACTIVE_STATE` 使用 `instance_name` 精确定位器件。
 - 器件创建、参数更新、删除或状态设置成功后会立即保存工程；保存失败时回滚本次操作。
+- `REPLACE_PORT_COMPONENT` 只能在 `TermG` 和 `P_nToneG` 之间替换；目标器件和新器件都必须只有一个外部引脚，替换会保留原连线关系。
 - `GENERATE_SCHEMATIC_FROM_NETLIST` 必须提供已存在的工程文件和网表文件，固定操作 `main` 原理图。
 - `clear_before_import=true` 会在导入前清空 `main` 原理图，调用方应确认原内容允许删除。
 - `MODEL_REPLACE` 必须提供已存在的 `.csv` 文件路径。
