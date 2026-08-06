@@ -85,6 +85,23 @@ def _register_token(path: Path, disposition: str) -> tuple[str, str]:
     return token, f"{_base_url()}/documents/{token}"
 
 
+def register_document_url(file_path: str, disposition: str = "inline") -> str:
+    """为本地文档注册临时 HTTP 访问 Token，返回可访问的 URL。
+
+    供其他模块（如报告生成器）在生成文档后直接返回预览链接。
+    Token 10 分钟后过期，仅本机 127.0.0.1 可访问。
+    """
+    _cleanup_expired()
+    token = secrets.token_urlsafe(24)
+    with _TOKEN_LOCK:
+        _DOC_TOKENS[token] = {
+            "path": str(Path(file_path).resolve()),
+            "disposition": disposition,
+            "expires_at": time.time() + _TOKEN_TTL,
+        }
+    return f"{_base_url()}/documents/{token}"
+
+
 # ═══════════════════════════════════════════════════════════
 # open_document — 临时 HTTP 链接
 # ═══════════════════════════════════════════════════════════

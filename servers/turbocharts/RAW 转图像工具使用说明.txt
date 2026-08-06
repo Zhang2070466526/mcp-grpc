@@ -37,7 +37,7 @@ turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result.raw" -
 S参数增益  DB_S[2,1]是输出增益,DB_S[1,2]是反向增益
 turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_tr.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.png" --type "SP" --linename "DB_S[2,1]" --dependcy "freq"
 
-驻波
+驻波(只支持单条曲线)
 turbocharts_app.exe --raw "C:/Users/crb/Desktop/中文路径测试/result_tr.raw" --csv "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.csv" --img "C:/Users/crb/Desktop/中文路径测试/输出SP_tr.png" --type "SP" --linename "VSWR_S[1,1]" --dependcy "freq"
 
 数控衰减器 附加相移

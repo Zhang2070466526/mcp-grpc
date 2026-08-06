@@ -18,6 +18,7 @@ from starlette.responses import FileResponse, JSONResponse
 from servers import mcp
 from servers.runtime_config import get_server_base_url
 from servers.multimodal_vision.validators import validate_image_path
+from servers.multimodal_vision.workspace_copy import OPENCLAW_WORKSPACE_PATH
 
 load_dotenv()
 _logger = logging.getLogger("multimodal.display")
@@ -38,18 +39,25 @@ _MIME_TYPES: dict[str, str] = {
 # show_image
 # ═══════════════════════════════════════════════════════════
 
+def _workspace_note() -> str:
+    """根据工作区配置返回相应的提示文案。"""
+    if OPENCLAW_WORKSPACE_PATH is not None:
+        return "如需在工作区内查看，可要求复制到 OpenClaw 工作区。"
+    return "当前未配置 OPENCLAW_WORKSPACE，请使用资源管理器打开该文件。"
+
+
 @mcp.tool(structured_output=False)
 def show_image(image_path: str) -> list[Any]:
-    """读取本地图片，返回标准 MCP ImageContent。
+    """读取本地图片，返回标准 MCP ImageContent 和本地路径。
 
-    如果客户端无法渲染 ImageContent，直接报告"客户端不支持"，停止处理。
-    不得通过 Read、Exec、Write、Canvas、HTML 或 MEDIA 文本再次尝试显示。
-    不得自动调用工作区复制工具。
+    不复制文件，不调用工作区工具。即使客户端无法渲染 MCP ImageContent，
+    MCP 服务本身也是调用成功的——能否显示取决于客户端的渲染能力和目录权限。
 
     Args:
         image_path: 图片文件绝对路径。
     """
     path = validate_image_path(image_path)
+    ws_note = _workspace_note()
 
     size = path.stat().st_size
     if size > _MAX_NATIVE_IMAGE_SIZE:
@@ -58,8 +66,8 @@ def show_image(image_path: str) -> list[Any]:
                 type="text",
                 text=(
                     "图片文件较大（>10 MB），未内嵌到 MCP 返回内容中。\n\n"
-                    f"原始路径：{path}\n\n"
-                    "可以在本机查看，或明确要求复制到 OpenClaw 工作区。"
+                    f"本地路径：{path}\n\n"
+                    f"{ws_note}"
                 ),
             ),
         ]
@@ -71,10 +79,11 @@ def show_image(image_path: str) -> list[Any]:
         TextContent(
             type="text",
             text=(
-                "图片内容已返回给客户端。能否直接显示取决于客户端的图片渲染和文件访问策略。\n"
-                f"原始路径：{path}\n"
-                "如果客户端限制工作区外文件访问，可要求用户将图片复制到 OpenClaw 工作区。\n"
-                "不要自行调用 Read、Exec 或 filePath 读取原始文件。"
+                "图片已返回（MCP ImageContent）。\n"
+                f"本地路径：{path}\n"
+                "客户端能否直接渲染取决于其图片支持和文件访问策略——"
+                "即使显示为 Unavailable，也不代表 MCP 调用失败。\n"
+                f"{ws_note}"
             ),
         ),
         ImageContent(type="image", data=encoded, mimeType=mime),

@@ -764,7 +764,7 @@ generate_schematic_from_netlist(project_path: str, netlist_path: str, clear_befo
 
 ## Resources & Prompts
 
-除了 36 个 Tool，服务还注册了只读 Resource 和可复用 Prompt 工作流模板。
+除了 Tool（启动时动态统计，当前约 40/41 个），服务还注册了只读 Resource 和可复用 Prompt 工作流模板。
 
 ### Resources（3 个）
 
@@ -896,16 +896,29 @@ response = await svc.chat(session_id="abc123", message="打开第一个工程")
 
 ```python
 {
-    "success": bool,        # 是否成功
-    "completed": bool,      # 是否已终态（异步任务运行中为 False）
-    "status": str,          # QUEUED / ACCEPTED / RUNNING / SUCCEEDED / FAILED / REJECTED / TIMEOUT
+    "success": bool,        # 本次 MCP 调用是否成功
+    "completed": bool,      # MCP 侧任务是否已结束（非 EDI 仿真是否成功）
+    "status": str,          # SUCCEEDED / FAILED / TIMEOUT / REJECTED /
+                            # STREAM_DISCONNECTED / GRPC_UNAVAILABLE /
+                            # PROTOCOL_MISMATCH / QUEUED / RUNNING / QUEUE_TIMEOUT
+    "outcome_known": bool,  # 是否收到 EDI 最终事件（SUCCEEDED/FAILED），
+                            # False 时 task_success 无意义
+    "task_success": bool|null,  # EDI 任务是否成功；仅 outcome_known=True 时有意义，
+                                # None 表示结果未知（超时/断连/协议不匹配等）
+    "failure_source": str|null,  # 异常来源："mcp" 表示 MCP 自身异常，非 EDI 业务失败
     "message": str,         # 描述信息
     "project_path": str,    # 工程路径（如适用）
     "result_path": str,     # 结果路径（如适用）
-    "ads_output": str,      # 增量拼接的完整日志
+    "ads_output": str,      # 增量拼接的完整仿真器日志
     "log_complete": bool,   # 日志是否接收完整
     "details": dict,        # 原始事件 payload 字段
 }
 ```
+
+字段语义：
+- `completed` — MCP 侧本次调用结束；TIMEOUT/STREAM_DISCONNECTED 也是 `completed=True`
+- `outcome_known` — 收到 EDI 最终事件（SUCCEEDED/FAILED）时为 True；超时/断连时为 False
+- `task_success` — 只有 `outcome_known=True` 时才有确定值；`None` 表示 EDI 实际状态未知
+- `failure_source: "mcp"` — MCP 进程自身异常（如无法连接 EDI），不属于 EDI 业务失败
 
 纯本地工具（如 `list_epp_projects`）使用各自的简化结构。

@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from servers import mcp
 from servers.settings import get_settings
 from servers.runtime_config import build_file_link
+from servers.multimodal_vision.document import register_document_url
 
 load_dotenv()
 _logger = logging.getLogger("report.generator")
@@ -334,11 +335,18 @@ def generate_simulation_report(
     if schematic_missing:
         warnings.append("原理图文件未找到，已跳过链路拓扑章节")
 
+    preview_url = register_document_url(str(expected_output),
+                                         disposition="inline" if file_type == "pdf" else "attachment")
+    md_link = f"[打开{file_type.upper()}报告]({preview_url})"
+
     result = {
         "success": True,
         "file_path": str(expected_output),
         "file_type": data.get("file_type", file_type),
         "file_size": actual_size,
+        "preview_url": preview_url,
+        "markdown_link": md_link,
+        "message": f"报告已生成：{md_link}\n\n本地路径：{expected_output}\n\n链接 10 分钟有效，仅本机可访问。",
         "sections": data.get("sections", []),
         "chart_count": data.get("chart_count", 0),
         "component_count": data.get("component_count", 0),

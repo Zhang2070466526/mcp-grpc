@@ -76,11 +76,13 @@ _MAX_TOOL_CALLS_PER_ROUND = 8 # 单轮最多工具调用数
 _MAX_TOOL_RESULT_CHARS = 100_000  # 工具返回最大字符数
 _PENDING_ACTION_TTL = 300      # 待确认操作有效期 5 分钟
 
-# 破坏性工具：Chat 层需用户确认后才执行
+# 破坏性工具：Chat 层需用户确认后才执行（仅工具名匹配，参数条件在下方单独处理）
 _DESTRUCTIVE_CHAT_TOOLS = {
     "delete_simulation_component",
     "replace_models_from_csv",
     "replace_port_component",
+    "close_edi_project",          # 确认时需要 need_save=true
+    "generate_simulation_report",  # 确认时需要 overwrite=true
 }
 
 # ---------------------------------------------------------------------------
@@ -173,7 +175,7 @@ def _build_tools_schema() -> list[dict]:
         _rtool("launch_edi", "启动 EDI 客户端并等待 gRPC 就绪", {}, {"edi_path": "string", "wait_for_grpc": "boolean", "wait_timeout": "integer"}),
         _rtool("compare_simulation_results", "多个 RAW 结果同一条曲线对比叠图", {"result_paths": "array", "curve": "string", "img_path": "string"}, {"chart_type": "string", "labels": "array", "dependency": "string", "csv_path": "string", "alignment": "string", "reference_index": "integer"}),
         _rtool("list_result_curves", "解析 RAW 文件返回可用曲线名和依赖轴，画图前调用避免猜测曲线名", {"result_path": "string"}),
-        _rtool("turbocharts_convert", "ADS RAW 文件转曲线图和 CSV", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
+        _rtool("turbocharts_convert", "ADS RAW 转曲线图和 CSV。VSWR 类曲线 CSV 一次只取第一条，多条需分次导出。导出后核对行数列数", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
         _rtool("show_image", "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）", {"image_path": "string"}),
         _rtool("analyze_image", "调用视觉模型分析图片内容（会上传到第三方）。仅用户明确要求分析时调用，不得自动触发。显示图片用 show_image", {"image_path": "string"}, {"prompt": "string", "detail": "string", "max_tokens": "integer"}),
         _rtool("open_document", "为本地 PDF/DOCX 生成临时 HTTP 链接。只生成链接不自动打开，仅用户明确要求时调用", {"file_path": "string"}, {"disposition": "string"}),
@@ -433,7 +435,7 @@ class ChatService:
                     session.pending_action = None
                     return ChatResponse(success=True, session_id=session.session_id,
                                         request_id=request_id, reply="已取消操作。")
-                # 有其他 pending 但消息不匹配 — 提示确认方式
+                # 消息不匹配 — 再次提示
                 return ChatResponse(success=True, session_id=session.session_id,
                                     request_id=request_id,
                                     reply=_confirmation_text(pending))
@@ -531,13 +533,21 @@ class ChatService:
                         )
 
                     # 破坏性工具检查：必须是本轮唯一调用
-                    destructive = [tc for tc in tool_calls
-                                   if tc.get("function", {}).get("name", "") in _DESTRUCTIVE_CHAT_TOOLS]
-                    # generate_schematic with clear_before_import is also destructive
-                    clear_imports = [tc for tc in tool_calls
-                                     if tc.get("function", {}).get("name", "") == "generate_schematic_from_netlist"
-                                     and _safe_json(tc.get("function", {}).get("arguments", "{}")).get("clear_before_import")]
-                    destructive.extend(clear_imports)
+                    destructive = []
+                    for tc in tool_calls:
+                        fn = tc.get("function", {})
+                        name = fn.get("name", "")
+                        args = _safe_json(fn.get("arguments", "{}"))
+                        if name in _DESTRUCTIVE_CHAT_TOOLS:
+                            # 参数感知确认：仅在实际会造成破坏时才拦截
+                            if name == "close_edi_project" and not args.get("need_save"):
+                                continue
+                            if name == "generate_simulation_report" and not args.get("overwrite"):
+                                continue
+                            destructive.append(tc)
+                        elif name == "generate_schematic_from_netlist":
+                            if args.get("clear_before_import"):
+                                destructive.append(tc)
                     if destructive:
                         if len(tool_calls) > 1:
                             return ChatResponse(
@@ -905,7 +915,7 @@ def _tool_label(name: str) -> str:
 
 # ── 破坏性工具确认（ChatService 方法）──
 
-_CONFIRM_WORDS: set[str] = set()  # 仅通过 action_id 匹配: "确认 a1b2c3d4"
+_CONFIRM_WORDS: set[str] = {"确认", "是", "yes", "ok", "执行", "继续", "confirm", "好的", "可以", "行"}
 _CANCEL_WORDS: set[str] = {"取消", "不要执行", "no", "cancel"}
 
 
@@ -919,6 +929,12 @@ def _create_pending(tool_name: str, args: dict) -> PendingAction:
             f"从工程中删除器件 {args.get('instance_name', '?')} 及其连接线",
         "replace_models_from_csv":
             f"使用 {args.get('csv_path', '?')} 批量替换工程模型",
+        "close_edi_project":
+            f"关闭工程 {args.get('project_path', '?')} 并保存修改",
+        "generate_simulation_report":
+            f"覆盖已有报告文件 {args.get('output_path', '?')}",
+        "replace_port_component":
+            f"替换端口器件 {args.get('target_instance_name', '?')} 为 {args.get('replacement_component_type', '?')}",
     }.get(tool_name, f"执行 {tool_name}")
     return PendingAction(
         action_id=uuid.uuid4().hex[:8],
@@ -932,10 +948,13 @@ def _confirmation_text(pending: PendingAction) -> str:
     target = {
         "delete_simulation_component": f"{pending.summary}。此操作无法由 MCP 自动恢复。",
         "replace_models_from_csv": f"{pending.summary}。此操作将修改工程中的模型。",
+        "close_edi_project": f"{pending.summary}。保存后无法撤销。",
+        "generate_simulation_report": f"{pending.summary}。原文件将被覆盖。",
+        "replace_port_component": f"{pending.summary}。此操作将替换器件并重新连线。",
     }.get(pending.tool_name, pending.summary)
     return (
         f"⚠️ **确认操作**\n\n{target}\n\n"
-        f"请回复\"确认 {pending.action_id}\"继续，或回复\"取消\"放弃。"
+        f"回复 **确认** 继续，或回复 **取消** 放弃。"
     )
 
 

@@ -855,7 +855,7 @@ REPORT_RENDER_TIMEOUT_SECONDS=45
 
 ## 十一、跨层设计原则
 
-### 9.1 参数校验分层
+### 11.1 参数校验分层
 
 AI 的请求经过 5 层校验才能到达 EDI 服务端，每一层拦截不同类别的错误：
 
@@ -871,7 +871,7 @@ call_grpc()                JSON 序列化、超时控制、锁获取
 EDI gRPC 服务             最终业务校验和执行
 ```
 
-### 9.2 错误码体系
+### 11.2 错误码体系
 
 | 层级 | 字段 | 来源 | 示例 |
 |---|---|---|---|
@@ -897,7 +897,7 @@ FILE_NOT_FOUND                  INVALID_STATUS
 SIMULATION_QUEUE_FULL           TASK_NOT_FOUND
 ```
 
-### 9.3 并发控制
+### 11.3 并发控制
 
 | 资源 | 锁类型 | 原因 |
 |---|---|---|
@@ -909,11 +909,11 @@ SIMULATION_QUEUE_FULL           TASK_NOT_FOUND
 | Chat 会话 | `threading.Lock` | 保护 `_sessions` 字典的读写 |
 | 图片 token | `threading.RLock` | 保护 `_IMAGE_TOKENS` 字典（注册、查询、过期清理） |
 
-### 9.4 向后兼容
+### 11.4 向后兼容
 
 协议 v2 不兼容 v1。`UPSERT_SIMULATION_COMPONENT` 已被拆分为 `CREATE_SIMULATION_COMPONENT`(11) + `UPDATE_SIMULATION_COMPONENT`(15)，新增 `GENERATE_SCHEMATIC_FROM_NETLIST`(13) 和 `SET_COMPONENT_ACTIVE_STATE`(14)。EDI 服务、MCP 服务、protobuf 生成代码必须成套升级，禁止新旧混用。
 
-### 9.5 非幂等操作保护
+### 11.5 非幂等操作保护
 
 以下操作禁止在 `TIMEOUT`/`STREAM_DISCONNECTED` 后自动重试：
 
@@ -922,3 +922,63 @@ SIMULATION_QUEUE_FULL           TASK_NOT_FOUND
 - `generate_schematic_from_netlist` 的清空模式（可能再次清空）
 
 `set_component_active_state` 是确定性设置，可以安全重试。
+
+### 11.6 返回字段语义 — outcome_known / task_success
+
+gRPC 层通过 `_terminal_result()` 统一构建返回结构，关键字段：
+
+```
+completed      MCP 侧任务是否结束（线程退出、超时、断连都是 completed=True）
+outcome_known  是否收到了 EDI 的最终事件（SUCCEEDED 或 FAILED）
+task_success   仅 outcome_known=True 时有意义；None = EDI 实际状态未知
+failure_source 异常来源："mcp" 表示 MCP 自身异常，不是 EDI 业务失败
+```
+
+语义矩阵：
+
+| 状态 | success | outcome_known | task_success |
+|---|---|---|---|
+| SUCCEEDED | True | True | True |
+| FAILED（EDI） | False | True | False |
+| REJECTED | False | True | False |
+| TIMEOUT | False | False | None |
+| STREAM_DISCONNECTED | False | False | None |
+| GRPC_UNAVAILABLE | False | False | None |
+| PROTOCOL_MISMATCH | False | False | None |
+| MCP 异常 | False | False | None（failure_source="mcp"） |
+
+`_run_sim_task()` 不覆盖 gRPC 层已计算的 `task_success`，
+只在字段不存在时从 `outcome_known` 和 `status` 推导。
+
+### 11.7 配置统一
+
+所有环境变量收敛到 `servers/settings.py` → `Settings` dataclass（frozen，lru_cache 单例）。
+其他模块通过 `get_settings()` 读取，不再直接调用 `os.getenv()`。
+
+启动时 `start_servers.py` 调用 `settings.validate()`，校验：
+- EDA_GRPC_SERVER 格式（host:port）
+- gRPC 端口范围（1-65535）
+- MCP_TRANSPORT 合法性（sse / stdio / streamable-http）
+- MCP_PORT 范围
+
+### 11.8 Chat 破坏性工具确认
+
+注册时标记 5 个破坏性工具，参数感知确认：
+
+| 工具 | 确认条件 |
+|---|---|
+| delete_simulation_component | 无条件确认 |
+| replace_models_from_csv | 无条件确认 |
+| replace_port_component | 无条件确认 |
+| close_edi_project | need_save=true 时确认 |
+| generate_simulation_report | overwrite=true 时确认 |
+| generate_schematic_from_netlist | clear_before_import=true 时确认（Chat 层补 confirm_clear） |
+
+确认支持简单肯定词（确认/是/yes/ok/好的），无操作 5 分钟过期。
+
+### 11.9 HFSS 任务管理
+
+- TTL 2 小时自动清理（`_prune_hfss_tasks()`）
+- 最大 50 个任务（含历史）
+- 统一 `outcome_known` / `task_success` 字段
+- TASK_NOT_FOUND 返回 `success=False, outcome_known=False, task_success=None`

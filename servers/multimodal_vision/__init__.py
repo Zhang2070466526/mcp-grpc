@@ -10,7 +10,7 @@ validators.py        共享校验                   （路径/扩展名/Pillow�
 from servers.multimodal_vision.image_display import show_image, register_image_url, serve_image
 from servers.multimodal_vision.workspace_copy import copy_image_to_workspace, OPENCLAW_WORKSPACE_PATH
 from servers.multimodal_vision.vision_analyzer import analyze_image
-from servers.multimodal_vision.document import open_document, open_local_document, serve_document
+from servers.multimodal_vision.document import open_document, open_local_document, serve_document, register_document_url
 
 # 条件注册 copy_image_to_workspace
 from servers import mcp

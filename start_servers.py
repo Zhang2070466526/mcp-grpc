@@ -40,7 +40,17 @@ DEFAULT_TRANSPORT = _cfg.mcp_transport
 DEFAULT_HOST = _cfg.mcp_host
 DEFAULT_PORT = _cfg.mcp_port
 
-from servers import mcp
+# ── 启动时配置校验 ──
+_cfg_issues = _cfg.validate()
+if _cfg_issues:
+    print("WARNING: 配置存在问题 —")
+    for issue in _cfg_issues:
+        print(f"  - {issue}")
+    print()
+
+from servers import mcp, __version__ as _server_ver
+from servers.eda.config import EDA_GRPC_SERVER as _grpc_cfg_addr
+from servers.runtime_config import set_server_address
 import servers.registry_server  #  — 触发工具注册
 
 
@@ -65,8 +75,7 @@ def _setup_logging() -> None:
     root = logging.getLogger()
     root.addHandler(handler)
     root.setLevel(logging.INFO)
-    from servers import __version__ as _ver
-    root.info("EDI MCP v%s starting", _ver)
+    root.info("EDI MCP v%s starting", _server_ver)
 
 
 def _run_http_server(port: int, transport: str = "streamable-http") -> None:
@@ -99,27 +108,24 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     tools = [t.name for t in mcp._tool_manager._tools.values()]
 
     # 检测 50055 状态
-    from servers.eda.config import EDA_GRPC_SERVER as _grpc_addr
-    _grpc_host, _grpc_port = _grpc_addr.rsplit(":", 1)
+    _grpc_host, _grpc_port = _grpc_cfg_addr.rsplit(":", 1)
     _test = socket.socket()
     _test.settimeout(1)
     _grpc_ok = _test.connect_ex((_grpc_host, int(_grpc_port))) == 0
     _test.close()
 
     print("=" * 50)
-    from servers import __version__ as _ver
-    print(f"  EDI MCP v{_ver}")
+    print(f"  EDI MCP v{_server_ver}")
     print(f"  UI:   http://{host}:{port}/ui")
     endpoint = "/mcp" if transport == "streamable-http" else "/sse"
     print(f"  MCP:  http://{host}:{port}{endpoint}")
     print(f"  Tools: {len(tools)} loaded")
-    print(f"  gRPC: {_grpc_addr} [{'ONLINE' if _grpc_ok else 'OFFLINE'}]")
+    print(f"  gRPC: {_grpc_cfg_addr} [{'ONLINE' if _grpc_ok else 'OFFLINE'}]")
     print(f"  Close window to stop")
     print("=" * 50)
 
     mcp.settings.host = host
     mcp.settings.port = port
-    from servers.runtime_config import set_server_address
     set_server_address(host, port)
     mcp.run(transport=transport)
 
@@ -140,6 +146,11 @@ def main() -> None:
         help=f"HTTP 服务端口（默认: {DEFAULT_PORT}）",
     )
     args = parser.parse_args()
+
+    # 校验 --port 范围
+    if args.port < 1 or args.port > 65535:
+        print(f"错误：端口号无效（{args.port}），必须在 1-65535 之间。")
+        sys.exit(1)
 
     if args.transport in ("sse", "streamable-http"):
         _setup_logging()

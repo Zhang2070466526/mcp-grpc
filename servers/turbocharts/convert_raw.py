@@ -308,6 +308,13 @@ def turbocharts_convert(
         ├─ MV_S[2,1]          数控移相器幅度波动
         └─ PSS_S[2,1]         数控移相器移相态
 
+    CSV 导出限制:
+        DB 类曲线（DB_S[a,b]）多条可一次导出。
+        VSWR 类曲线一次 CSV 调用只保留第一条——多条 VSWR 必须
+        分次调用，每次一条（如 VSWR_S[1,1] 和 VSWR_S[2,2] 分两次导出）。
+        DB+VSWR 混用时图片正常，CSV 中 VSWR 仍只取第一条。
+        导出后务必核对 CSV 行数和列数与预期一致。
+
     精度配置（--ac）:
         格式: ac_type#bit#data#nv_type#nv_value
         ac_type: phase（相位精度）或 att（衰减精度）
@@ -348,10 +355,28 @@ def turbocharts_convert(
     if ac_config:
         cmd.extend(["--ac", ac_config])
 
+    # ── VSWR CSV 限制警告 ──
+    warnings: list[str] = []
+    if csv_path and linename:
+        vswr_curves = re.findall(r'VSWR_S\[\d+,\d+\]', linename)
+        if len(vswr_curves) > 1:
+            warnings.append(
+                f"CSV 导出时 VSWR 曲线只保留第一条：{vswr_curves}。"
+                f"如需多个端口的驻波数据，请分次调用，每次一条 VSWR。"
+            )
+        elif len(vswr_curves) == 1:
+            # 混合调用：DB + VSWR，CSV 中 VSWR 正常但 DB 可能受影响取决于顺序
+            non_vswr = re.findall(r'(?<!VSWR_S)\b\w+_S?\[?\d+,?\d*\]?', linename)
+            pass  # 单条 VSWR OK，不警告
+
     result = run_turbocharts(cmd, timeout_seconds=120)
 
     img_generated = Path(img_path).exists()
     csv_generated = bool(csv_path) and Path(csv_path).exists()
+
+    # CSV 生成后做完整性提示
+    if csv_generated:
+        warnings.append("CSV 已生成，请核对行数和列数与预期一致后再使用数据。")
 
     resp = {
         "success": result.returncode == 0,
@@ -363,6 +388,8 @@ def turbocharts_convert(
         "csv_generated": csv_generated,
         "output_paths": {"img": img_path} | ({"csv": csv_path} if csv_path else {}),
     }
+    if warnings:
+        resp["warnings"] = warnings
     if result.returncode == 0 and img_generated:
         resp.update(build_file_link(img_path, "打开曲线图"))
     return resp

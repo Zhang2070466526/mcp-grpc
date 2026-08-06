@@ -158,7 +158,9 @@ def _run_sim_task(
             task["error"] = None if result.get("success") else result.get("message")
             task["finished_at"] = time.time()
             result["completed"] = True
-            result["task_success"] = result.get("status") == "SUCCEEDED"
+            # 不覆盖 gRPC 层已计算的 task_success：只有 outcome_known=True 时才有意义
+            if "task_success" not in result:
+                result["task_success"] = result.get("outcome_known") and result.get("status") == "SUCCEEDED"
             # 最终 result 已含完整拼接日志，清 chunk 避免双份
             task["log_chunks"] = []
 
@@ -175,7 +177,9 @@ def _run_sim_task(
             task["result"] = {
                 "success": False,
                 "completed": True,
-                "task_success": False,
+                "outcome_known": False,
+                "task_success": None,
+                "failure_source": "mcp",
                 "task_id": task_id,
                 "client_uuid": client_uuid,
                 "status": "FAILED",
@@ -342,6 +346,7 @@ def get_simulation_async_result(task_id: str) -> dict[str, Any]:
         "success": True,
         "completed": completed,
         "task_success": None,
+        "outcome_known": False,
         "task_id": task_id,
         "client_uuid": task["client_uuid"],
         "status": task["status"],

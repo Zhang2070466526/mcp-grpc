@@ -87,7 +87,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `get_project_summary` | 工程概览（元数据/原理图/仿真配置） |
 | `analyze_variables` | 分析变量定义、引用和 Sweep 配置 |
 
-### 仿真器件（8 个）— 协议 v3
+### 仿真器件（8 个）— 工具 API v3，底层 gRPC 协议 v2
 
 | 工具 | 说明 |
 |---|---|

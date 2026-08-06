@@ -87,12 +87,25 @@ class Settings:
         default_factory=lambda: _read_str("OPENCLAW_WORKSPACE"))
 
     def validate(self) -> list[str]:
-        """启动时校验关键配置，返回问题列表。"""
+        """启动时校验关键配置，返回问题列表。不阻断启动，仅返回警告。"""
         issues: list[str] = []
+        # ── gRPC 地址 ──
         if ":" not in self.eda_grpc_server:
-            issues.append(f"EDA_GRPC_SERVER 格式无效: {self.eda_grpc_server}")
+            issues.append(f"EDA_GRPC_SERVER 格式无效（需要 host:port）: {self.eda_grpc_server}")
+        else:
+            host, port_str = self.eda_grpc_server.rsplit(":", 1)
+            try:
+                port = int(port_str)
+                if port < 1 or port > 65535:
+                    issues.append(f"EDA_GRPC_SERVER 端口越界: {port}")
+            except ValueError:
+                issues.append(f"EDA_GRPC_SERVER 端口不是整数: {port_str}")
+        # ── 传输方式 ──
         if self.mcp_transport not in ("sse", "stdio", "streamable-http"):
-            issues.append(f"MCP_TRANSPORT 不支持: {self.mcp_transport}")
+            issues.append(f"MCP_TRANSPORT 不支持（需 sse/stdio/streamable-http）: {self.mcp_transport}")
+        # ── MCP 端口 ──
+        if self.mcp_port < 1 or self.mcp_port > 65535:
+            issues.append(f"MCP_PORT 越界: {self.mcp_port}")
         return issues
 
 

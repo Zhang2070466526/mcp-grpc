@@ -21,7 +21,7 @@ servers/
   settings.py             # 统一配置加载
   multimodal_vision/      # 图片 + 视觉分析 + 文档工具
   report/                 # 仿真报告生成
-  eda/                   # EDI 工程工具（25 个）
+  eda/                   # EDI 工程工具（26 个）
     __init__.py           # 公共 API + 工具清单
     config.py             # 配置 + ProjectReader + S-expression
     grpc_client.py        # gRPC 通信层（FetchEvent → PerformAction）
@@ -203,6 +203,15 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 30. FetchEvent 必须在 PerformAction 之前建立（文档要求），否则 EDI 返回 external handler not ready
 31. `create_blank_epp` 暂不可用（已取消注册），函数代码保留，取消注释 @mcp.tool() 即可恢复
 32. PyPI 包 (`edi-mcp`) 仅含 Python 源码，不含 PyInstaller 二进制；Windows 专属（pywin32/COM）
+33. 配置统一到 `servers/settings.py`，所有模块通过 `get_settings()` 读取，不再各自调用 os.getenv
+34. gRPC 返回增加 `outcome_known` / `task_success` 字段：TIMEOUT/STREAM_DISCONNECTED 时 `outcome_known=False, task_success=None`，MCP 异常增加 `failure_source: "mcp"`
+35. `start_servers.py` 启动时调用 `settings.validate()`，校验 gRPC 地址格式、端口范围、传输方式
+36. `document_tools.py` 已迁移到 `multimodal_vision/document.py`，PyInstaller spec 同步更新
+37. Chat 破坏性工具列表扩展为 5 个（新增 close_edi_project need_save / generate_simulation_report overwrite），参数感知确认
+38. Chat 确认流程支持简单肯定词（确认/是/yes/ok/好的等），不需要输入随机 ID
+39. HFSS 异步任务：2 小时 TTL 自动清理、最大 50 个任务、`outcome_known` / `task_success` 字段
+40. `compare_simulation_results`：增加 alignment/reference_index/labels/X 轴递增/重复值/路径规范化校验
+41. 报告日志脱敏：INFO 仅记录 file_type/output_path/size，完整 body 移入 DEBUG 级别
 
 ## 维护人
 
