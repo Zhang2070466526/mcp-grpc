@@ -628,7 +628,7 @@ HFSS 任务队列：串行 worker 线程从 `queue.Queue(maxsize=10)` 取任务�
 
 ### 6.2 copy_image_to_workspace
 
-条件注册（仅 `OPENCLAW_WORKSPACE` 有效目录时）。复制到 `{workspace}/media/edi/mcp-cache/`：
+条件注册（`OPENCLAW_WORKSPACE` 有效时，支持 `.env` 配置或自动检测 `rfclaw/openclaw-service/state/workspace`）。复制到 `{workspace}/media/edi/mcp-cache/`：
 
 - 文件名 = `{安全源文件名}_{MD5前8位}{扩展名}`（稳定文件名，同一源文件总是相同目标）
 - 上限 40MB

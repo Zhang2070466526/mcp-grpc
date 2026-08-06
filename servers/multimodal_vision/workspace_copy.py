@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 import shutil
+import sys as _sys
 import time
 from pathlib import Path
 from typing import Any
@@ -23,23 +23,47 @@ _MAX_WORKSPACE_IMAGE_SIZE = 40 * 1024 * 1024  # 40 MB
 _OPENCLAW_CACHE_TTL = 24 * 60 * 60
 _ALLOWED_CACHE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 
+_MIME_MAP: dict[str, str] = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp",
+}
+
 
 # ═══════════════════════════════════════════════════════════
 # 工作区检测
 # ═══════════════════════════════════════════════════════════
 
 def _get_openclaw_workspace() -> Path | None:
+    # 1. 优先 .env 配置
     value = get_settings().openclaw_workspace
-    if not value:
-        return None
-    try:
-        w = Path(value).expanduser().resolve()
-        if not w.is_dir():
-            _logger.warning("OPENCLAW_WORKSPACE is invalid")
-            return None
-        return w
-    except OSError:
-        return None
+    if value:
+        try:
+            w = Path(value).expanduser().resolve()
+            if w.is_dir():
+                return w
+            _logger.warning("OPENCLAW_WORKSPACE 配置的路径无效: %s", value)
+        except OSError:
+            pass
+
+    # 2. 自动检测：edi-mcp/ 同级 rfclaw/openclaw-service/state/workspace
+    if getattr(_sys, "frozen", False):
+        _app_root = Path(_sys.executable).parent.resolve()
+    else:
+        _app_root = Path(__file__).resolve().parent.parent.parent  # multimodal_vision/ → servers/ → 项目根
+
+    candidates = [
+        _app_root.parent / "rfclaw" / "openclaw-service" / "state" / "workspace",
+        _app_root.parent / "openclaw" / "state" / "workspace",
+    ]
+    for p in candidates:
+        try:
+            if p.is_dir():
+                _logger.info("OPENCLAW_WORKSPACE auto-detected: %s", p)
+                return p
+        except OSError:
+            continue
+
+    return None
 
 
 OPENCLAW_WORKSPACE_PATH = _get_openclaw_workspace()
@@ -94,7 +118,7 @@ def copy_image_to_workspace(image_path: str) -> dict[str, Any]:
             "success": True, "copied": False,
             "status": "WORKSPACE_NOT_CONFIGURED", "retryable": False,
             "source_path": str(path),
-            "message": "未配置 OPENCLAW_WORKSPACE。请在 .env 中配置并重启服务。",
+            "message": "未找到 OpenClaw 工作区。请在 .env 中配置 OPENCLAW_WORKSPACE，或将工作区放在 edi-mcp 同级目录。",
         }
 
     size = path.stat().st_size
@@ -125,12 +149,18 @@ def copy_image_to_workspace(image_path: str) -> dict[str, Any]:
             "message": "图片超过工作区复制大小限制（40 MB）。",
         }
 
+    target_path = Path(target)
+    rel = target_path.relative_to(workspace) if str(target_path).startswith(str(workspace)) else target_path
+    mime = _MIME_MAP.get(target_path.suffix.lower(), "application/octet-stream")
+
     return {
         "success": True, "copied": True, "displayed": False,
         "status": "COPIED", "retryable": False,
         "source_path": str(path),
         "workspace_path": str(workspace),
         "image_path": target,
+        "media_path": str(rel).replace("\\", "/"),
+        "media_type": mime,
         "openclaw_attachment": {"filePath": target},
         "message": "图片已复制到工作区。请使用 OpenClaw 消息工具的 filePath 发送。",
     }

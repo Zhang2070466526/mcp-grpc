@@ -36,7 +36,7 @@ TURBOCHARTS_PATH=                    # 留空自动检测
 MCP_TRANSPORT=streamable-http         # streamable-http（Web）或 stdio（本地）
 MCP_PORT=50026                       # 监听端口
 MCP_HOST=127.0.0.1                   # 监听地址
-OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace  # copy_image_to_workspace 需要
+OPENCLAW_WORKSPACE=                             # 留空自动检测 rfclaw/openclaw-service/state/workspace
 LLM_API_KEY=sk-xxx                   # 可选：聊天 AI 功能
 LLM_BASE_URL=https://api.deepseek.com
 LLM_MODEL=deepseek-chat
@@ -48,7 +48,7 @@ VISION_MODEL=
 REPORT_RENDER_URL=http://127.0.0.1:17867/api/v1/reports/render
 ```
 
-> 留空的字段走自动检测(除OPENCLAW_WORKSPACE)，一般只需确认 `EDA_GRPC_SERVER` 正确。
+> 留空的字段走自动检测，一般只需确认 `EDA_GRPC_SERVER` 正确。
 
 ---
 
@@ -175,7 +175,7 @@ netstat -ano | findstr 50055
 
 **图片显示"不在聊天中显示"？**
 
-检查 `.env` 中 `OPENCLAW_WORKSPACE` 是否已配置为有效的 OpenClaw 工作区路径（如 `C:\Users\JGL\.openclaw\workspace`）。打包生成的 `.env` 默认为空，需要手动填写。
+检查 `.env` 中 `OPENCLAW_WORKSPACE` 是否正确，或确认工作区在 edi-mcp 同级目录（自动检测 rfclaw/openclaw-service/state/workspace）。
 
 **图片显示白屏或 Outside allowed folders？**
 

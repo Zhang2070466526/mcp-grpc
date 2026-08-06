@@ -30,7 +30,7 @@ EDI_PATH=                                         # 留空自动检测
 TURBOCHARTS_PATH=                                 # 留空自动检测
 MCP_TRANSPORT=streamable-http
 MCP_PORT=50026
-OPENCLAW_WORKSPACE=                               # 配置后启用 copy_image_to_workspace
+OPENCLAW_WORKSPACE=                               # 留空自动检测，或手动指定
 ```
 
 > 完整配置和客户端接入说明见 [部署指南](./docs/DEPLOY.md)。
