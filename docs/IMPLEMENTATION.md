@@ -797,7 +797,23 @@ workspace_enabled = OPENCLAW_WORKSPACE_PATH is not None
 
 ---
 
-## 九、报告渲染（1 个工具）
+## 九、文档工具（2 个工具）
+
+`open_document` 和 `open_local_document` 实现在 `servers/document_tools.py`。
+
+**`open_document`**：为本地 PDF/DOCX 生成临时 HTTP 链接。
+- Token 映射 `/documents/{token}`，10 分钟过期
+- 链接内保存 `disposition` 参数，PDF inline 预览、DOCX attachment 下载
+- 安全：UNC 拒绝、绝对路径校验、nosniff 头
+
+**`open_local_document`**：使用 `os.startfile()` 调用系统默认程序打开。
+- 支持 10 种格式（.pdf/.doc/.docx/.xls/.xlsx/.ppt/.pptx/.txt/.csv/.rtf）
+- 拒绝可执行文件、相对路径、网络路径
+- 工具描述明确"仅用户要求时调用，生成报告后不得自动打开"
+
+---
+
+## 十、报告渲染（1 个工具）
 
 `generate_simulation_report` 生成本地仿真报告（PDF/DOCX）。核心实现在 `servers/report/generator.py`。
 
@@ -836,7 +852,7 @@ REPORT_RENDER_TIMEOUT_SECONDS=45
 
 ---
 
-## 十、跨层设计原则
+## 十一、跨层设计原则
 
 ### 9.1 参数校验分层
 

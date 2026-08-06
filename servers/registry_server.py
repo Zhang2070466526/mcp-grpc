@@ -1,7 +1,7 @@
 """MCP 工具注册中心 — 导入即可自动注册所有 @mcp.tool() 工具。
 
 ═══════════════════════════════════════════════════════════
-  已注册工具（37 个，配置工作区后 38 个）：
+  已注册工具（39 个，配置工作区后 40 个）：
 
   工程管理：
     list_epp_projects             扫描文件夹中的 .epp 工程
@@ -51,6 +51,10 @@
     analyze_image                 调用视觉模型分析图片内容
     copy_image_to_workspace       条件注册，复制到 media/edi/mcp-cache/（需配置工作区）
 
+  文档：
+    open_document                 为本地 PDF/DOCX 生成临时 HTTP 链接
+    open_local_document           使用系统默认程序打开本地文档
+
   报告：
     generate_simulation_report    生成本地仿真报告（PDF/DOCX）
 
@@ -78,6 +82,7 @@ import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
 import servers.multimodal_vision          # noqa: F401 — show_image + copy + analyze
 import servers.report                     # noqa: F401 — generate_simulation_report
+import servers.document_tools              # noqa: F401 — open_document + open_local_document
 
 # Resources & Prompts
 import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.prompt()
@@ -85,6 +90,7 @@ import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.pr
 # Web 路由
 from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
 from servers.multimodal_vision import serve_image  # noqa: E402
+from servers.document_tools import serve_document  # noqa: E402
 
 mcp.custom_route("/", methods=["GET"])(ui_page)
 mcp.custom_route("/ui", methods=["GET"])(ui_page)
@@ -92,3 +98,4 @@ mcp.custom_route("/health", methods=["GET"])(health_check)
 mcp.custom_route("/chat", methods=["POST"])(chat_endpoint)
 mcp.custom_route("/tools/list", methods=["GET"])(tool_list)
 mcp.custom_route("/images/{token}", methods=["GET"])(serve_image)
+mcp.custom_route("/documents/{token}", methods=["GET"])(serve_document)

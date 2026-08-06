@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json as _json
 import logging
 import os
 import time
@@ -127,6 +128,15 @@ def _validate_charts(charts: list | None) -> tuple[list | None, list[str], dict 
     return validated, warnings, None
 
 
+# AI 可能使用中文 key，统一映射到 API 要求的英文 key
+_COMPONENT_KEY_MAP = {
+    "类型": "type", "器件类型": "type", "type": "type",
+    "型号": "model", "器件型号": "model", "model": "model",
+    "厂家": "manufacturer", "厂商": "manufacturer", "制造厂商": "manufacturer", "manufacturer": "manufacturer",
+    "规格": "specs", "器件规格": "specs", "specs": "specs",
+}
+
+
 def _validate_components(comps: list | None) -> dict | None:
     if comps is None:
         return None
@@ -139,10 +149,19 @@ def _validate_components(comps: list | None) -> dict | None:
     for i, c in enumerate(comps):
         if not isinstance(c, dict):
             return _error("INVALID_REPORT_PARAMETERS", f"components[{i}] 必须是对象")
+        # 中文 key → 英文 key 映射
+        normalized: dict = {}
+        for k, v in c.items():
+            target = _COMPONENT_KEY_MAP.get(k.strip(), k)
+            normalized[target] = v
+        comps[i] = normalized
         for field in ("type", "model", "manufacturer", "specs"):
-            val = c.get(field, "")
+            val = normalized.get(field, "")
             if not isinstance(val, str):
                 return _error("INVALID_REPORT_PARAMETERS", f"components[{i}].{field} 必须是字符串")
+            if not val.strip():
+                return _error("INVALID_REPORT_PARAMETERS",
+                               f"components[{i}] 缺少必填字段 '{field}'（支持中英文 key）")
             if len(val) > 2000:
                 return _error("INVALID_REPORT_PARAMETERS",
                                f"components[{i}].{field} 最长 2000 字符")
@@ -236,29 +255,37 @@ def generate_simulation_report(
 
     # 9. Build payload
     expected_output = Path(output_path).expanduser().resolve()
+    report_obj: dict = {"model_name": mn}
+    if description:
+        report_obj["description"] = description
+    if conclusion:
+        report_obj["conclusion"] = conclusion
+    if spec_table:
+        report_obj["spec_table"] = spec_table
+    if valid_charts:
+        report_obj["charts"] = valid_charts
+    if components:
+        report_obj["components"] = components
+    if schematic_path:
+        report_obj["schematic"] = schematic_path
+
     payload = {
         "output_path": str(expected_output),
         "file_type": file_type,
         "overwrite": overwrite,
-        "report": {
-            "model_name": mn,
-            "description": description,
-            "conclusion": conclusion,
-            "spec_table": spec_table or [],
-            "charts": valid_charts or [],
-            "components": components or [],
-            "schematic": schematic_path or "",
-        },
+        "report": report_obj,
     }
 
     # 10. Call report service
     t0 = time.monotonic()
+    body = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    _logger.info("REPORT_REQ: %s", body.decode("utf-8"))
     try:
         with httpx.Client(timeout=effective_timeout) as client:
             resp = client.post(
                 _REPORT_URL,
-                json=payload,
-                headers={"Content-Type": "application/json"},
+                content=body,
+                headers={"Content-Type": "application/json; charset=utf-8"},
             )
     except httpx.ConnectError:
         return _error("REPORT_SERVICE_UNAVAILABLE",

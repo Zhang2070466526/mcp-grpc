@@ -424,7 +424,7 @@ def list_eda_tasks(status: str = "") -> dict[str, Any]:
                可选：QUEUED / ACCEPTED / RUNNING / SUCCEEDED / FAILED /
                TIMEOUT / STREAM_DISCONNECTED / REJECTED。
     """
-    _VALID_STATUSES = {"", "QUEUED", "ACCEPTED", "RUNNING", "SUCCEEDED",
+    _VALID_STATUSES = {"", "QUEUED", "QUEUE_TIMEOUT", "ACCEPTED", "RUNNING", "SUCCEEDED",
                        "FAILED", "TIMEOUT", "STREAM_DISCONNECTED", "REJECTED",
                        "PROTOCOL_MISMATCH", "GRPC_UNAVAILABLE"}
     status_filter = status.strip().upper()

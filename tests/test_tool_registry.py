@@ -20,6 +20,8 @@ def test_all_tools_registered():
         "list_result_curves", "turbocharts_convert",
         "show_image", "analyze_image", "analyze_variables",
         "generate_simulation_report",
+        "open_document",
+        "open_local_document",
         "get_simulation_component_schema",
         "list_simulation_components", "create_simulation_component",
         "update_simulation_component", "delete_simulation_component",

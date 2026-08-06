@@ -63,6 +63,9 @@ a = Analysis(
         'servers.report',
         'servers.report.generator',
 
+        # 文档工具
+        'servers.document_tools',
+
         # 运行时配置
         'servers.runtime_config',
         'servers.settings',

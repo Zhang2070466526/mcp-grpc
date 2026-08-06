@@ -53,11 +53,15 @@ def _suggest_curves(var_name: str, var_type: str) -> list[str]:
     # Detect special patterns first (before generic real/complex)
     delay_m = re.match(r'S\.delay\[(\d+),(\d+)\]', var_name)
     if delay_m:
-        # Known turbocharts crash (0xC0000005) for real_delayS — skip suggestion
+        # Known turbocharts crash (0xC0000005) for real_delayS — skip
         return curves
 
     if var_type == "real":
-        # Normalize square brackets → round for nf[1] → nf(1)
+        # Skip known crash patterns: nf(1), nf(2), nfmin
+        is_nf = bool(re.fullmatch(r'nf(?:min|[[(]\d+[\])])?', var_name, re.IGNORECASE))
+        if is_nf:
+            return curves  # turbocharts crashes with real_nf(*) regardless of bracket type
+        # Normalize square brackets → round for other real variables
         safe_name = var_name.replace("[", "(").replace("]", ")")
         curves.append(f"real_{safe_name}")
         return curves
@@ -132,7 +136,8 @@ def _parse_mds_format(text: str) -> list[dict]:
 
         if in_variables and line and not line.startswith("File Format:") \
                 and not line.startswith("Plotname:"):
-            parts = line.split()
+            # Handle both space-separated and tab-separated formats
+            parts = line.replace("\t", " ").split()
             if len(parts) < 3:
                 continue
             var_name = parts[1]

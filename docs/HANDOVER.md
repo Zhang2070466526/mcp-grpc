@@ -21,6 +21,7 @@ servers/
   settings.py             # 统一配置加载
   multimodal_vision/      # 图片工具（show_image + copy_image_to_workspace + analyze_image）
   report/                 # 仿真报告生成
+  document_tools.py       # 文档工具（临时链接 + 本地打开）
   eda/                   # EDI 工程工具（25 个）
     __init__.py           # 公共 API + 工具清单
     config.py             # 配置 + ProjectReader + S-expression
@@ -61,7 +62,7 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 
 PyPI: https://pypi.org/project/edi-mcp/
 
-## MCP 工具清单（37 个，配置 OPENCLAW_WORKSPACE 后 38 个）
+## MCP 工具清单（39 个，配置 OPENCLAW_WORKSPACE 后 40 个）
 
 **工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary, analyze_variables
 
@@ -76,6 +77,8 @@ PyPI: https://pypi.org/project/edi-mcp/
 **模型/启动**：replace_models_from_csv, launch_edi
 
 **图片**：show_image（MCP ImageContent）+ analyze_image（视觉模型分析，默认关闭）+ copy_image_to_workspace（需配置工作区，条件注册）
+
+**文档**：open_document（临时 HTTP 链接）+ open_local_document（系统默认程序打开）
 
 **图表**：list_result_curves, turbocharts_convert, compare_simulation_results
 
@@ -189,7 +192,7 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 18. 打包时自动过滤 LLM_API_KEY 等敏感配置，强制 MCP_TRANSPORT=sse
 19. ANSYS COM 支持多 ProgID 回退（AnsoftHfss.HfssScriptInterface / Ansoft.ElectronicsDesktop）
 20. AEDT 工程锁文件管理：打开前检查/清理失效锁，关闭后安全删除，PID 活跃时绝不删除
-21. `/tools/list` 端点返回全部 MCP 工具列表（37/38 个），`chat_client.html` 动态加载面板
+21. `/tools/list` 端点返回全部 MCP 工具列表（39/40 个），`chat_client.html` 动态加载面板
 22. EXE 使用 `exclude_binaries=True`，DLL/Pyd 统一放 `_internal/`，不再重复打包（预计减 45~50 MB）
 23. `matplotlib.use("Agg")` 必须在 `import matplotlib.pyplot` 之前调用，否则 GUI 后端被意外加载
 24. UPX 压缩已关闭（某些原生 DLL 压缩后兼容性问题），目录模式依赖 `_internal/` 不可单独分发 EXE

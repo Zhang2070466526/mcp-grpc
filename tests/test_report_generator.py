@@ -44,7 +44,7 @@ class TestOutputPath:
 
     def test_docx_ok(self, tmp_path):
         r = generate_simulation_report(str(tmp_path / "test.docx"), "OK")
-        assert r["error_code"] != "INVALID_OUTPUT_PATH"  # docx passes output check
+        assert r.get("error_code") != "INVALID_OUTPUT_PATH"
 
     def test_parent_dir_missing(self):
         r = generate_simulation_report("C:/nonexistent_xyz_123/test.pdf", "OK")
@@ -72,7 +72,7 @@ class TestModelName:
 
     def test_ok(self, tmp_path):
         r = generate_simulation_report(_ok_path(tmp_path), "ValidName")
-        assert r["error_code"] not in ("INVALID_REPORT_PARAMETERS", "INVALID_OUTPUT_PATH")  # passes validation
+        assert r.get("error_code") not in ("INVALID_REPORT_PARAMETERS", "INVALID_OUTPUT_PATH")  # passes validation
 
 
 # ═══════════════════════════════════════════════════════════
@@ -110,11 +110,11 @@ class TestSpecTable:
 
     def test_empty_skipped(self, tmp_path):
         r = generate_simulation_report(_ok_path(tmp_path), "OK", spec_table=[])
-        assert r["error_code"] != "INVALID_REPORT_PARAMETERS"
+        assert r.get("error_code") != "INVALID_REPORT_PARAMETERS"
 
     def test_none_skipped(self, tmp_path):
         r = generate_simulation_report(_ok_path(tmp_path), "OK", spec_table=None)
-        assert r["error_code"] != "INVALID_REPORT_PARAMETERS"
+        assert r.get("error_code") != "INVALID_REPORT_PARAMETERS"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -138,7 +138,7 @@ class TestCharts:
 
     def test_empty_skipped(self, tmp_path):
         r = generate_simulation_report(_ok_path(tmp_path), "OK", charts=[])
-        assert r["error_code"] != "INVALID_REPORT_PARAMETERS"
+        assert r.get("error_code") != "INVALID_REPORT_PARAMETERS"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -157,7 +157,7 @@ class TestComponents:
 
     def test_empty_skipped(self, tmp_path):
         r = generate_simulation_report(_ok_path(tmp_path), "OK", components=[])
-        assert r["error_code"] != "INVALID_REPORT_PARAMETERS"
+        assert r.get("error_code") != "INVALID_REPORT_PARAMETERS"
 
 
 # ═══════════════════════════════════════════════════════════

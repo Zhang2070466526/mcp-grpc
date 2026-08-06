@@ -147,6 +147,8 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `analyze_image` | 调用视觉模型分析图片内容 |
 | `copy_image_to_workspace`* | 复制到工作区（需 OPENCLAW_WORKSPACE） |
 | `generate_simulation_report` | 生成本地仿真报告（PDF/DOCX） |
+| `open_document` | 为 PDF/DOCX 生成临时 HTTP 链接 |
+| `open_local_document` | 用系统默认程序打开本地文档 |
 
 > *条件注册。完整参数说明见 [API 参考](./docs/API_REFERENCE.md)。
 
@@ -163,6 +165,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 │   ├── settings.py                统一配置加载
 │   ├── mcp_content.py            3 个 Resource + 4 个 Prompt
 │   ├── multimodal_vision/        图片显示 + 工作区复制 + 视觉分析
+│   ├── document_tools.py           文档工具（临时链接 + 本地打开）
 │   ├── report/                    仿真报告生成
 │   ├── chat/                     聊天模块（LLM 多轮工具闭环）
 │   ├── eda/                      EDI gRPC 工具

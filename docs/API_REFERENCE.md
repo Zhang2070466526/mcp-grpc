@@ -772,6 +772,41 @@ generate_schematic_from_netlist(project_path: str, netlist_path: str, clear_befo
 
 ---
 
+## 文档（2 个）
+
+### `open_document`
+
+```python
+from servers.document_tools import open_document
+
+open_document(file_path: str, disposition: str = "inline") -> dict
+```
+
+为本地 PDF/DOCX 文件生成临时 HTTP 链接（10 分钟过期）。PDF 在线预览，DOCX 触发下载。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `file_path` | str | 是 | — | 本地绝对路径（.pdf/.docx） |
+| `disposition` | str | 否 | "inline" | inline（预览）或 attachment（下载） |
+
+返回：`{"success": True, "url": "http://...", "file_name": "...", "expires_in": 600, "markdown_link": "[...](...)"}`
+
+### `open_local_document`
+
+```python
+from servers.document_tools import open_local_document
+
+open_local_document(file_path: str) -> dict
+```
+
+使用系统默认程序打开本地文档（Word/WPS/PDF 阅读器等）。支持 10 种格式。仅用户明确要求时调用。
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `file_path` | str | 是 | 本地绝对路径 |
+
+---
+
 ## 报告（1 个）
 
 ### `generate_simulation_report`

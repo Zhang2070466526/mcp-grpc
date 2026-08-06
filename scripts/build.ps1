@@ -58,6 +58,12 @@ OPENCLAW_WORKSPACE=
 MCP_TRANSPORT=sse
 MCP_HOST=127.0.0.1
 MCP_PORT=50026
+# Optional: image vision analysis (enabled when all three are configured)
+VISION_API_KEY=
+VISION_BASE_URL=
+VISION_MODEL=
+# Optional: simulation report rendering
+REPORT_RENDER_URL=http://127.0.0.1:17867/api/v1/reports/render
 "@
 $envPath = Join-Path $distDir ".env"
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -87,7 +93,7 @@ Write-Host ("EXE:        {0,7} MB" -f $exeSize)
 Write-Host ("Directory:  {0,7} MB" -f $dirSize)
 Write-Host ("ZIP:        {0,7} MB" -f $zipSize)
 Write-Host ("Files:      {0,7}"    -f $fileCount)
-Write-Host ("Tools:            variable (37 default, 38 with OPENCLAW_WORKSPACE)")
+Write-Host ("Tools:            variable (39 default, 40 with OPENCLAW_WORKSPACE)")
 Write-Host "--------------------------------" -ForegroundColor DarkGray
 
 if ($topFiles) {

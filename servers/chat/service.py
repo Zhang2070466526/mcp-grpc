@@ -59,6 +59,7 @@ from servers.turbocharts.compare_results import compare_simulation_results  # no
 from servers.turbocharts.convert_raw import turbocharts_convert, list_result_curves  # noqa: E402
 from servers.multimodal_vision import show_image, copy_image_to_workspace, analyze_image, OPENCLAW_WORKSPACE_PATH  # noqa: E402
 from servers.report import generate_simulation_report  # noqa: E402
+from servers.document_tools import open_document, open_local_document  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 常量
@@ -105,6 +106,8 @@ CHAT_TOOL_MAP: dict[str, Any] = {
     "show_image":                     show_image,
     "analyze_image":                  analyze_image,
     "generate_simulation_report":     generate_simulation_report,
+    "open_document":                  open_document,
+    "open_local_document":            open_local_document,
     "get_simulation_component_schema": get_simulation_component_schema,
     "list_simulation_components": list_simulation_components,
     "create_simulation_component": create_simulation_component,
@@ -170,6 +173,8 @@ def _build_tools_schema() -> list[dict]:
         _rtool("turbocharts_convert", "ADS RAW 文件转曲线图和 CSV", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
         _rtool("show_image", "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）", {"image_path": "string"}),
         _rtool("analyze_image", "调用视觉模型分析图片内容（会上传到第三方）。仅用户明确要求分析时调用，不得自动触发。显示图片用 show_image", {"image_path": "string"}, {"prompt": "string", "detail": "string", "max_tokens": "integer"}),
+        _rtool("open_document", "为本地 PDF/DOCX 生成临时 HTTP 链接。只生成链接不自动打开，仅用户明确要求时调用", {"file_path": "string"}, {"disposition": "string"}),
+        _rtool("open_local_document", "使用系统默认程序打开本地文档。仅用户明确要求时调用，生成报告后不得自动打开", {"file_path": "string"}),
         _rtool("get_simulation_component_schema", "查询仿真控件支持的参数、类型和单位；配置控件前优先调用", {"component_type": "string"}, {"parameter_name": "string"}),
         _rtool("list_simulation_components", "查询工程中的仿真器件", {"project_path": "string"}, {"component_type": "string"}),
         _rtool("create_simulation_component", "创建新的 SP/HB/XDB 实例；每次调用都会新增。配置参数前先调用 get_simulation_component_schema", {"project_path": "string", "component_type": "string"}, {"parameters": "object", "timeout_seconds": "integer"}),
@@ -523,27 +528,31 @@ class ChatService:
                     # 破坏性工具检查：必须是本轮唯一调用
                     destructive = [tc for tc in tool_calls
                                    if tc.get("function", {}).get("name", "") in _DESTRUCTIVE_CHAT_TOOLS]
+                    # generate_schematic with clear_before_import is also destructive
+                    clear_imports = [tc for tc in tool_calls
+                                     if tc.get("function", {}).get("name", "") == "generate_schematic_from_netlist"
+                                     and _safe_json(tc.get("function", {}).get("arguments", "{}")).get("clear_before_import")]
+                    destructive.extend(clear_imports)
                     if destructive:
                         if len(tool_calls) > 1:
                             return ChatResponse(
                                 success=False, session_id=session.session_id,
                                 request_id=request_id,
-                                reply="破坏性操作（删除/批量替换）不能与其他操作同时执行，请单独请求。",
+                                reply="破坏性操作不能与其他操作同时执行，请单独请求。",
                             )
-                        # 不写入 assistant tool_calls 消息（确认后再写摘要）
                         tc = destructive[0]
                         fn = tc.get("function", {})
                         tool_name = fn.get("name", "")
                         tool_args = _safe_json(fn.get("arguments", "{}"))
                         is_valid, validation_result = self._validate(tool_name, tool_args, session)
                         if not is_valid:
-                            tool_result = validation_result
-                            session.messages.append({"role": "tool", "tool_call_id": tc.get("id", ""),
-                                                     "name": tool_name, "content": _serialize_result(tool_result)})
                             return ChatResponse(success=False, session_id=session.session_id,
                                                 request_id=request_id,
                                                 reply=f"参数校验失败: {validation_result.get('error', {}).get('detail', '')}",
                                                 context=self._build_context(session))
+                        # 清空原理图：Chat 层补 confirm_clear=True，不信任模型传入
+                        if tool_name == "generate_schematic_from_netlist":
+                            validation_result["confirm_clear"] = True
                         pending = _create_pending(tool_name, validation_result)
                         session.pending_action = pending
                         return ChatResponse(
@@ -564,6 +573,16 @@ class ChatService:
                         fn = tc.get("function", {})
                         tool_name = fn.get("name", "")
                         tool_args = _safe_json(fn.get("arguments", "{}"))
+
+                        is_valid, validation_result = self._validate(
+                            tool_name, tool_args, session
+                        )
+                        act = Activity(
+                            tool=tool_name,
+                            label=_tool_label(tool_name),
+                            status="success" if is_valid else "error",
+                        )
+                        t0 = time.time()
 
                         if not is_valid:
                             act.error = validation_result.get("error", {}).get("detail", "")
@@ -669,11 +688,20 @@ class ChatService:
                     return False, _tool_error("MISSING_REQUIRED_ARGUMENT",
                                               f"{key} 不能为空，请提供正确的 {key}")
 
-        # 自动补齐 project_path
-        if tool_name not in ("list_epp_projects", "launch_edi", "compare_simulation_results",
-                              "turbocharts_convert", "show_image", "analyze_image", "copy_image_to_workspace",
-                              "generate_simulation_report",
-                              "get_simulation_async_status", "get_simulation_async_result"):
+        # 自动补齐 project_path（仅对需要工程路径的工具）
+        _PROJECT_PATH_TOOLS = {
+            "open_edi_project", "close_edi_project",
+            "get_project_summary", "analyze_variables",
+            "list_project_components", "get_component_parameters",
+            "capture_schematic", "export_project_netlist",
+            "start_simulation_async", "simulate_project",
+            "list_simulation_components",
+            "create_simulation_component", "update_simulation_component",
+            "delete_simulation_component", "set_component_active_state",
+            "generate_schematic_from_netlist",
+            "replace_models_from_csv",
+        }
+        if tool_name in _PROJECT_PATH_TOOLS:
             if not args.get("project_path"):
                 if session.current_project_path:
                     args = dict(args, project_path=session.current_project_path)
@@ -851,6 +879,8 @@ _TOOL_LABELS: dict[str, str] = {
     "show_image": "显示图片",
     "analyze_image": "分析图片",
     "generate_simulation_report": "生成报告",
+    "open_document": "打开文档",
+    "open_local_document": "本地打开",
     "get_simulation_component_schema": "控件参数",
     "list_simulation_components": "查询器件",
     "create_simulation_component": "新增器件",
