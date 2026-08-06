@@ -194,6 +194,14 @@ def compare_simulation_results(
                 f.write(",".join(row) + "\n")
         csv_ok = Path(csv_path).exists()
 
+    artifacts: list[dict] = []
+    if img_ok:
+        artifacts.append({"type": "image", "path": img_path, "name": Path(img_path).name,
+                          "generated_by": "compare_simulation_results"})
+    if csv_ok:
+        artifacts.append({"type": "csv", "path": csv_path, "name": Path(csv_path).name,
+                          "generated_by": "compare_simulation_results"})
+
     result = {
         "success": img_ok,
         "image_path": img_path,
@@ -202,6 +210,8 @@ def compare_simulation_results(
         "alignment": alignment,
         "series": series,
         "metrics": metrics,
+        "artifacts": artifacts,
+        "message": "对比图已生成。" if img_ok else "对比图生成失败。",
     }
     if img_ok and result.get("success"):
         result.update(build_file_link(img_path, "打开对比图"))

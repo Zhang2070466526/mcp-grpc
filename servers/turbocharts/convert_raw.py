@@ -378,6 +378,14 @@ def turbocharts_convert(
     if csv_generated:
         warnings.append("CSV 已生成，请核对行数和列数与预期一致后再使用数据。")
 
+    artifacts: list[dict] = []
+    if img_generated:
+        artifacts.append({"type": "image", "path": img_path, "name": Path(img_path).name,
+                          "generated_by": "turbocharts_convert"})
+    if csv_generated:
+        artifacts.append({"type": "csv", "path": csv_path, "name": Path(csv_path).name,
+                          "generated_by": "turbocharts_convert"})
+
     resp = {
         "success": result.returncode == 0,
         "return_code": result.returncode,
@@ -386,7 +394,9 @@ def turbocharts_convert(
         "stderr": result.stderr.strip() or "",
         "img_generated": img_generated,
         "csv_generated": csv_generated,
+        "artifacts": artifacts,
         "output_paths": {"img": img_path} | ({"csv": csv_path} if csv_path else {}),
+        "message": "曲线图已生成。" if img_generated else "图表生成失败，请检查 RAW 文件和参数。",
     }
     if warnings:
         resp["warnings"] = warnings
