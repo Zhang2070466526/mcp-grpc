@@ -33,7 +33,7 @@ C:\EDI\
 EDA_GRPC_SERVER=127.0.0.1:50055     # gRPC 地址（通常不改）
 EDI_PATH=                            # 留空自动检测
 TURBOCHARTS_PATH=                    # 留空自动检测
-MCP_TRANSPORT=sse                    # sse（Web）或 stdio（本地）
+MCP_TRANSPORT=streamable-http         # streamable-http（Web）或 stdio（本地）
 MCP_PORT=50026                       # 监听端口
 MCP_HOST=127.0.0.1                   # 监听地址
 OPENCLAW_WORKSPACE=C:\Users\JGL\.openclaw\workspace  # copy_image_to_workspace 需要
@@ -95,26 +95,26 @@ http://127.0.0.1:50026/health
 }
 ```
 
-### OpenClaw（SSE）
+### OpenClaw
 
 配置文件路径：`%USERPROFILE%\.openclaw\workspace\config\mcporter.json`（如 `C:\Users\JGL\.openclaw\workspace\config`）
 
 ```json
 {
   "mcpServers": {
-    "eda-mcp-sse-50026": {
-      "baseUrl": "http://127.0.0.1:50026/sse"
+    "eda-mcp": {
+      "baseUrl": "http://127.0.0.1:50026/mcp"
     }
   }
 }
 ```
 
-### 其他 SSE 客户端
+### 其他客户端
 
 | 配置项 | 值 |
 |---|---|
-| 传输方式 | SSE / Streamable HTTP |
-| URL | `http://127.0.0.1:50026/sse` |
+| 传输方式 | Streamable HTTP |
+| URL | `http://127.0.0.1:50026/mcp` |
 
 ---
 
@@ -126,7 +126,7 @@ http://127.0.0.1:50026/health
 当前你检测到了那些mcp服务，这个mcp服务有那些工具
 ```
 
-客户端会列出已连接的 MCP 服务，如果出现 `eda-mcp-sse-50026` 就代表连接成功。
+客户端会列出已连接的 MCP 服务，如果出现 `eda-mcp` 就代表连接成功。
 
 ---
 

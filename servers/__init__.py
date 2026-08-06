@@ -8,8 +8,11 @@
 """
 
 from mcp.server.fastmcp import FastMCP
+from servers.settings import get_settings
 
 __version__ = "0.1.4"
+
+_settings = get_settings()
 
 mcp = FastMCP(
     "EDA MCP",
@@ -18,5 +21,9 @@ mcp = FastMCP(
         "扫描工程、打开工程、网表查看、仿真执行、截图原理图、"
         "模型替换、关闭工程、ADS 仿真控制、启动 EDI、RAW 图表生成、"
         "ANSYS HFSS 工具。"
+    ),
+    stateless_http=(
+        _settings.mcp_transport == "streamable-http"
+        and _settings.mcp_stateless_http
     ),
 )

@@ -958,7 +958,7 @@ failure_source 异常来源："mcp" 表示 MCP 自身异常，不是 EDI 业务�
 启动时 `start_servers.py` 调用 `settings.validate()`，校验：
 - EDA_GRPC_SERVER 格式（host:port）
 - gRPC 端口范围（1-65535）
-- MCP_TRANSPORT 合法性（sse / stdio / streamable-http）
+- MCP_TRANSPORT 合法性（streamable-http / stdio）
 - MCP_PORT 范围
 
 ### 11.8 Chat 破坏性工具确认

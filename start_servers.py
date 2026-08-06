@@ -5,13 +5,17 @@ r"""EDI MCP 一键启动 — 统一入口。
   工具定义见：servers/eda/*.py
 
   启动方式：
-    uv run python start_servers.py                          # sse（默认）
+    uv run python start_servers.py                          # streamable-http（默认）
     uv run python start_servers.py --transport stdio         # Claude Code
     uv run python start_servers.py --port 9000               # 自定义端口
 
   客户端连接：
     Claude Code   .mcp.json 自动管理，/mcp 重载
-    OpenClaw      http://127.0.0.1:50026/sse
+    OpenClaw      http://127.0.0.1:50026/mcp
+
+  健康检查：
+    /health       进程是否存在 + gRPC 状态
+    /ready        服务是否已初始化完成（启动中返回 503）
 ═══════════════════════════════════════════════════════════
 """
 
@@ -21,8 +25,10 @@ import argparse
 import asyncio
 import logging
 import os
+import signal
 import socket
 import sys
+import threading
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -53,6 +59,36 @@ from servers.eda.config import EDA_GRPC_SERVER as _grpc_cfg_addr
 from servers.runtime_config import set_server_address
 import servers.registry_server  #  — 触发工具注册
 
+# ── 运行时状态 ──
+_server_ready = threading.Event()
+_server_stopping = threading.Event()
+_log = logging.getLogger("edi_mcp")
+
+
+def is_server_ready() -> bool:
+    return _server_ready.is_set()
+
+
+def _lifecycle_log(event: str, **extra) -> None:
+    parts = [f"{k}={v}" for k, v in extra.items()]
+    _log.info("%s %s", event, " ".join(parts))
+
+
+# ── 优雅关闭 ──
+def _install_shutdown_handlers() -> None:
+    def _handle_shutdown(signum, frame):
+        if _server_stopping.is_set():
+            return  # 已经在关闭
+        _server_stopping.set()
+        _lifecycle_log("MCP_STOPPING")
+        sys.exit(0)
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(sig, _handle_shutdown)
+        except (ValueError, OSError):
+            pass  # 非主线程或平台不支持
+
 
 def _setup_logging() -> None:
     """按大小轮转的文件日志，写入 %TEMP%/edi/data/log/。"""
@@ -75,11 +111,46 @@ def _setup_logging() -> None:
     root = logging.getLogger()
     root.addHandler(handler)
     root.setLevel(logging.INFO)
-    root.info("EDI MCP v%s starting", _server_ver)
+    _lifecycle_log("MCP_STARTING", version=_server_ver)
+
+
+# ── /ready 路由处理函数 ──
+async def ready_check(request):
+    from starlette.responses import JSONResponse
+    from servers.eda.config import EDA_GRPC_SERVER as _grpc
+    from servers.runtime_config import SERVER_STARTED_AT
+
+    if not is_server_ready():
+        return JSONResponse({
+            "status": "starting",
+            "message": "MCP 服务正在初始化，请稍后重试",
+        }, status_code=503)
+
+    tools = [t.name for t in mcp._tool_manager._tools.values()]
+    try:
+        host, port_str = _grpc.rsplit(":", 1)
+        s = socket.socket()
+        s.settimeout(0.5)
+        grpc_ok = s.connect_ex((host, int(port_str))) == 0
+        s.close()
+    except Exception:
+        grpc_ok = False
+
+    return JSONResponse({
+        "status": "ready",
+        "transport": "streamable-http",
+        "stateless": True,
+        "version": _server_ver,
+        "grpc": "online" if grpc_ok else "offline",
+        "tool_count": len(tools),
+        "started_at": SERVER_STARTED_AT,
+    })
 
 
 def _run_http_server(port: int, transport: str = "streamable-http") -> None:
-    """SSE / streamable-http 模式入口。"""
+    """Streamable HTTP 模式入口。"""
+    _install_shutdown_handlers()
+
     # 冻结模式无控制台时，重定向 stdout/stderr 避免 uvicorn 日志报错
     if getattr(sys, "frozen", False) and sys.stdout is None:
         sys.stdout = open(os.devnull, "w")
@@ -114,13 +185,21 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     _grpc_ok = _test.connect_ex((_grpc_host, int(_grpc_port))) == 0
     _test.close()
 
+    # 注册 /ready 路由
+    mcp.custom_route("/ready", methods=["GET"])(ready_check)
+
+    # 标记就绪
+    _server_ready.set()
+    _lifecycle_log("MCP_READY", tools=len(tools),
+                   grpc="online" if _grpc_ok else "offline")
+
     print("=" * 50)
-    print(f"  EDI MCP v{_server_ver}")
-    print(f"  UI:   http://{host}:{port}/ui")
-    endpoint = "/mcp" if transport == "streamable-http" else "/sse"
-    print(f"  MCP:  http://{host}:{port}{endpoint}")
+    print(f"  EDI MCP v{_server_ver}  (streamable-http, stateless)")
+    print(f"  UI:    http://{host}:{port}/ui")
+    print(f"  MCP:   http://{host}:{port}/mcp")
+    print(f"  Ready: http://{host}:{port}/ready")
     print(f"  Tools: {len(tools)} loaded")
-    print(f"  gRPC: {_grpc_cfg_addr} [{'ONLINE' if _grpc_ok else 'OFFLINE'}]")
+    print(f"  gRPC:  {_grpc_cfg_addr} [{'ONLINE' if _grpc_ok else 'OFFLINE'}]")
     print(f"  Close window to stop")
     print("=" * 50)
 
@@ -129,13 +208,16 @@ def _run_http_server(port: int, transport: str = "streamable-http") -> None:
     set_server_address(host, port)
     mcp.run(transport=transport)
 
+    # 正常退出
+    _lifecycle_log("MCP_STOPPED")
+
 
 def main() -> None:
     """CLI 入口 — 解析参数并启动 MCP 服务。"""
     parser = argparse.ArgumentParser(description="启动所有 MCP 服务")
     parser.add_argument(
         "--transport",
-        choices=["stdio", "sse", "streamable-http"],
+        choices=["stdio", "streamable-http"],
         default=DEFAULT_TRANSPORT,
         help=f"通信方式（默认: {DEFAULT_TRANSPORT}）",
     )
@@ -152,7 +234,7 @@ def main() -> None:
         print(f"错误：端口号无效（{args.port}），必须在 1-65535 之间。")
         sys.exit(1)
 
-    if args.transport in ("sse", "streamable-http"):
+    if args.transport == "streamable-http":
         _setup_logging()
         _run_http_server(args.port, transport=args.transport)
     else:

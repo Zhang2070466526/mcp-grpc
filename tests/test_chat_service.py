@@ -40,8 +40,8 @@ class TestSessionIsolation:
     def test_different_sessions_have_separate_context(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s1 = svc._get_or_create("session-a")
-        s2 = svc._get_or_create("session-b")
+        s1 = svc._get_or_create("")  # 空 ID 创建新会话
+        s2 = svc._get_or_create("")  # 空 ID 创建另一个
         s1.current_project_path = "C:/a.epp"
         s2.current_project_path = "C:/b.epp"
         assert s1.current_project_path != s2.current_project_path
@@ -49,15 +49,17 @@ class TestSessionIsolation:
     def test_reopen_same_session_keeps_context(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s1 = svc._get_or_create("session-keep")
+        s1 = svc._get_or_create("")  # 空 ID 创建新会话
         s1.current_project_path = "C:/keep.epp"
-        s2 = svc._get_or_create("session-keep")
+        sid = s1.session_id
+        s2 = svc._get_or_create(sid)  # 用已有 ID 重连
+        assert s2 is not None, "Should return existing session"
         assert s2.current_project_path == "C:/keep.epp"
 
     def test_open_close_clears_project(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s = svc._get_or_create("session-close")
+        s = svc._get_or_create("")  # 空 ID 创建新会话
         s.current_project_path = "C:/proj.epp"
         s.current_project_name = "proj"
         # close clears
@@ -110,7 +112,7 @@ class TestContextUpdate:
     def test_list_epp_projects_updates_last_projects(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s = svc._get_or_create("session-ctx-list")
+        s = svc._get_or_create("")  # 空 ID 创建新会话
         svc._update_context(s, "list_epp_projects",
                             {"folder_path": "C:/proj"},
                             {"success": True, "projects": [{"name": "a", "path": "C:/a.epp"}]})
@@ -120,7 +122,7 @@ class TestContextUpdate:
     def test_start_simulation_saves_task_id(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s = svc._get_or_create("session-ctx-sim")
+        s = svc._get_or_create("")  # 空 ID 创建新会话
         svc._update_context(s, "start_simulation_async",
                             {"project_path": "C:/p.epp"},
                             {"success": True, "task_id": "task-123"})
@@ -129,7 +131,7 @@ class TestContextUpdate:
     def test_no_current_project_prevents_simulation(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s = svc._get_or_create("session-no-proj")
+        s = svc._get_or_create("")  # 空 ID 创建新会话
         s.current_project_path = None
         ok, result = svc._validate("start_simulation_async", {}, s)
         assert not ok
@@ -142,12 +144,25 @@ class TestSessionPrune:
     def test_expired_sessions_cleaned(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s = svc._get_or_create("session-old")
+        s = svc._get_or_create("")  # 空 ID 创建新会话
+        sid = s.session_id
         s.updated_at = 0  # force expired
         svc._last_prune = 0
         svc._prune()
-        s2 = svc._get_or_create("session-old")
-        assert s2.updated_at > 0  # new session created
+        # 过期后旧 ID 失效 — 返回 None（等同于重启后的行为）
+        s2 = svc._get_or_create(sid)
+        assert s2 is None, "Expired session should return None, forcing client to re-init"
+        # 空 ID 可以创建全新会话
+        s3 = svc._get_or_create("")
+        assert s3 is not None
+        assert s3.session_id != sid
+
+    def test_session_not_found_after_restart(self):
+        """模拟重启：旧 session_id 应返回 None。"""
+        from servers.chat.service import ChatService
+        svc = ChatService.instance()
+        s = svc._get_or_create("nonexistent-after-restart")
+        assert s is None, "Non-existent session ID should return None (restart behavior)"
 
 
 class TestRepeatDetection:

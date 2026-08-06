@@ -365,7 +365,8 @@ class ChatService:
 
     # ── 会话管理 ──
 
-    def _get_or_create(self, session_id: str) -> ChatSession:
+    def _get_or_create(self, session_id: str) -> ChatSession | None:
+        """获取已有会话，或新建。返回 None 表示 session_id 失效（如重启后）。"""
         self._prune()
         sid = session_id.strip() if session_id else ""
         with self._session_lock:
@@ -373,7 +374,11 @@ class ChatService:
                 s = self._sessions[sid]
                 s.updated_at = time.time()
                 return s
-            new_id = sid or uuid.uuid4().hex[:12]
+            if sid:
+                # 客户端携带了旧 session_id 但服务端已不存在（重启/TTL）
+                return None
+            # 空 session_id → 新建
+            new_id = uuid.uuid4().hex[:12]
             s = ChatSession(session_id=new_id)
             self._sessions[new_id] = s
             return s
@@ -414,6 +419,13 @@ class ChatService:
                                 reply=f"消息过长（最大 {_MAX_MESSAGE_CHARS} 字符）。")
 
         session = self._get_or_create(session_id)
+        if session is None:
+            _logger.warning("MCP_SESSION_NOT_FOUND session=%s", session_id[:12])
+            return ChatResponse(
+                success=False, session_id=session_id, request_id=request_id,
+                reply=(f"Session not found ({session_id[:12]}...)。"
+                       "服务重启后旧会话已失效，请重新 initialize。"),
+            )
 
         # ── 会话锁：同 session 串行（先锁，再处理确认/正常消息）──
         try:

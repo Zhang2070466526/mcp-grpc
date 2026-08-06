@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/edi-mcp?label=PyPI)](https://pypi.org/project/edi-mcp/)
 
-将 EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 **MCP 服务**，支持 SSE（Web）和 stdio（本地）两种传输方式，使 AI 客户端能通过自然语言操作 EDA 工程。
+将 EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 **MCP 服务**，使用 Streamable HTTP（stateless）或 stdio 传输，使 AI 客户端能通过自然语言操作 EDA 工程。
 
 > 每台电脑独立运行，服务和文件都在本机。
 
@@ -28,7 +28,7 @@ git clone <repo-url> && cd mcp-grpc && uv sync
 EDA_GRPC_SERVER=127.0.0.1:50055
 EDI_PATH=                                         # 留空自动检测
 TURBOCHARTS_PATH=                                 # 留空自动检测
-MCP_TRANSPORT=sse
+MCP_TRANSPORT=streamable-http
 MCP_PORT=50026
 OPENCLAW_WORKSPACE=                               # 配置后启用 copy_image_to_workspace
 ```
@@ -38,7 +38,7 @@ OPENCLAW_WORKSPACE=                               # 配置后启用 copy_image_t
 ### 启动
 
 ```powershell
-edi-mcp                    # SSE 模式，默认端口 50026
+edi-mcp                    # Streamable HTTP，默认端口 50026
 edi-mcp --transport stdio  # stdio 模式
 edi-mcp --port 9000        # 自定义端口
 ```

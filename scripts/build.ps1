@@ -55,7 +55,7 @@ EDI_PATH=
 TURBOCHARTS_PATH=
 # Optional OpenClaw workspace. Leave empty to disable workspace copying.
 OPENCLAW_WORKSPACE=
-MCP_TRANSPORT=sse
+MCP_TRANSPORT=streamable-http
 MCP_HOST=127.0.0.1
 MCP_PORT=50026
 # Optional: image vision analysis (enabled when all three are configured)

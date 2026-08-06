@@ -91,7 +91,7 @@ PyPI: https://pypi.org/project/edi-mcp/
 EDA_GRPC_SERVER=127.0.0.1:50055
 EDI_PATH=C:\Program Files (x86)\EDI\EDI.exe    # 留空自动检测
 TURBOCHARTS_PATH=C:\Program Files (x86)\EDI\turbocharts_app.exe  # 留空自动检测
-MCP_TRANSPORT=sse
+MCP_TRANSPORT=streamable-http
 MCP_HOST=127.0.0.1
 MCP_PORT=50026
 ```
@@ -186,9 +186,9 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 13. `/health` 端点可区分 MCP 故障与 EDI 离线
 14. `compare_simulation_results` 使用 Matplotlib + numpy 做叠图插值
 15. 打包为目录型，复制 dist/edi-mcp/ 到目标电脑后创建 .env 即可运行
-16. 使用 SSE 传输模式（支持 /ui /health /chat /tools/list 自定义路由）
+16. 使用 Streamable HTTP 传输模式（stateless，支持 /ui /health /ready /chat /tools/list 自定义路由）
 17. 控制台启动时显示 gRPC 50055 端口状态
-18. 打包时自动过滤 LLM_API_KEY 等敏感配置，强制 MCP_TRANSPORT=sse
+18. 打包时自动过滤 LLM_API_KEY 等敏感配置，强制 MCP_TRANSPORT=streamable-http
 19. ANSYS COM 支持多 ProgID 回退（AnsoftHfss.HfssScriptInterface / Ansoft.ElectronicsDesktop）
 20. AEDT 工程锁文件管理：打开前检查/清理失效锁，关闭后安全删除，PID 活跃时绝不删除
 21. `/tools/list` 端点返回全部 MCP 工具列表（40/41 个），`chat_client.html` 动态加载面板

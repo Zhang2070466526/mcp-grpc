@@ -142,7 +142,7 @@ class TestChatSimContext:
     def test_last_task_id_saved(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s = svc._get_or_create("session-sim-ctx")
+        s = svc._get_or_create("")  # 空 ID 创建新会话
         svc._update_context(s, "start_simulation_async",
                             {"project_path": "/p.epp"},
                             {"success": True, "task_id": "sim-001"})
@@ -152,7 +152,7 @@ class TestChatSimContext:
     def test_task_id_auto_fill(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s = svc._get_or_create("session-sim-fill")
+        s = svc._get_or_create("")  # 空 ID 创建新会话
         s.last_simulation_task_id = "sim-002"
         ok, args = svc._validate("get_simulation_async_status", {}, s)
         assert ok
@@ -161,7 +161,7 @@ class TestChatSimContext:
     def test_sim_ids_capped_at_20(self):
         from servers.chat.service import ChatService
         svc = ChatService.instance()
-        s = svc._get_or_create("session-sim-cap")
+        s = svc._get_or_create("")  # 空 ID 创建新会话
         for i in range(25):
             svc._update_context(s, "start_simulation_async",
                                 {"project_path": "/p.epp"},

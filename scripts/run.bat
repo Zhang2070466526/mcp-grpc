@@ -4,7 +4,7 @@ title EDI MCP
 echo =================================================
 echo   EDI MCP v0.1.4
 echo   UI:  http://127.0.0.1:50026/ui
-echo   MCP: http://127.0.0.1:50026/sse
+echo   MCP: http://127.0.0.1:50026/mcp
 echo   Close this window or press Ctrl+C to stop
 echo =================================================
 echo.

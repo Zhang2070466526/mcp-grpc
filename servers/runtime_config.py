@@ -1,10 +1,18 @@
-"""运行时配置 — CLI 参数覆盖后的统一地址。"""
+"""运行时配置 — CLI 参数覆盖后的统一地址 + 服务就绪状态。"""
 
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
+
+# ── 服务启动时间戳 ──
+SERVER_STARTED_AT: float = time.time()
+
+
+def server_uptime_seconds() -> float:
+    return time.time() - SERVER_STARTED_AT
 
 
 @dataclass

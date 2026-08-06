@@ -27,6 +27,13 @@ def _read_str(name: str, default: str = "") -> str:
     return raw if raw else default
 
 
+def _read_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes", "on")
+
+
 def _read_int(name: str, default: int, minimum: int, maximum: int) -> int:
     raw = os.getenv(name, "").strip()
     if not raw:
@@ -54,7 +61,9 @@ class Settings:
     mcp_port: int = field(
         default_factory=lambda: _read_int("MCP_PORT", 50026, 1, 65535))
     mcp_transport: str = field(
-        default_factory=lambda: _read_str("MCP_TRANSPORT", "sse"))
+        default_factory=lambda: _read_str("MCP_TRANSPORT", "streamable-http"))
+    mcp_stateless_http: bool = field(
+        default_factory=lambda: _read_bool("MCP_STATELESS_HTTP", True))
 
     # ── 路径（环境变量覆盖优先，空字符串 = 未设置 = 自动检测）──
     edi_path: str = field(default_factory=lambda: _read_str("EDI_PATH"))
@@ -101,8 +110,8 @@ class Settings:
             except ValueError:
                 issues.append(f"EDA_GRPC_SERVER 端口不是整数: {port_str}")
         # ── 传输方式 ──
-        if self.mcp_transport not in ("sse", "stdio", "streamable-http"):
-            issues.append(f"MCP_TRANSPORT 不支持（需 sse/stdio/streamable-http）: {self.mcp_transport}")
+        if self.mcp_transport not in ("stdio", "streamable-http"):
+            issues.append(f"MCP_TRANSPORT 不支持（streamable-http / stdio）: {self.mcp_transport}")
         # ── MCP 端口 ──
         if self.mcp_port < 1 or self.mcp_port > 65535:
             issues.append(f"MCP_PORT 越界: {self.mcp_port}")
