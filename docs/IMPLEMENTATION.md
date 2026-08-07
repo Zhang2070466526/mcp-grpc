@@ -233,6 +233,7 @@ QUEUED → ACCEPTED → RUNNING → SUCCEEDED / FAILED
 | `set_component_active_state` | SET_ACTIVE_STATE(14) | 状态规范化 `.strip().upper()`。确定性设置（非切换），重复调用具有幂等性 |
 | `generate_schematic_from_netlist` | GENERATE(13) | **双重确认**：`clear_before_import=true` 必须同时 `confirm_clear=true`。`confirm_clear` 不进入 gRPC payload。默认追加到 main 原理图 |
 | `replace_port_component` | REPLACE_PORT_COMPONENT(16) | payload: `project_path`, `target_instance_name`, `replacement_component_type`(TermG/P_nToneG), `parameters`。Chat 层需确认 |
+| `attach_out_component` | ATTACH_OUT_COMPONENT(17) | payload: `project_path`, `target_instance_name`, 可选 `pin_index`。自动创建 Out 器件并连线 |
 
 **update 类型推断的完整流程**：
 

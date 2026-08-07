@@ -55,6 +55,7 @@ enum EventType {
   SET_COMPONENT_ACTIVE_STATE = 14;
   UPDATE_SIMULATION_COMPONENT = 15;
   REPLACE_PORT_COMPONENT = 16;
+  ATTACH_OUT_COMPONENT = 17;
 }
 ```
 
@@ -74,6 +75,7 @@ enum EventType {
 - `SET_COMPONENT_ACTIVE_STATE`：按器件实例名确定性设置正常、禁用或短路状态。
 - `UPDATE_SIMULATION_COMPONENT`：按器件实例名更新任意普通器件的已有参数；指定器件类型额外支持动态参数或变量新增。
 - `REPLACE_PORT_COMPONENT`：将原理图上的 `TermG` 与 `P_nToneG` 相互替换，并保留原有外部引脚连线。
+- `ATTACH_OUT_COMPONENT`：为指定器件的目标引脚新增并连接一个 `Out` 器件。
 
 ## 4. payload_json 示例
 
@@ -229,6 +231,25 @@ enum EventType {
 
 该任务直接设置目标状态，不执行状态切换；保存失败时恢复原状态。
 
+### ATTACH_OUT_COMPONENT
+
+```json
+{
+  "project_path": "C:/path/to/project.epp",
+  "target_instance_name": "U1",
+  "pin_index": 0
+}
+```
+
+- `target_instance_name` 为需要挂载 `Out` 的目标器件实例名，按名称精确匹配。
+- `pin_index` 为可选的非负整数，使用从 `0` 开始的内部引脚编号。传入时按该编号检索目标引脚，器件不存在此引脚时失败。
+- 未传 `pin_index` 时沿用单引脚规则：目标器件必须恰好只有一个引脚，否则任务失败并提示调用方通过 `pin_index` 确认添加至哪个端口。
+- 服务端创建使用默认参数的 `Out` 器件，实例名按 `Out1`、`Out2`……自动分配未占用名称。
+- 服务端根据“器件位置指向目标引脚”的方向判断引脚朝向，优先在该方向距离目标引脚 100 个原理图坐标单位处放置 `Out`，并同步旋转 `Out`，使其引脚朝向目标器件。
+- 每个候选位置会将 `Out` 图元包围框向外扩展 10 个坐标单位，再与原理图已有器件的包围框检测重叠。首选方向冲突时，按顺时针顺序尝试其余三个方向；四个方向都冲突时任务失败，不创建器件。
+- 目标引脚已有网络时，新增网线加入原网段；没有网络时创建新网段。
+- 器件与网线在同一个撤销命令组内创建；连接或保存失败时整体回滚。
+
 ### REPLACE_PORT_COMPONENT
 
 ```json
@@ -364,6 +385,7 @@ enum ResultStatus {
 - `DELETE_SIMULATION_COMPONENT`：`project_path`、`instance_name`
 - `SET_COMPONENT_ACTIVE_STATE`：`project_path`、`instance_name`、`state`
 - `REPLACE_PORT_COMPONENT`：`project_path`、`target_instance_name`、`old_component_type`、`new_component_type`、`new_instance_name`
+- `ATTACH_OUT_COMPONENT`：`project_path`、`target_instance_name`、可选的 `pin_index`、`out_instance_name`
 - `GENERATE_SCHEMATIC_FROM_NETLIST`：`project_path`、`netlist_path`、`schematic_path`、`clear_before_import`、`symbols_added`、`nets_added`、`lines_added`、`net_points_added`
 
 ## 8. SIMULATE_NETLIST 完整调用示例
@@ -694,6 +716,34 @@ enum ResultStatus {
 
 替换操作在同一个原理图撤销命令组中完成。器件创建、参数应用、连线恢复、连接数量检查或工程保存失败时，服务端会撤销本次替换。
 
+### 9.6 为指定器件端口挂载 Out
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-attach-out-001",
+  "type": "ATTACH_OUT_COMPONENT",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"target_instance_name\":\"U1\",\"pin_index\":0}"
+}
+```
+
+如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `17`。
+
+最终成功事件示例：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-attach-out-001",
+  "event_type": "ATTACH_OUT_COMPONENT",
+  "status": "RESULT_STATUS_SUCCESS",
+  "message": "Out component attached",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"target_instance_name\":\"U1\",\"pin_index\":0,\"out_instance_name\":\"Out1\"}"
+}
+```
+
+`pin_index` 仅在请求提供时回传；`out_instance_name` 是服务端实际创建的 `Out` 实例名。单引脚器件可以省略 `pin_index`。若省略后目标不是单引脚器件、指定引脚不存在、无法创建或连接 `Out`，最终事件返回 `RESULT_STATUS_FAILED`，工程保持调用前状态。
+
 ## 10. 网表生成链路完整调用示例
 
 建议先调用 `FetchEvent` 建立流式订阅，再调用 `PerformAction` 提交任务。两次调用的 `client_uuid` 必须一致。
@@ -758,6 +808,7 @@ enum ResultStatus {
 - `DELETE_SIMULATION_COMPONENT` 和 `SET_COMPONENT_ACTIVE_STATE` 使用 `instance_name` 精确定位器件。
 - 器件创建、参数更新、删除或状态设置成功后会立即保存工程；保存失败时回滚本次操作。
 - `REPLACE_PORT_COMPONENT` 只能在 `TermG` 和 `P_nToneG` 之间替换；目标器件和新器件都必须只有一个外部引脚，替换会保留原连线关系。
+- `ATTACH_OUT_COMPONENT` 必须提供 `target_instance_name`；多引脚器件还必须提供从 `0` 开始的 `pin_index`，未提供时目标必须是单引脚器件；成功后返回实际创建的 `out_instance_name`。
 - `GENERATE_SCHEMATIC_FROM_NETLIST` 必须提供已存在的工程文件和网表文件，固定操作 `main` 原理图。
 - `clear_before_import=true` 会在导入前清空 `main` 原理图，调用方应确认原内容允许删除。
 - `MODEL_REPLACE` 必须提供已存在的 `.csv` 文件路径。

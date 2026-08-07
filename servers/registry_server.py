@@ -28,6 +28,7 @@
     set_component_active_state    设置器件状态（NORMAL/DISABLED/SHORTED）
     generate_schematic_from_netlist  从网表生成原理图
     replace_port_component          替换端口器件类型
+    attach_out_component            为器件引脚挂载 Out 器件
 
   分析：
     export_project_netlist        查看/导出工程网表

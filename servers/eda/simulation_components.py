@@ -910,3 +910,52 @@ def generate_schematic_from_netlist(
         timeout_seconds,
         max_timeout_seconds=600,
     )
+
+
+# ═══════════════════════════════════════════════════════════
+# 8. attach_out_component
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool()
+def attach_out_component(
+    project_path: str,
+    target_instance_name: str,
+    pin_index: int | None = None,
+    timeout_seconds: int = 120,
+) -> dict[str, Any]:
+    """为目标器件引脚挂载一个 Out 器件，并自动连线。
+
+    Out 器件使用默认参数创建，实例名按 Out1/Out2/... 自动分配。
+    服务端自动判断引脚朝向、计算放置位置、检测重叠并旋转对齐。
+
+    Args:
+        project_path: .epp 工程文件绝对路径。
+        target_instance_name: 要挂载 Out 的目标器件实例名（如 "U1"）。
+        pin_index: 0 开始的目标引脚编号。单引脚器件可省略。
+        timeout_seconds: 最长等待秒数（默认 120）。
+    """
+    if not target_instance_name or not target_instance_name.strip():
+        return {"success": False,
+                "error_code": "EMPTY_INSTANCE_NAME",
+                "message": "target_instance_name 不能为空"}
+
+    if pin_index is not None and (not isinstance(pin_index, int) or pin_index < 0):
+        return {"success": False,
+                "error_code": "INVALID_PARAMETERS",
+                "message": "pin_index 必须是非负整数"}
+
+    resolved = validate_project_path(project_path)
+
+    payload: dict[str, Any] = {
+        "project_path": resolved,
+        "target_instance_name": target_instance_name.strip(),
+    }
+    if pin_index is not None:
+        payload["pin_index"] = pin_index
+
+    return call_grpc(
+        ecserver_pb2.ATTACH_OUT_COMPONENT,
+        payload,
+        timeout_seconds,
+        max_timeout_seconds=300,
+    )

@@ -9,7 +9,7 @@ project_manage.py  工程管理（7 个工具）
     get_project_summary           工程概览（元数据/原理图/仿真）
     analyze_variables             分析变量定义和引用关系
 
-simulation_components.py  仿真器件管理（8 个工具）
+simulation_components.py  仿真器件管理（9 个工具）
     get_simulation_component_schema  查询器件参数 schema
     list_simulation_components       列出工程中的仿真器件
     create_simulation_component      新增器件（EDI 默认参数）
@@ -18,6 +18,7 @@ simulation_components.py  仿真器件管理（8 个工具）
     delete_simulation_component      按实例名删除器件
     set_component_active_state       设置器件状态（NORMAL/DISABLED/SHORTED）
     generate_schematic_from_netlist  从网表生成原理图
+    attach_out_component          为器件引脚挂载 Out 器件
 
 simulation.py  仿真（7 个工具）
     simulate_project               对工程执行仿真
@@ -60,6 +61,7 @@ from servers.eda.simulation_components import (  # noqa: F401
     set_component_active_state,
     generate_schematic_from_netlist,
     replace_port_component,
+    attach_out_component,
 )
 
 from servers.eda.simulation import (  # noqa: F401

@@ -678,7 +678,7 @@ copy_image_to_workspace(image_path: str) -> dict
 
 ---
 
-## 仿真器件管理（8 个）— 协议 v3
+## 仿真器件管理（9 个）— 协议 v3
 
 ### `get_simulation_component_schema`
 
@@ -772,9 +772,28 @@ generate_schematic_from_netlist(project_path: str, netlist_path: str, clear_befo
 
 ---
 
+### `attach_out_component`
+
+```python
+from servers.eda.simulation_components import attach_out_component
+
+attach_out_component(project_path: str, target_instance_name: str, pin_index: int | None = None, timeout_seconds: int = 120) -> dict
+```
+
+为目标器件引脚挂载 Out 器件并自动连线。单引脚器件可省略 `pin_index`。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `project_path` | str | 是 | — | .epp 绝对路径 |
+| `target_instance_name` | str | 是 | — | 目标器件实例名 |
+| `pin_index` | int | 否 | None | 0 开始的目标引脚编号 |
+| `timeout_seconds` | int | 否 | 120 | 最长等待秒数 |
+
+---
+
 ## Resources & Prompts
 
-除了 Tool（启动时动态统计，当前约 40/41 个），服务还注册了只读 Resource 和可复用 Prompt 工作流模板。
+除了 Tool（启动时动态统计，当前 42 个），服务还注册了只读 Resource 和可复用 Prompt 工作流模板。
 
 ### Resources（3 个）
 

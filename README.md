@@ -150,7 +150,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `get_project_summary` | 工程概览（元数据/原理图/仿真配置） |
 | `analyze_variables` | 分析变量定义、引用和 Sweep 配置 |
 
-### 仿真器件（8 个）— 工具 API v3 / gRPC 协议 v2
+### 仿真器件（9 个）— 工具 API v3 / gRPC 协议 v2
 
 | 工具 | 说明 |
 |---|---|
@@ -162,6 +162,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `replace_port_component` | 替换端口器件类型（TermG↔P_nToneG） |
 | `set_component_active_state` | 确定性设置 NORMAL / DISABLED / SHORTED |
 | `generate_schematic_from_netlist` | 从网表导入生成原理图 |
+| `attach_out_component` | 为器件引脚挂载 Out 器件并自动连线 |
 
 ### 仿真（7 个）
 
@@ -415,7 +416,7 @@ mcp-grpc/
 │   │   ├── project_manage.py           #     工程管理：扫描/打开/关闭/元件/概述/变量分析 (7 工具)
 │   │   ├── simulation.py               #     仿真引擎：同步/异步/网表/ADS 控制器 (7 工具)
 │   │   │                               #     ThreadPoolExecutor(1) 串行执行，最多 8 个排队任务
-│   │   ├── simulation_components.py    #     仿真器件管理：创建/更新/删除/状态 (8 工具)
+│   │   ├── simulation_components.py    #     仿真器件管理：9 工具（含 Out 挂载）
 │   │   │                               #     11 步参数校验管线 + wire↔public 名称映射
 │   │   ├── simulation_component_catalog.json  # SP/HB/XDB 参数目录 v2.0
 │   │   ├── design_export.py            #     网表查看 + 原理图截图 (2 工具)

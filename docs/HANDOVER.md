@@ -28,7 +28,7 @@ servers/
     grpc_client.py        # gRPC 通信层（FetchEvent → PerformAction）
     project_manage.py     # 工程管理（7 工具）
     simulation.py         # 仿真（7 工具）
-    simulation_components.py  # 仿真器件（8 工具）
+    simulation_components.py  # 仿真器件（9 工具）
     simulation_component_catalog.json  # 参数目录 v2.0
     design_export.py      # 网表/截图（2 工具）
     model_replace.py      # 模型替换（1 工具）
@@ -66,7 +66,7 @@ PyPI: https://pypi.org/project/edi-mcp/  |  当前版本：0.1.5
 
 **工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary, analyze_variables
 
-**仿真器件**：get_simulation_component_schema, list_simulation_components, create_simulation_component, update_simulation_component, delete_simulation_component, set_component_active_state, generate_schematic_from_netlist, replace_port_component
+**仿真器件**：get_simulation_component_schema, list_simulation_components, create_simulation_component, update_simulation_component, delete_simulation_component, set_component_active_state, generate_schematic_from_netlist, replace_port_component, attach_out_component
 
 **仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, list_eda_tasks, simulate_netlist, simulate_netlist_with_ads
 
