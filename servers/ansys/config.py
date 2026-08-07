@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import psutil
 import subprocess
 import threading

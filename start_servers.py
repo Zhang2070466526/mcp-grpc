@@ -56,7 +56,7 @@ if _cfg_issues:
 
 from servers import mcp, __version__ as _server_ver
 from servers.eda.config import EDA_GRPC_SERVER as _grpc_cfg_addr
-from servers.runtime_config import set_server_address
+from servers.utils import set_server_address
 import servers.registry_server  #  — 触发工具注册
 
 # ── 运行时状态 ──
@@ -118,7 +118,7 @@ def _setup_logging() -> None:
 async def ready_check(request):
     from starlette.responses import JSONResponse
     from servers.eda.config import EDA_GRPC_SERVER as _grpc
-    from servers.runtime_config import SERVER_STARTED_AT
+    from servers.utils import SERVER_STARTED_AT
 
     if not is_server_ready():
         return JSONResponse({

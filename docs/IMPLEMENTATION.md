@@ -628,8 +628,13 @@ HFSS 任务队列：串行 worker 线程从 `queue.Queue(maxsize=10)` 取任务�
 
 ### 6.2 copy_image_to_workspace
 
-条件注册（`OPENCLAW_WORKSPACE` 有效时，支持 `.env` 配置或自动检测 `rfclaw/openclaw-service/state/workspace`）。复制到 `{workspace}/media/edi/mcp-cache/`：
+条件注册（`OPENCLAW_WORKSPACE` 有效时，支持 `.env` 配置或自动检测 `rfclaw/openclaw-service/state/workspace`）。复制到 `{workspace}/media/edi/mcp-cache/`。
 
+返回关键字段：
+- `media_path`：相对工作区的路径（如 `media/edi/mcp-cache/S11.png`），客户端可直接用于 MEDIA 指令
+- `media_type`：MIME 类型（如 `image/png`）
+
+其他细节：
 - 文件名 = `{安全源文件名}_{MD5前8位}{扩展名}`（稳定文件名，同一源文件总是相同目标）
 - 上限 40MB
 - 超过 24h 的缓存自动清理
@@ -713,7 +718,7 @@ class ChatSession:
   ├─ system prompt（动态注入当前工程/任务上下文）
   ├─ 最多 5 轮:
   │   ├─ POST {LLM_BASE_URL}/v1/chat/completions
-  │   │   └─ tools: CHAT_TOOLS_SCHEMA（28 个工具，配置工作区后 29 个）
+  │   │   └─ tools: CHAT_TOOLS_SCHEMA（从 MCP 元数据自动生成，排除同步/COM 工具后通常 32 个）
   │   ├─ 无 tool_calls → 返回最终回复
   │   └─ 有 tool_calls:
   │       ├─ _validate(tool_name, args, session):
@@ -731,7 +736,7 @@ class ChatSession:
 
 ### 7.3 工具 Schema 构建
 
-`_build_tools_schema()` 生成 OpenAI function-calling 格式的工具描述。每个工具的 `required` 和 `optional` 参数与其实际函数签名保持一致。
+Chat 工具列表和 Schema 从 MCP 注册表自动生成（`_auto_build_chat_tools()`），不再手工维护两套列表。FastMCP 的 `t.parameters` 已是标准 JSON Schema，直接用作 OpenAI function-calling 参数定义，永远不会和函数签名不一致。
 
 ### 7.4 Web 路由
 
@@ -764,7 +769,7 @@ class ChatSession:
 
 ## 八、Resources 与 Prompts
 
-MCP 协议除了 Tool，还定义了 Resource（只读上下文）和 Prompt（可复用工作流模板）。实现在 `servers/mcp_content.py`。
+MCP 协议除了 Tool，还定义了 Resource（只读上下文）和 Prompt（可复用工作流模板）。实现在 `servers/resources_prompts/`（resources.py + prompts.py）。
 
 ### 8.1 Resources
 
@@ -843,7 +848,7 @@ REPORT_RENDER_TIMEOUT_SECONDS=45
 - 默认禁止覆盖（`overwrite=false`），防止意外覆盖已有报告
 - 器件厂家和规格不得猜测，无来源时留空
 - 服务不可用时工具仍注册，返回 `REPORT_SERVICE_UNAVAILABLE`
-- `_rtool` 已扩展支持完整 JSON Schema 属性定义（对象数组、二维数组）
+- Chat Schema 自动生成，新增 MCP 工具无需手动同步到 Chat 层（排除列表 `_CHAT_EXCLUDED_TOOLS` 除外）
 
 **11 个错误码**：`INVALID_OUTPUT_PATH` `OUTPUT_DIRECTORY_NOT_FOUND`
 `OUTPUT_ALREADY_EXISTS` `INVALID_REPORT_PARAMETERS` `INVALID_CHART_PATH`
@@ -982,3 +987,39 @@ failure_source 异常来源："mcp" 表示 MCP 自身异常，不是 EDI 业务�
 - 最大 50 个任务（含历史）
 - 统一 `outcome_known` / `task_success` 字段
 - TASK_NOT_FOUND 返回 `success=False, outcome_known=False, task_success=None`
+
+### 11.10 工作区自动检测
+
+`OPENCLAW_WORKSPACE` 查找顺序：
+
+1. `.env` 中 `OPENCLAW_WORKSPACE` 配置路径（优先）
+2. 自动检测：edi-mcp 同级目录下查找 `rfclaw/openclaw-service/state/workspace`
+3. 回退检测：edi-mcp 同级目录下查找 `openclaw/state/workspace`
+
+只要任一目录存在且有效，`copy_image_to_workspace` 即自动注册。
+
+### 11.11 产物统一格式（artifacts）
+
+所有文件生成工具返回统一的 `artifacts` 数组：
+
+```json
+{
+  "artifacts": [
+    {"type": "image", "path": "C:/.../sp.png", "name": "sp.png", "generated_by": "turbocharts_convert"}
+  ],
+  "message": "曲线图已生成。"
+}
+```
+
+适用工具：`turbocharts_convert`、`capture_schematic`、`compare_simulation_results`、`generate_simulation_report`。
+
+`message` 用"已生成"，不用"已显示"——MCP 不保证客户端渲染成功。`copy_image_to_workspace` 额外返回 `media_path`（相对路径）和 `media_type`（MIME），便于客户端生成 MEDIA 指令。
+
+### 11.12 重启恢复机制
+
+- `/ready` 端点：初始化中返回 503，完成后返回 200（含 `transport`/`stateless`/`tool_count`/`started_at`）
+- 优雅关闭：SIGINT/SIGTERM → 停止接收新请求 → 退出进程
+- 生命周期日志：`MCP_STARTING` → `MCP_READY` → `MCP_STOPPING` → `MCP_STOPPED`
+- 旧 session_id 返回 `Session not found`，客户端需重新 initialize
+- 重启后仿真任务状态丢失（内存），查询旧 task_id 返回 TASK_NOT_FOUND
+- 不自动生成文件、不自动修改工程、不自动重放工具调用

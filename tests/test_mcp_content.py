@@ -23,7 +23,7 @@ import pytest
 
 class TestResourcesDirect:
     def test_service_overview_structure(self):
-        from servers.mcp_content import resource_service_overview
+        from servers.resources_prompts.resources import resource_service_overview
         data = resource_service_overview()
         assert data["server_name"] == "EDI MCP"
         assert data["protocol_version"] == "2"
@@ -38,7 +38,7 @@ class TestResourcesDirect:
         assert "OPENCLAW_WORKSPACE" not in text
 
     def test_simulation_components_matches_catalog(self):
-        from servers.mcp_content import resource_simulation_components
+        from servers.resources_prompts.resources import resource_simulation_components
         from servers.eda.simulation_components import _load_catalog
         data = resource_simulation_components()
         cat = _load_catalog()
@@ -46,7 +46,7 @@ class TestResourcesDirect:
         assert data["schema_version"] == "2.0.0"
 
     def test_operation_guide_has_key_rules(self):
-        from servers.mcp_content import resource_operation_guide
+        from servers.resources_prompts.resources import resource_operation_guide
         text = resource_operation_guide()
         assert isinstance(text, str)
         for keyword in ["TIMEOUT", "STREAM_DISCONNECTED",
@@ -57,7 +57,7 @@ class TestResourcesDirect:
 
 class TestPromptsDirect:
     def test_inspect_edi_project(self):
-        from servers.mcp_content import prompt_inspect_edi_project
+        from servers.resources_prompts.prompts import prompt_inspect_edi_project
         msgs = prompt_inspect_edi_project("C:/test.epp", "full")
         assert msgs[0]["role"] == "user"
         assert "get_project_summary" in msgs[0]["content"]
@@ -65,21 +65,21 @@ class TestPromptsDirect:
         assert "analyze_variables" in msgs[0]["content"]
 
     def test_run_and_review_async(self):
-        from servers.mcp_content import prompt_run_and_review_simulation
+        from servers.resources_prompts.prompts import prompt_run_and_review_simulation
         msgs = prompt_run_and_review_simulation("C:/test.epp")
         assert "start_simulation_async" in msgs[0]["content"]
         assert "禁止自动重试" in msgs[0]["content"]
         assert "ads_output" in msgs[0]["content"]
 
     def test_run_and_review_sync(self):
-        from servers.mcp_content import prompt_run_and_review_simulation
+        from servers.resources_prompts.prompts import prompt_run_and_review_simulation
         msgs = prompt_run_and_review_simulation(
             "C:/test.epp", execution_mode="sync", analyze_log=False)
         assert "simulate_project" in msgs[0]["content"]
         assert "start_simulation_async" not in msgs[0]["content"]
 
     def test_configure_create(self):
-        from servers.mcp_content import prompt_configure_simulation_component
+        from servers.resources_prompts.prompts import prompt_configure_simulation_component
         msgs = prompt_configure_simulation_component(
             "C:/test.epp", "create", "XDB", requirements="默认参数")
         text = msgs[0]["content"]
@@ -89,7 +89,7 @@ class TestPromptsDirect:
         assert "XDB" in text
 
     def test_configure_update(self):
-        from servers.mcp_content import prompt_configure_simulation_component
+        from servers.resources_prompts.prompts import prompt_configure_simulation_component
         msgs = prompt_configure_simulation_component(
             "C:/test.epp", "update", "HarmonicBalance",
             instance_name="HB1", requirements="基频改为 2GHz")
@@ -101,7 +101,7 @@ class TestPromptsDirect:
 
     def test_configure_bad_action_rejected(self):
         """无效 action 必须拒绝，不能静默回退。"""
-        from servers.mcp_content import prompt_configure_simulation_component
+        from servers.resources_prompts.prompts import prompt_configure_simulation_component
         msgs = prompt_configure_simulation_component(
             "C:/test.epp", "nonexistent", "")
         assert "错误" in msgs[0]["content"]

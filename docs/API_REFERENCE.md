@@ -652,7 +652,7 @@ analyze_image(image_path: str, prompt: str = "请描述图片中的主要内容�
 
 ### `copy_image_to_workspace`（条件注册）
 
-仅在 `OPENCLAW_WORKSPACE` 配置有效时注册。负责将图片复制到 `media/edi/`，返回绝对路径和 `openclaw_attachment.filePath`。显示由 OpenClaw Agent 的消息工具负责。
+仅在 `OPENCLAW_WORKSPACE` 有效时注册（支持 `.env` 配置或自动检测）。复制到 `media/edi/mcp-cache/`。
 
 ```python
 from servers.multimodal_vision import copy_image_to_workspace
@@ -664,7 +664,17 @@ copy_image_to_workspace(image_path: str) -> dict
 |---|---|---|---|
 | `image_path` | str | 是 | 图片文件绝对路径 |
 
-返回：`{"success": true, "copied": true, "displayed": false, "image_path": "...", "openclaw_attachment": {"filePath": "..."}}`
+返回：
+```python
+{
+    "success": True, "copied": True,
+    "workspace_path": "C:/Users/JGL/.openclaw/workspace",
+    "image_path": "C:/Users/.../mcp-cache/S11_a1b2c3d4.png",
+    "media_path": "media/edi/mcp-cache/S11_a1b2c3d4.png",  # 相对工作区路径
+    "media_type": "image/png",
+    "openclaw_attachment": {"filePath": "..."}
+}
+```
 
 ---
 

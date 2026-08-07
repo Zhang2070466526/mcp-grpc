@@ -86,125 +86,104 @@ _DESTRUCTIVE_CHAT_TOOLS = {
 }
 
 # ---------------------------------------------------------------------------
-# 聊天工具注册表。不包含: simulate_project(同步阻塞)、ANSYS(COM依赖)、simulate_netlist(需本地网表文件)
+# Chat 工具注册表 — 从 MCP 元数据自动生成，不手工维护第二套列表
+# 排除：同步阻塞、ANSYS COM 依赖、需本地网表文件
 # ---------------------------------------------------------------------------
-CHAT_TOOL_MAP: dict[str, Any] = {
-    "analyze_variables":               analyze_variables,
-    "list_epp_projects":              list_epp_projects,
-    "open_edi_project":               open_edi_project,
-    "close_edi_project":              close_edi_project,
-    "list_project_components":        list_project_components,
-    "get_component_parameters":       get_component_parameters,
-    "get_project_summary":            get_project_summary,
-    "start_simulation_async":         start_simulation_async,
-    "get_simulation_async_status":    get_simulation_async_status,
-    "get_simulation_async_result":    get_simulation_async_result,
-    "list_eda_tasks":                 list_eda_tasks,
-    "capture_schematic":              capture_schematic,
-    "export_project_netlist":         export_project_netlist,
-    "replace_models_from_csv":        replace_models_from_csv,
-    "launch_edi":                     launch_edi,
-    "compare_simulation_results":     compare_simulation_results,
-    "list_result_curves":             list_result_curves,
-    "turbocharts_convert":            turbocharts_convert,
-    "show_image":                     show_image,
-    "analyze_image":                  analyze_image,
-    "generate_simulation_report":     generate_simulation_report,
-    "open_document":                  open_document,
-    "open_local_document":            open_local_document,
-    "get_simulation_component_schema": get_simulation_component_schema,
-    "list_simulation_components": list_simulation_components,
-    "create_simulation_component": create_simulation_component,
-    "update_simulation_component": update_simulation_component,
-    "delete_simulation_component": delete_simulation_component,
-    "set_component_active_state": set_component_active_state,
-    "generate_schematic_from_netlist": generate_schematic_from_netlist,
-    "replace_port_component": replace_port_component,
+_CHAT_EXCLUDED_TOOLS = {
+    "simulate_project",          # 同步阻塞，不适合 Chat
+    "simulate_netlist",          # 需要本地网表文件
+    "simulate_netlist_with_ads", # 需要 ADS 安装
+    "open_hfss_project",         # ANSYS COM 依赖
+    "close_hfss_project",
+    "launch_aedt",
+    "get_hfss_project_info",
+    "start_hfss_analysis_async",
+    "get_hfss_analysis_status",
 }
-if OPENCLAW_WORKSPACE_PATH is not None:
-    CHAT_TOOL_MAP["copy_image_to_workspace"] = copy_image_to_workspace
 
-def _rtool(name: str, desc: str, required: dict, optional: dict | None = None) -> dict:
-    """构建单个 OpenAI function-call 工具 schema。
+# 需要增强描述的工具（补充使用注意事项）
+_CHAT_TOOL_DESCRIPTIONS: dict[str, str] = {
+    "turbocharts_convert": (
+        "ADS RAW 转曲线图和 CSV。"
+        "VSWR 类曲线 CSV 一次只取第一条，多条需分次导出。导出后核对行数列数"
+    ),
+    "show_image": "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）",
+    "analyze_image": (
+        "调用视觉模型分析图片内容（会上传到第三方）。"
+        "仅用户明确要求分析时调用，不得自动触发。显示图片用 show_image"
+    ),
+    "generate_simulation_report": (
+        "生成本地仿真报告（PDF/DOCX）。"
+        "只负责校验数据并调用渲染服务，不会自动仿真或编造数据"
+    ),
+    "open_document": (
+        "为本地 PDF/DOCX 生成临时 HTTP 链接。"
+        "只生成链接不自动打开，仅用户明确要求时调用"
+    ),
+    "open_local_document": (
+        "使用系统默认程序打开本地文档。"
+        "仅用户明确要求时调用，生成报告后不得自动打开"
+    ),
+    "delete_simulation_component": (
+        "按实例名删除任意原理图器件及其连接线；删除直接由 EDI 执行"
+    ),
+    "set_component_active_state": (
+        "确定性设置器件状态为 NORMAL、DISABLED 或 SHORTED，不是状态切换"
+    ),
+    "generate_schematic_from_netlist": (
+        "从网表追加或重建 main 原理图；"
+        "clear_before_import=true 会清空原理图，必须同时确认"
+    ),
+    "update_simulation_component": (
+        "按实例名更新器件参数。SP/HB/XDB 支持校验，其他类型参数原样发送"
+    ),
+    "replace_port_component": (
+        "替换端口器件类型（TermG-P_nToneG），服务端保留位置和连线"
+    ),
+    "create_simulation_component": (
+        "使用 EDI 器件工厂默认参数创建器件。"
+        "创建后根据 instance_name 调用 update 设置参数。支持任意 EDI 工厂类型"
+    ),
+    "get_simulation_component_schema": (
+        "查询仿真控件支持的参数、类型和单位；配置控件前优先调用"
+    ),
+}
 
-    Args:
-        name: 工具名。
-        desc: 工具描述。
-        required: 必填参数字典，值可以是类型字符串或完整 JSON Schema 属性定义。
-        optional: 可选参数字典，同上。
+
+def _auto_build_chat_tools() -> tuple[dict[str, Any], list[dict]]:
+    """从 MCP 工具注册表自动生成 Chat 工具映射和 OpenAI function-calling schema。
+
+    FastMCP 的 t.parameters 已经是标准 JSON Schema，直接用作 function parameters。
     """
-    props = {}
-    for k, t in {**required, **(optional or {})}.items():
-        if isinstance(t, dict):
-            props[k] = t  # 完整 JSON Schema 定义
-        elif t == "array":
-            props[k] = {"type": "array", "items": {"type": "string"}}
-        else:
-            props[k] = {"type": t}
-    return {
-        "type": "function",
-        "function": {
-            "name": name,
-            "description": desc,
-            "parameters": {
-                "type": "object",
-                "properties": props,
-                "required": list(required.keys()),
+    from servers import mcp as _mcp
+
+    tool_map: dict[str, Any] = {}
+    schema: list[dict] = []
+
+    for t in _mcp._tool_manager._tools.values():
+        if t.name in _CHAT_EXCLUDED_TOOLS:
+            continue
+
+        tool_map[t.name] = t.fn
+
+        desc = _CHAT_TOOL_DESCRIPTIONS.get(t.name, t.description or "")
+        schema.append({
+            "type": "function",
+            "function": {
+                "name": t.name,
+                "description": desc,
+                "parameters": t.parameters or {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
             },
-        },
-    }
+        })
+
+    return tool_map, schema
 
 
-def _build_tools_schema() -> list[dict]:
-    """构建聊天工具 schema，与 CHAT_TOOL_MAP 保持一致。"""
-    tools = [
-        _rtool("analyze_variables", "分析工程中的 Var 变量定义、引用关系和 Sweep 扫描配置", {"project_path": "string"}),
-        _rtool("list_epp_projects", "扫描文件夹中的 .epp 工程文件", {"folder_path": "string"}),
-        _rtool("open_edi_project", "打开 .epp 工程", {"project_path": "string"}, {"timeout_seconds": "integer"}),
-        _rtool("close_edi_project", "关闭 EDA 工程", {"project_path": "string"}, {"need_save": "boolean", "timeout_seconds": "integer"}),
-        _rtool("list_project_components", "列出工程原理图中的元件", {"project_path": "string"}, {"schematic_name": "string", "component_type": "string", "name_contains": "string", "offset": "integer", "limit": "integer"}),
-        _rtool("get_component_parameters", "查询单个元件的完整参数", {"project_path": "string", "component_id": "string"}, {"schematic_name": "string", "include_hidden": "boolean"}),
-        _rtool("get_project_summary", "获取 .epp 工程完整概览", {"project_path": "string"}, {"include_component_types": "boolean", "include_latest_result": "boolean"}),
-        _rtool("start_simulation_async", "异步启动 EDA 工程仿真，立即返回 task_id", {"project_path": "string"}, {"log_source": "string", "timeout_seconds": "integer"}),
-        _rtool("get_simulation_async_status", "查询仿真状态及已实时接收的 ads_output 日志", {"task_id": "string"}),
-        _rtool("get_simulation_async_result", "获取仿真结果；运行中返回当前日志，完成后返回完整 ads_output", {"task_id": "string"}),
-        _rtool("list_eda_tasks", "列出当前异步仿真任务列表", {}, {"status": "string"}),
-        _rtool("capture_schematic", "截取原理图为图片", {"project_path": "string", "img_path": "string"}, {"timeout_seconds": "integer"}),
-        _rtool("export_project_netlist", "查看/导出工程网表", {"project_path": "string"}, {"timeout_seconds": "integer"}),
-        _rtool("replace_models_from_csv", "按 CSV 批量替换元件模型", {"project_path": "string", "csv_path": "string"}, {"timeout_seconds": "integer"}),
-        _rtool("launch_edi", "启动 EDI 客户端并等待 gRPC 就绪", {}, {"edi_path": "string", "wait_for_grpc": "boolean", "wait_timeout": "integer"}),
-        _rtool("compare_simulation_results", "多个 RAW 结果同一条曲线对比叠图", {"result_paths": "array", "curve": "string", "img_path": "string"}, {"chart_type": "string", "labels": "array", "dependency": "string", "csv_path": "string", "alignment": "string", "reference_index": "integer"}),
-        _rtool("list_result_curves", "解析 RAW 文件返回可用曲线名和依赖轴，画图前调用避免猜测曲线名", {"result_path": "string"}),
-        _rtool("turbocharts_convert", "ADS RAW 转曲线图和 CSV。VSWR 类曲线 CSV 一次只取第一条，多条需分次导出。导出后核对行数列数", {"raw_path": "string", "img_path": "string", "chart_type": "string"}, {"csv_path": "string", "linename": "string", "dependency": "string", "ac_config": "string"}),
-        _rtool("show_image", "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）", {"image_path": "string"}),
-        _rtool("analyze_image", "调用视觉模型分析图片内容（会上传到第三方）。仅用户明确要求分析时调用，不得自动触发。显示图片用 show_image", {"image_path": "string"}, {"prompt": "string", "detail": "string", "max_tokens": "integer"}),
-        _rtool("open_document", "为本地 PDF/DOCX 生成临时 HTTP 链接。只生成链接不自动打开，仅用户明确要求时调用", {"file_path": "string"}, {"disposition": "string"}),
-        _rtool("open_local_document", "使用系统默认程序打开本地文档。仅用户明确要求时调用，生成报告后不得自动打开", {"file_path": "string"}),
-        _rtool("get_simulation_component_schema", "查询仿真控件支持的参数、类型和单位；配置控件前优先调用", {"component_type": "string"}, {"parameter_name": "string"}),
-        _rtool("list_simulation_components", "查询工程中的仿真器件", {"project_path": "string"}, {"component_type": "string"}),
-        _rtool("create_simulation_component", "使用 EDI 器件工厂默认参数创建器件。创建后根据 instance_name 调用 update 设置参数。支持任意 EDI 工厂类型", {"project_path": "string", "component_type": "string"}, {"timeout_seconds": "integer"}),
-        _rtool("update_simulation_component", "按实例名更新器件参数。SP/HB/XDB 支持校验，其他类型参数原样发送", {"project_path": "string", "instance_name": "string", "parameters": "object"}, {"component_type": "string", "timeout_seconds": "integer"}),
-        _rtool("replace_port_component", "替换端口器件类型（TermG↔P_nToneG），服务端保留位置和连线", {"project_path": "string", "target_instance_name": "string", "replacement_component_type": "string"}, {"parameters": "object", "timeout_seconds": "integer"}),
-        _rtool("delete_simulation_component", "按实例名删除任意原理图器件及其连接线；删除直接由 EDI 执行", {"project_path": "string", "instance_name": "string"}, {"timeout_seconds": "integer"}),
-        _rtool("set_component_active_state", "确定性设置器件状态为 NORMAL、DISABLED 或 SHORTED，不是状态切换", {"project_path": "string", "instance_name": "string", "state": "string"}, {"timeout_seconds": "integer"}),
-        _rtool("generate_schematic_from_netlist", "从网表追加或重建 main 原理图；clear_before_import=true 会清空原理图，必须同时确认", {"project_path": "string", "netlist_path": "string"}, {"clear_before_import": "boolean", "confirm_clear": "boolean", "timeout_seconds": "integer"}),
-    ]
-    if OPENCLAW_WORKSPACE_PATH is not None:
-        tools.append(_rtool("copy_image_to_workspace", "复制图片到工作区 media/edi，需配置 OPENCLAW_WORKSPACE", {"image_path": "string"}))
-    tools.append(_rtool("generate_simulation_report",
-        "生成本地仿真报告（PDF/DOCX）。只负责校验数据并调用渲染服务，不会自动仿真或编造数据",
-        {"output_path": "string", "model_name": "string"},
-        {
-            "description": "string", "conclusion": "string",
-            "spec_table": {"type": "array", "items": {"type": "array", "items": {}}},
-            "charts": {"type": "array", "items": {"type": "object", "properties": {"path": {"type": "string"}, "title": {"type": "string"}}, "required": ["path", "title"]}},
-            "components": {"type": "array", "items": {"type": "object", "properties": {"type": {"type": "string"}, "model": {"type": "string"}, "manufacturer": {"type": "string"}, "specs": {"type": "string"}}, "required": ["type", "model", "manufacturer", "specs"]}},
-            "schematic": "string", "overwrite": "boolean", "timeout_seconds": "integer",
-        }))
-    return tools
-
-
-CHAT_TOOLS_SCHEMA = _build_tools_schema()
+CHAT_TOOL_MAP, CHAT_TOOLS_SCHEMA = _auto_build_chat_tools()
 
 # ---------------------------------------------------------------------------
 # 数据结构

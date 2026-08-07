@@ -19,7 +19,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 
 from servers import mcp
-from servers.runtime_config import get_server_base_url
+from servers.utils import get_server_base_url
 
 load_dotenv()
 _logger = logging.getLogger("multimodal.document")

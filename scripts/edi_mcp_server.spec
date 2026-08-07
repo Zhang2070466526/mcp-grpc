@@ -28,7 +28,9 @@ a = Analysis(
         'servers.chat.routes',
 
         # MCP Resources & Prompts
-        'servers.mcp_content',
+        'servers.resources_prompts',
+        'servers.resources_prompts.resources',
+        'servers.resources_prompts.prompts',
 
         # EDA 工具
         'servers.eda',
@@ -66,7 +68,7 @@ a = Analysis(
         'servers.report.generator',
 
         # 运行时配置
-        'servers.runtime_config',
+        'servers.utils',
         'servers.settings',
 
         # Proto / gRPC

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import logging
-import os
 import threading
 import time
 from pathlib import Path
@@ -14,6 +13,7 @@ import httpx
 from dotenv import load_dotenv
 
 from servers import mcp
+from servers.utils import tool_error
 from servers.multimodal_vision.validators import validate_image_path, validate_image_content
 
 from servers.settings import get_settings
@@ -51,21 +51,21 @@ def _validate(image_path: str) -> tuple[Path | None, dict | None]:
     try:
         path = validate_image_path(image_path, allowed=_VISION_ALLOWED)
     except PermissionError as e:
-        return None, _error("INVALID_IMAGE", str(e))
+        return None, tool_error("INVALID_IMAGE", str(e))
     except FileNotFoundError as e:
-        return None, _error("IMAGE_NOT_FOUND", str(e))
+        return None, tool_error("IMAGE_NOT_FOUND", str(e))
     except ValueError as e:
-        return None, _error("UNSUPPORTED_IMAGE_FORMAT", str(e))
+        return None, tool_error("UNSUPPORTED_IMAGE_FORMAT", str(e))
 
     size_mb = path.stat().st_size / (1024 * 1024)
     if size_mb > VISION_MAX_MB:
-        return None, _error("IMAGE_TOO_LARGE",
+        return None, tool_error("IMAGE_TOO_LARGE",
                              f"图片 {size_mb:.1f}MB 超过限制 {VISION_MAX_MB}MB")
 
     try:
         validate_image_content(path)
     except ValueError as e:
-        return None, _error("INVALID_IMAGE", str(e))
+        return None, tool_error("INVALID_IMAGE", str(e))
 
     return path, None
 
@@ -76,7 +76,7 @@ def _encode(path: Path) -> tuple[str, str] | tuple[None, dict]:
     try:
         data = base64.b64encode(path.read_bytes()).decode("ascii")
     except OSError as e:
-        return None, _error("INVALID_IMAGE", f"读取图片失败: {e}")
+        return None, tool_error("INVALID_IMAGE", f"读取图片失败: {e}")
     return f"data:{mime};base64,{data}", mime
 
 
@@ -111,34 +111,34 @@ def _call_vision(path: Path, prompt: str, detail: str, max_tokens: int) -> dict:
             timeout=VISION_TIMEOUT,
         )
     except httpx.TimeoutException:
-        return _error("VISION_TIMEOUT", f"视觉模型调用超时（{VISION_TIMEOUT}s）")
+        return tool_error("VISION_TIMEOUT", f"视觉模型调用超时（{VISION_TIMEOUT}s）")
     except httpx.RequestError as e:
-        return _error("VISION_PROVIDER_ERROR", f"视觉模型请求失败: {e}")
+        return tool_error("VISION_PROVIDER_ERROR", f"视觉模型请求失败: {e}")
 
     elapsed_ms = round((time.monotonic() - t0) * 1000)
     _logger.info("vision_api status=%d model=%s size=%d mime=%s elapsed_ms=%d",
                  resp.status_code, VISION_MODEL, path.stat().st_size, mime, elapsed_ms)
 
     if resp.status_code in (401, 403):
-        return _error("VISION_AUTH_FAILED", f"API Key 无效: {VISION_MODEL}")
+        return tool_error("VISION_AUTH_FAILED", f"API Key 无效: {VISION_MODEL}")
     if resp.status_code == 429:
-        return _error("VISION_RATE_LIMITED", "调用频率过高，请稍后重试")
+        return tool_error("VISION_RATE_LIMITED", "调用频率过高，请稍后重试")
     if resp.status_code != 200:
-        return _error("VISION_PROVIDER_ERROR",
+        return tool_error("VISION_PROVIDER_ERROR",
                        f"视觉模型返回 HTTP {resp.status_code}: {resp.text[:200]}")
 
     try:
         data = resp.json()
     except Exception:
-        return _error("INVALID_VISION_RESPONSE", "返回内容无法解析")
+        return tool_error("INVALID_VISION_RESPONSE", "返回内容无法解析")
 
     usage = data.get("usage", {})
     choices = data.get("choices", [])
     if not choices:
-        return _error("INVALID_VISION_RESPONSE", "返回为空")
+        return tool_error("INVALID_VISION_RESPONSE", "返回为空")
     content = choices[0].get("message", {}).get("content", "")
     if not content:
-        return _error("INVALID_VISION_RESPONSE", "未返回分析文字")
+        return tool_error("INVALID_VISION_RESPONSE", "未返回分析文字")
 
     return {
         "success": True,
@@ -176,7 +176,7 @@ def analyze_image(
         max_tokens: 分析结果最大长度（128-4096）。
     """
     if not all([VISION_API_KEY, VISION_BASE_URL, VISION_MODEL]):
-        return _error("VISION_NOT_CONFIGURED",
+        return tool_error("VISION_NOT_CONFIGURED",
                        "图片分析未配置。请设置 VISION_API_KEY、VISION_BASE_URL 和 VISION_MODEL。",
                        retryable=False)
 
@@ -192,15 +192,10 @@ def analyze_image(
 
     acquired = _VISION_SEMAPHORE.acquire(blocking=False)
     if not acquired:
-        return _error("VISION_BUSY", "当前图片分析请求较多，请稍后重试", retryable=True)
+        return tool_error("VISION_BUSY", "当前图片分析请求较多，请稍后重试", retryable=True)
     try:
         return _call_vision(path, prompt.strip(), detail, max_tokens)
     finally:
         _VISION_SEMAPHORE.release()
 
 
-def _error(code: str, message: str, retryable: bool = False) -> dict:
-    result: dict = {"success": False, "error_code": code, "message": message}
-    if retryable:
-        result["retryable"] = True
-    return result

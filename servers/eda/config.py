@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -61,15 +60,7 @@ EDI_PATH = _settings.edi_path or _find_first(*_EDI_CANDIDATES)
 TURBOCHARTS_PATH = _settings.turbocharts_path or _find_first(*_TC_CANDIDATES)
 
 
-def validate_file(path: str, extensions: tuple[str, ...] = ()) -> str:
-    """校验文件存在，可选限制扩展名，返回规范化绝对路径。"""
-    p = Path(path).expanduser()
-    if not p.is_file():
-        raise FileNotFoundError(f"文件不存在: {p}")
-    if extensions and p.suffix.lower() not in extensions:
-        raise ValueError(f"文件扩展名必须是 {extensions}: {p}")
-    return str(p.resolve())
-
+from servers.utils import validate_file  # noqa: F401 — re-export
 
 def validate_project_path(project_path: str) -> str:
     """校验 .epp 工程路径，返回规范化后的绝对路径。"""

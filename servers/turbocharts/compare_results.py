@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from servers.eda.config import TURBOCHARTS_PATH
-from servers.runtime_config import build_file_link
+from servers.utils import build_file_link
 from servers.turbocharts.config import run_turbocharts
 from servers import mcp
 

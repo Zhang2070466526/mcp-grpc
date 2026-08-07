@@ -85,7 +85,7 @@ import servers.multimodal_vision          # noqa: F401 — show_image + copy + a
 import servers.report                     # noqa: F401 — generate_simulation_report
 
 # Resources & Prompts
-import servers.mcp_content            # noqa: F401 — @mcp.resource() / @mcp.prompt()
+import servers.resources_prompts      # noqa: F401 — @mcp.resource() / @mcp.prompt()
 
 # Web 路由
 from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402

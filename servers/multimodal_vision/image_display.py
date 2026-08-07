@@ -16,7 +16,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 
 from servers import mcp
-from servers.runtime_config import get_server_base_url
+from servers.utils import get_server_base_url
 from servers.multimodal_vision.validators import validate_image_path
 from servers.multimodal_vision.workspace_copy import OPENCLAW_WORKSPACE_PATH
 

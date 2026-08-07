@@ -54,16 +54,11 @@ class Settings:
     """
 
     # ── 服务器 ──
-    eda_grpc_server: str = field(
-        default_factory=lambda: _read_str("EDA_GRPC_SERVER", "127.0.0.1:50055"))
-    mcp_host: str = field(
-        default_factory=lambda: _read_str("MCP_HOST", "127.0.0.1"))
-    mcp_port: int = field(
-        default_factory=lambda: _read_int("MCP_PORT", 50026, 1, 65535))
-    mcp_transport: str = field(
-        default_factory=lambda: _read_str("MCP_TRANSPORT", "streamable-http"))
-    mcp_stateless_http: bool = field(
-        default_factory=lambda: _read_bool("MCP_STATELESS_HTTP", True))
+    eda_grpc_server: str = field(default_factory=lambda: _read_str("EDA_GRPC_SERVER", "127.0.0.1:50055"))
+    mcp_host: str = field(default_factory=lambda: _read_str("MCP_HOST", "127.0.0.1"))
+    mcp_port: int = field(default_factory=lambda: _read_int("MCP_PORT", 50026, 1, 65535))
+    mcp_transport: str = field(default_factory=lambda: _read_str("MCP_TRANSPORT", "streamable-http"))
+    mcp_stateless_http: bool = field(default_factory=lambda: _read_bool("MCP_STATELESS_HTTP", True))
 
     # ── 路径（环境变量覆盖优先，空字符串 = 未设置 = 自动检测）──
     edi_path: str = field(default_factory=lambda: _read_str("EDI_PATH"))
@@ -79,21 +74,16 @@ class Settings:
     vision_api_key: str = field(default_factory=lambda: _read_str("VISION_API_KEY"))
     vision_base_url: str = field(default_factory=lambda: _read_str("VISION_BASE_URL"))
     vision_model: str = field(default_factory=lambda: _read_str("VISION_MODEL"))
-    vision_timeout: int = field(
-        default_factory=lambda: _read_int("VISION_TIMEOUT_SECONDS", 45, 5, 120))
-    vision_max_mb: int = field(
-        default_factory=lambda: _read_int("VISION_MAX_IMAGE_MB", 10, 1, 100))
+    vision_timeout: int = field(default_factory=lambda: _read_int("VISION_TIMEOUT_SECONDS", 45, 5, 120))
+    vision_max_mb: int = field(default_factory=lambda: _read_int("VISION_MAX_IMAGE_MB", 10, 1, 100))
 
     # ── 报告渲染 ──
     report_render_url: str = field(
-        default_factory=lambda: _read_str("REPORT_RENDER_URL",
-                                          "http://127.0.0.1:17867/api/v1/reports/render"))
-    report_timeout: int = field(
-        default_factory=lambda: _read_int("REPORT_RENDER_TIMEOUT_SECONDS", 45, 5, 120))
+        default_factory=lambda: _read_str("REPORT_RENDER_URL", "http://127.0.0.1:17867/api/v1/reports/render"))
+    report_timeout: int = field(default_factory=lambda: _read_int("REPORT_RENDER_TIMEOUT_SECONDS", 45, 5, 120))
 
     # ── 工作区 ──
-    openclaw_workspace: str = field(
-        default_factory=lambda: _read_str("OPENCLAW_WORKSPACE"))
+    openclaw_workspace: str = field(default_factory=lambda: _read_str("OPENCLAW_WORKSPACE"))
 
     def validate(self) -> list[str]:
         """启动时校验关键配置，返回问题列表。不阻断启动，仅返回警告。"""

@@ -2,9 +2,58 @@
 
 [![PyPI](https://img.shields.io/pypi/v/edi-mcp?label=PyPI)](https://pypi.org/project/edi-mcp/)
 
-将 EDI 的 gRPC 接口、命令行工具和 ANSYS HFSS 封装为 **MCP 服务**，使用 Streamable HTTP（stateless）或 stdio 传输，使 AI 客户端能通过自然语言操作 EDA 工程。
+**让 AI 客户端通过自然语言操作 EDA 工程，从扫描工程到生成仿真报告，一条龙闭环。**
 
-> 每台电脑独立运行，服务和文件都在本机。
+---
+
+## 为什么用这个项目
+
+电子设计自动化（EDA）工具通常需要人工在图形界面中操作——打开工程、配置器件、执行仿真、导出结果。本项目将这些操作封装为 41 个 MCP 工具，接入 Claude Code 或 OpenClaw 后，只需用自然语言描述需求，AI 就能自动完成：
+
+> "帮我看看 C:/Projects 下有哪些 .epp 工程，打开第一个，查看 S 参数仿真器件的配置，设置频率 1-10GHz、步长 0.1GHz，然后跑仿真"
+
+MCP 服务自动完成：扫描工程 → 打开 → 查询器件 → 更新参数 → 启动异步仿真 → 返回 task_id → 查询进度 → 获取结果。
+
+**核心价值：**
+
+| 价值 | 说明 |
+|---|---|
+| **自然语言驱动** | 不需要记命令、不点鼠标，用自然语言描述需求即可操作 EDA 工程 |
+| **全流程闭环** | 从工程扫描到仿真执行到报告生成，一条龙自动完成 |
+| **本地安全** | 所有服务和文件都在本机，不依赖云端，不传工程数据出去 |
+| **AI 友好** | 参数 Schema 本地校验，减少无效调用轮次；误差提示明确，模型可据此修正 |
+| **生产可用** | 异步仿真 + 实时日志 + task_id 追踪 + 优雅关闭，支持长时间仿真任务 |
+| **可扩展** | 纯 Python，FastMCP 框架，新增工具只需添加装饰器即可自动注册 |
+
+---
+
+## 架构
+
+```
+AI 客户端 (Claude Code / OpenClaw)
+   │  Streamable HTTP (stateless) 或 stdio
+   │  POST /mcp  │  initialize → tools/list → tools/call
+   ▼
+EDI MCP 服务 (FastMCP, 41 工具, 3 Resource, 4 Prompt)
+   │
+   ├── EDA gRPC 工具 (15) ──→ EDI 客户端 (127.0.0.1:50055)
+   │     FetchEvent ← PerformAction 异步模型，增量 ads_output
+   │
+   ├── TurboCharts (3) ──→ turbocharts_app.exe (subprocess)
+   │     ADS RAW → 曲线图 + CSV，串行信号量保护
+   │
+   ├── ANSYS HFSS (6) ──→ ansysedt.exe (COM 附着)
+   │     多 ProgID 回退，锁文件管理，异步任务队列
+   │
+   ├── 视觉分析 ──→ Vision API (可选, OpenAI 兼容)
+   │
+   ├── 报告渲染 ──→ Report Render Service (可选, POST /api/v1/reports/render)
+   │
+   └── Chat ──→ LLM API (可选, OpenAI 兼容)
+         会话管理，多轮工具闭环，破坏性操作确认门
+```
+
+---
 
 ## 快速开始
 
@@ -13,41 +62,56 @@
 ```powershell
 pip install edi-mcp
 ```
-
-或源码：
-
-```powershell
-git clone <repo-url> && cd mcp-grpc && uv sync
-```
+或源码：`git clone <repo-url> && cd mcp-grpc && uv sync`
 
 ### 配置
 
-创建 `.env` 文件（通常只需确认第一行）：
+创建 `.env`，留空的字段自动检测：
 
 ```ini
 EDA_GRPC_SERVER=127.0.0.1:50055
-EDI_PATH=                                         # 留空自动检测
-TURBOCHARTS_PATH=                                 # 留空自动检测
+EDI_PATH=                    # 留空自动检测
+TURBOCHARTS_PATH=            # 留空自动检测
 MCP_TRANSPORT=streamable-http
 MCP_PORT=50026
-OPENCLAW_WORKSPACE=                               # 留空自动检测，或手动指定
+OPENCLAW_WORKSPACE=          # 留空自动检测，或手动指定
 ```
 
-> 完整配置和客户端接入说明见 [部署指南](./docs/DEPLOY.md)。
+自动检测规则：
+- `EDI_PATH`：项目同级找 `EDI.exe` → `EDA-PMDS.exe` → `CAIS.exe`
+- `TURBOCHARTS_PATH`：项目同级找 `turbocharts_app.exe` → `TurboCharts.exe`
+- `OPENCLAW_WORKSPACE`：项目同级找 `rfclaw/openclaw-service/state/workspace`
 
 ### 启动
 
 ```powershell
-edi-mcp                    # Streamable HTTP，默认端口 50026
-edi-mcp --transport stdio  # stdio 模式
+edi-mcp                    # Streamable HTTP，默认 50026
+edi-mcp --transport stdio  # Claude Code stdio 模式
 edi-mcp --port 9000        # 自定义端口
 ```
 
-验证：
+### 验证
 
-```
-curl http://127.0.0.1:50026/health
+```powershell
+curl http://127.0.0.1:50026/health     # 进程 + gRPC 状态
 → {"status":"ok","mcp_ready":true,"eda_grpc_ready":true}
+
+curl http://127.0.0.1:50026/ready      # 初始化完成 (启动中 503)
+→ {"status":"ready","transport":"streamable-http","stateless":true,"tool_count":41}
+```
+
+### 客户端接入
+
+```json
+// Claude Code (.mcp.json)
+{ "mcpServers": { "eda": {
+    "command": "edi-mcp", "args": ["--transport", "stdio"]
+} } }
+
+// OpenClaw
+{ "mcpServers": { "eda-mcp": {
+    "baseUrl": "http://127.0.0.1:50026/mcp"
+} } }
 ```
 
 ---
@@ -56,9 +120,9 @@ curl http://127.0.0.1:50026/health
 
 | 方式 | 说明 |
 |---|---|
-| **MCP 客户端** | Claude Code / OpenClaw 接入后，自然语言调用全部工具 |
-| **聊天界面** | 浏览器访问 `http://127.0.0.1:50026/ui` |
-| **Python 调用** | `from servers.eda import list_epp_projects` 直接调用函数 |
+| **MCP 客户端** | Claude Code / OpenClaw 接入后，自然语言调用全部 41 个工具 |
+| **聊天界面** | 浏览器访问 `http://127.0.0.1:50026/ui`，内置 LLM 多轮工具闭环 |
+| **Python 调用** | `from servers.eda import list_epp_projects` 直接调用 |
 
 ```python
 from servers.eda.project_manage import list_epp_projects
@@ -66,14 +130,13 @@ from servers.eda.simulation import start_simulation_async
 
 r = list_epp_projects("C:/Users/JGL/EDI-Workspace")
 # → {"success": True, "count": 3, "projects": [...]}
-
 r = start_simulation_async("C:/Projects/test/test.epp")
 # → {"success": True, "task_id": "abc123...", "status": "QUEUED"}
 ```
 
 ---
 
-## 工具一览
+## 工具一览（41 个）
 
 ### 工程管理（7 个）
 
@@ -87,28 +150,28 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `get_project_summary` | 工程概览（元数据/原理图/仿真配置） |
 | `analyze_variables` | 分析变量定义、引用和 Sweep 配置 |
 
-### 仿真器件（8 个）— 工具 API v3，底层 gRPC 协议 v2
+### 仿真器件（8 个）— 工具 API v3 / gRPC 协议 v2
 
 | 工具 | 说明 |
 |---|---|
 | `get_simulation_component_schema` | 查询 SP/HB/XDB 支持的参数和权限 |
 | `list_simulation_components` | 查询工程中的仿真器件 |
 | `create_simulation_component` | 新增器件（EDI 默认参数，创建后 update 设参） |
-| `replace_port_component` | 替换端口器件类型（TermG↔P_nToneG） |
-| `update_simulation_component` | 按实例名更新参数（自动识别类型） |
+| `update_simulation_component` | 按实例名更新参数（三路类型推断） |
 | `delete_simulation_component` | 按实例名删除器件 |
-| `set_component_active_state` | 设置 NORMAL / DISABLED / SHORTED |
+| `replace_port_component` | 替换端口器件类型（TermG↔P_nToneG） |
+| `set_component_active_state` | 确定性设置 NORMAL / DISABLED / SHORTED |
 | `generate_schematic_from_netlist` | 从网表导入生成原理图 |
 
 ### 仿真（7 个）
 
 | 工具 | 说明 |
 |---|---|
-| `simulate_project` | 执行工程仿真（同步） |
-| `start_simulation_async` | 启动异步仿真 |
-| `get_simulation_async_status` | 查询异步仿真进度 |
-| `get_simulation_async_result` | 获取异步仿真结果 |
+| `start_simulation_async` | 启动异步仿真，立即返回 task_id（推荐） |
+| `get_simulation_async_status` | 查询实时进度和增量日志 |
+| `get_simulation_async_result` | 获取完整结果和 ads_output |
 | `list_eda_tasks` | 列出当前仿真任务 |
+| `simulate_project` | 执行工程仿真（同步阻塞） |
 | `simulate_netlist` | 仿真网表文件 |
 | `simulate_netlist_with_ads` | 调用 ADS 仿真控制器 |
 
@@ -124,7 +187,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | 工具 | 说明 |
 |---|---|
 | `replace_models_from_csv` | 按 CSV 批量替换模型 |
-| `launch_edi` | 启动 EDI 客户端 |
+| `launch_edi` | 启动 EDI 客户端并等待 gRPC 就绪 |
 
 ### ANSYS HFSS（6 个）
 
@@ -143,73 +206,326 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 |---|---|
 | `list_result_curves` | 解析 RAW 返回可用曲线名 |
 | `turbocharts_convert` | ADS RAW → 曲线图 + CSV |
-| `compare_simulation_results` | 多 RAW 同曲线对比叠图 |
-| `show_image` | 返回 MCP ImageContent |
+| `compare_simulation_results` | 多 RAW 同曲线对比叠图（Matplotlib） |
+| `show_image` | 返回 MCP ImageContent + 本地路径 |
 | `analyze_image` | 调用视觉模型分析图片内容 |
-| `copy_image_to_workspace`* | 复制到工作区（需 OPENCLAW_WORKSPACE） |
-| `generate_simulation_report` | 生成本地仿真报告（PDF/DOCX） |
+| `copy_image_to_workspace`* | 复制到工作区（条件注册） |
+
+### 报告与文档
+
+| 工具 | 说明 |
+|---|---|
+| `generate_simulation_report` | 仿真数据 → PDF/DOCX，自动返回 HTTP 预览链接 |
 | `open_document` | 为 PDF/DOCX 生成临时 HTTP 链接 |
 | `open_local_document` | 用系统默认程序打开本地文档 |
 
-> *条件注册。完整参数说明见 [API 参考](./docs/API_REFERENCE.md)。
+> \*条件注册。完整参数说明见 [API 参考](./docs/API_REFERENCE.md)。
+
+---
+
+## 接口设计
+
+### 传输方式
+
+| 方式 | 端点 | 适用场景 |
+|---|---|---|
+| **Streamable HTTP**（默认） | `POST http://127.0.0.1:50026/mcp` | OpenClaw、Web 客户端 |
+| **stdio** | 标准输入输出 | Claude Code、本地桌面客户端 |
+
+Streamable HTTP 模式启用 `stateless_http=True`，服务不保留 MCP 会话状态，重启后新请求自动重建连接。
+
+### HTTP 路由
+
+| 路由 | 方法 | 说明 | 响应示例 |
+|---|---|---|---|
+| `/health` | GET | 进程存活 + gRPC 连接状态 | `{"status":"ok","mcp_ready":true,"eda_grpc_ready":true}` |
+| `/ready` | GET | 服务是否完成初始化（启动中返回 503） | `{"status":"ready","transport":"streamable-http","stateless":true,"tool_count":41}` |
+| `/mcp` | POST | MCP 协议端点（Streamable HTTP） | MCP JSON-RPC 响应 |
+| `/ui` | GET | 内置聊天界面 | HTML 页面 |
+| `/chat` | POST | 聊天 API（LLM 多轮工具闭环） | `{"success":true,"reply":"...","activities":[...]}` |
+| `/tools/list` | GET | 已注册工具列表 | `[{"name":"list_epp_projects","description":"..."}]` |
+| `/images/{token}` | GET | 临时图片访问（10 分钟有效） | 图片文件 |
+| `/documents/{token}` | GET | 临时文档访问（10 分钟有效） | PDF/DOCX 文件 |
+
+### MCP Resources（3 个，只读上下文）
+
+客户端通过 `resources/list` 和 `resources/read` 访问。
+
+| URI | MIME | 说明 |
+|---|---|---|
+| `edi://service/overview` | `application/json` | 服务版本、gRPC 协议 v2、工具 API v3、安全规则、工作区状态 |
+| `edi://reference/simulation-components` | `application/json` | SP/HB/XDB 参数目录，与 `get_simulation_component_schema` 同源 |
+| `edi://reference/operation-guide` | `text/markdown` | 操作安全约束：创建/删除/网表导入规则 |
+
+### MCP Prompts（4 个，可复用工作流）
+
+| Prompt | 参数 | 说明 |
+|---|---|---|
+| `inspect_edi_project` | `project_path`, `detail_level` | 只读检查：概览 → 变量 → 器件 → 仿真配置 |
+| `run_and_review_simulation` | `project_path`, `execution_mode`, `analyze_log` | 异步仿真 + 日志分析，含轮询限制 |
+| `configure_simulation_component` | `project_path`, `action`, `component_type`, `instance_name`, `requirements` | Schema → 参数映射 → 确认 → 创建/更新 |
+| `create_simulation_report` | `project_path`, `output_path`, `overwrite` | 查询工程 → 确认结果 → 生成曲线 → 渲染 PDF/DOCX |
+
+---
+
+## 工具返回结构
+
+### gRPC 工具统一返回
+
+```python
+{
+    "success": bool,        # 本次 MCP 调用是否成功
+    "completed": bool,      # MCP 侧任务是否结束
+    "outcome_known": bool,  # 是否收到 EDI 最终事件（SUCCEEDED/FAILED）
+    "task_success": bool,   # EDI 任务是否成功（仅 outcome_known=True 有意义）
+    "status": str,          # SUCCEEDED / FAILED / TIMEOUT / STREAM_DISCONNECTED / ...
+    "message": str,         # 描述信息
+    "project_path": str,    # 工程路径
+    "result_path": str,     # 结果文件路径（如 RAW 文件）
+    "ads_output": str,      # 增量拼接的完整仿真器日志
+    "log_complete": bool,   # 日志是否完整接收
+    "details": dict,        # 原始事件 payload 字段
+}
+```
+
+### 异步仿真生命周期
+
+```
+QUEUED → ACCEPTED → RUNNING → SUCCEEDED / FAILED
+                                     ↓
+                              2 小时后自动清理
+```
+
+超时/断连时：`outcome_known=False, task_success=None`，不冒充 EDI 业务失败。
+
+### 产物格式 (artifacts)
+
+`turbocharts_convert`、`capture_schematic`、`compare_simulation_results`、`generate_simulation_report` 返回统一产物：
+
+```json
+{
+  "success": true,
+  "artifacts": [
+    {"type": "image", "path": "C:/.../gain.png", "name": "gain.png", "generated_by": "turbocharts_convert"},
+    {"type": "csv", "path": "C:/.../gain.csv", "name": "gain.csv", "generated_by": "turbocharts_convert"}
+  ],
+  "message": "曲线图已生成。"
+}
+```
+
+报告额外返回 `preview_url`（10 分钟有效 HTTP 链接）。
+
+---
+
+## Chat 接口
+
+内置 LLM 多轮工具调用闭环，通过 `POST /chat` 和浏览器 `/ui` 访问。
+
+### 请求
+
+```json
+POST /chat
+{"session_id": "", "message": "帮我扫描 C:/Projects 下的工程"}
+```
+
+### 响应
+
+```json
+{
+  "success": true,
+  "session_id": "a1b2c3d4",
+  "reply": "找到 3 个工程：demo1.epp, demo2.epp, test.epp",
+  "activities": [{"tool": "list_epp_projects", "status": "success", "summary": "找到 3 个工程"}],
+  "context": {"current_project_name": null},
+  "media": []
+}
+```
+
+### 特性
+
+- 会话保持（2h TTL，100 上限），自动记忆当前工程和最近仿真 task_id
+- 最多 5 轮工具调用，单轮最多 8 个工具
+- 参数自动补齐：`project_path` 从会话上下文，`task_id` 从最近仿真
+- 破坏性操作确认门：delete/replace/close_save/overwrite 需用户确认，支持肯定词
+- 重复调用保护：同轮同参数指纹去重
+- 空 session_id 自动创建，服务重启后旧 session 返回 Session not found
+
+---
+
+## 配置一览
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `EDA_GRPC_SERVER` | `127.0.0.1:50055` | EDI gRPC 服务地址 |
+| `MCP_TRANSPORT` | `streamable-http` | 传输方式（streamable-http / stdio） |
+| `MCP_STATELESS_HTTP` | `true` | 无状态模式 |
+| `MCP_HOST` | `127.0.0.1` | 监听地址（强制本地） |
+| `MCP_PORT` | `50026` | HTTP 监听端口 |
+| `EDI_PATH` | 自动检测 | EDI.exe 路径 |
+| `TURBOCHARTS_PATH` | 自动检测 | turbocharts_app.exe 路径 |
+| `OPENCLAW_WORKSPACE` | 自动检测 | OpenClaw 工作区路径 |
+| `LLM_API_KEY` | — | Chat AI 功能 |
+| `LLM_BASE_URL` | — | LLM API 地址 |
+| `LLM_MODEL` | — | 模型名称 |
+| `VISION_API_KEY` | — | 视觉分析（三项全填开启） |
+| `VISION_BASE_URL` | — | 视觉模型 API 地址 |
+| `VISION_MODEL` | — | 视觉模型名称 |
+| `REPORT_RENDER_URL` | `http://127.0.0.1:17867/api/v1/reports/render` | 报告渲染服务 |
 
 ---
 
 ## 项目结构
 
 ```
-├── proto/                        protobuf 协议及生成代码
-├── servers/
-│   ├── __init__.py               FastMCP 全局实例 + 版本号
-│   ├── registry_server.py        工具 / Resource / Prompt 注册入口
-│   ├── runtime_config.py          运行时配置（端口/地址）
-│   ├── settings.py                统一配置加载
-│   ├── mcp_content.py            3 个 Resource + 4 个 Prompt
-│   ├── multimodal_vision/        图片显示 + 工作区复制 + 视觉分析 + 文档工具
-│   ├── report/                    仿真报告生成
-│   ├── chat/                     聊天模块（LLM 多轮工具闭环）
-│   ├── eda/                      EDI gRPC 工具
-│   │   ├── config.py             配置 / S-expression 解析 / ProjectReader
-│   │   ├── grpc_client.py        gRPC 通信层（FetchEvent + PerformAction）
-│   │   ├── project_manage.py     工程管理（7 个工具）
-│   │   ├── simulation.py         仿真（7 个工具）
-│   │   ├── simulation_components.py     仿真器件（8 个工具）
-│   │   ├── simulation_component_catalog.json  参数目录 v2.0
-│   │   ├── design_export.py      网表 / 截图
-│   │   ├── model_replace.py      模型替换
-│   │   └── edi_launcher.py       启动 EDI
-│   ├── turbocharts/              RAW 图表工具
-│   └── ansys/                     ANSYS HFSS 工具
-├── docs/                         项目文档
-├── tests/                        测试套件（211 项）
-├── scripts/                      打包 / 启动脚本
-├── start_servers.py              入口
-└── pyproject.toml
+mcp-grpc/
+│
+├── proto/                              # protobuf 协议定义及编译产物
+│   ├── ecserver.proto                  #   gRPC 服务定义（ExternalCall, 16 种 EventType）
+│   ├── ecserver_pb2.py                 #   protobuf 编译消息类
+│   ├── ecserver_pb2_grpc.py            #   protobuf 编译 Stub/Servicer
+│   └── grpc接口调用.md                 #   gRPC 协议完整文档（含 payload 示例）
+│
+├── servers/                            # MCP 服务主体
+│   ├── __init__.py                     #   FastMCP 实例 + 版本号，支持 stateless_http
+│   ├── registry_server.py              #   注册入口：导入所有子包触发 @mcp.tool() 注册
+│   │                                   #   同时注册 8 条 HTTP 自定义路由
+│   ├── utils.py                        #   公共工具层
+│   │                                   #     validate_file() — 文件校验
+│   │                                   #     tool_error() — 统一错误响应
+│   │                                   #     build_file_link() — file:// + Markdown 链接
+│   │                                   #     get_server_base_url() — 运行时地址
+│   │                                   #     set_server_address() — CLI 参数覆盖
+│   │                                   #     ServerAddress — 运行时地址 dataclass
+│   │                                   #     SERVER_STARTED_AT — 服务启动时间戳
+│   ├── settings.py                     #   统一配置：Settings dataclass (frozen, lru_cache)
+│   │                                   #   所有环境变量收敛于此，启动时 validate()
+│   │
+│   ├── resources_prompts/              #   MCP Resource & Prompt
+│   │   ├── __init__.py                 #     导入触发 @mcp.resource() / @mcp.prompt() 注册
+│   │   ├── resources.py                #     3 个 Resource：服务概览 / 参数目录 / 操作规则
+│   │   └── prompts.py                  #     4 个 Prompt：检查工程 / 执行仿真 / 配置器件 / 生成报告
+│   │
+│   ├── eda/                            #   EDI gRPC 工具 (26 个)
+│   │   ├── __init__.py                 #     公共 API re-export
+│   │   ├── config.py                   #     路径检测 / S-expression 解析器 / ProjectReader
+│   │   ├── grpc_client.py              #     gRPC 通信层：FetchEvent + PerformAction 异步模型
+│   │   │                               #     全局 _EDA_LOCK 串行锁，增量 ads_output 收集
+│   │   │                               #     _terminal_result() 统一返回结构
+│   │   ├── project_manage.py           #     工程管理：扫描/打开/关闭/元件/概述/变量分析 (7 工具)
+│   │   ├── simulation.py               #     仿真引擎：同步/异步/网表/ADS 控制器 (7 工具)
+│   │   │                               #     ThreadPoolExecutor(1) 串行执行，最多 8 个排队任务
+│   │   ├── simulation_components.py    #     仿真器件管理：创建/更新/删除/状态 (8 工具)
+│   │   │                               #     11 步参数校验管线 + wire↔public 名称映射
+│   │   ├── simulation_component_catalog.json  # SP/HB/XDB 参数目录 v2.0
+│   │   ├── design_export.py            #     网表查看 + 原理图截图 (2 工具)
+│   │   ├── model_replace.py            #     CSV 批量模型替换 (1 工具)
+│   │   └── edi_launcher.py             #     启动 EDI 客户端 + gRPC 就绪轮询 (1 工具)
+│   │
+│   ├── turbocharts/                    #   ADS RAW 图表工具 (3 个)
+│   │   ├── __init__.py                 #     公共 API re-export
+│   │   ├── config.py                   #     run_turbocharts() 串行信号量执行器
+│   │   ├── convert_raw.py              #     RAW→曲线图+CSV，RAW 曲线查询，VSWR CSV 限制警告
+│   │   └── compare_results.py          #     多 RAW 对比叠图 (Matplotlib), alignment 校验
+│   │
+│   ├── ansys/                          #   ANSYS HFSS 工具 (6 个, COM 附着)
+│   │   ├── __init__.py                 #     公共 API re-export
+│   │   ├── config.py                   #     进程检测 / COM 附着 (多 ProgID 回退) / 锁文件管理
+│   │   ├── project_manage.py           #     工程打开/关闭 + AEDT 启动 + 信息查询 (4 工具)
+│   │   └── run_analysis.py             #     异步仿真队列 (单 worker), outcome_known 追踪
+│   │
+│   ├── multimodal_vision/              #   图片 + 视觉 + 文档 (6 个工具)
+│   │   ├── __init__.py                 #     条件注册 copy_image_to_workspace
+│   │   ├── validators.py               #     共享校验：图片路径/扩展名/Pillow 内容验证
+│   │   ├── image_display.py            #     show_image + HTTP /images/{token} 路由
+│   │   ├── vision_analyzer.py          #     analyze_image (OpenAI Vision API, Semaphore(2))
+│   │   ├── workspace_copy.py           #     copy_image_to_workspace + 工作区自动检测
+│   │   └── document.py                 #     open_document / open_local_document + /documents/{token}
+│   │
+│   ├── report/                         #   仿真报告渲染 (1 个工具)
+│   │   ├── __init__.py                 #     公共 API re-export
+│   │   └── generator.py               #     16 步校验 → POST 渲染服务 → 返回 preview_url
+│   │
+│   └── chat/                           #   Chat 聊天模块
+│       ├── __init__.py                 #     包标识
+│       ├── service.py                  #     ChatService 单例：会话管理、LLM 调用、工具闭环
+│       │                               #     _auto_build_chat_tools() 从 MCP 元数据自动生成
+│       ├── routes.py                   #     Web 路由：/chat /ui /health /tools/list
+│       └── index.html                  #     聊天前端页面
+│
+├── docs/                               # 项目文档
+│   ├── DEPLOY.md                       #   部署指南（打包产物使用、客户端配置）
+│   ├── API_REFERENCE.md                #   API 参考（41 个工具完整签名+返回值示例）
+│   ├── IMPLEMENTATION.md               #   实现原理（5 种通信类型、校验管线、并发控制）
+│   ├── HANDOVER.md                     #   交接文档（架构设计、技术栈、47 条注意事项）
+│   └── EDI系统接口与外部调用汇总.md    #   EDI 系统全量对外接口
+│
+├── tests/                              # 测试套件 (212 项)
+│   ├── test_chat_service.py            #   27 项：会话/校验/重复调用/上下文/show_image
+│   ├── test_simulation_components.py   #   85 项：参数目录/Schema/校验管线/wire转换
+│   ├── test_simulation.py              #   14 项：任务注册表/事件回调/生命周期
+│   ├── test_grpc_client.py             #   24 项：终端结果/日志累积/异常处理
+│   ├── test_report_generator.py        #   23 项：输出路径/模型名/spec_table/charts/components
+│   ├── test_mcp_content.py             #   13 项：Resources/Prompts 直接调用+MCP协议冒烟
+│   ├── test_tool_registry.py           #   7 项：完整工具注册+Chat一致性的双重验证
+│   ├── test_project_reader.py          #   5 项：S-expression 解析/元件提取
+│   ├── test_component_tools.py         #   4 项：list/过滤/分页/参数查询
+│   ├── test_chat_service.py            #   27 项
+│   ├── test_turbocharts_runner.py      #   3 项：串行执行器超时范围
+│   └── test_health.py                  #   2 项：TCP 检查
+│
+├── scripts/                            # 构建与启动脚本
+│   ├── build.ps1                       #   PyInstaller 打包脚本（体积检查+过滤敏感配置）
+│   ├── edi_mcp_server.spec             #   PyInstaller spec（hiddenimports+excludes）
+│   ├── run.bat                         #   快速启动批处理
+│   └── Logo.ico                        #   应用图标
+│
+├── dist/                               # 打包产物（不提交 Git）
+│   └── edi-mcp/                        #   edi_mcp_server.exe + _internal/ + .env 模板
+│
+├── start_servers.py                    # 主入口：配置校验 → 所有模块导入 → MCP 启动
+├── pyproject.toml                      # uv 项目配置 + PyPI 元数据
+├── .mcp.json                           # Claude Code MCP 配置示例
+├── .env                                # 本地配置（不提交 Git）
+└── README.md                           # 本文件
 ```
 
 ---
 
 ## 测试
 
+| 测试文件 | 覆盖范围 | 项数 |
+|---|---|---|
+| `test_simulation_components.py` | 参数目录 / Schema 查询 / 11 步校验 / wire 转换 / 权限 / 别名冲突 | 85 |
+| `test_chat_service.py` | 会话隔离 / 工具白名单 / 重复保护 / 上下文更新 / 消息裁剪 | 27 |
+| `test_grpc_client.py` | 终端结果构建 / 日志累积 / 任务隔离 / 异常处理 / 协议不匹配 | 24 |
+| `test_report_generator.py` | 输出路径 / 模型名 / spec_table / charts / components / timeout | 23 |
+| `test_simulation.py` | 任务注册表 / 事件回调 / TaskLifecycle / TASK_NOT_FOUND | 14 |
+| `test_mcp_content.py` | Resources 结构 / Prompts 参数校验 / MCP 协议 list/read/get | 13 |
+| `test_tool_registry.py` | 完整注册验证 / Chat 一致性 / 破坏性工具 / 工具数动态统计 | 7 |
+| `test_project_reader.py` | S-expression 解析 / 元件提取 | 5 |
+| `test_component_tools.py` | 元件列表 / 类型过滤 / 分页 / 参数查询 | 4 |
+| `test_turbocharts_runner.py` | 超时范围校验 | 3 |
+| `test_health.py` | TCP 连接检查 | 2 |
+| `test_chat_service.py` | 27 项 | 27 |
+
 ```powershell
-uv run pytest -q                 # 全量 211 项
+uv run pytest -q                 # 全量 212 项
+uv run pytest tests/ -v          # 详细输出
+uv run pytest tests/test_simulation_components.py -v  # 单文件
+```
+
+```powershell
+uv run pytest -q                 # 全量 212 项
 uv run pytest tests/ -v          # 详细输出
 ```
 
 ---
 
-## 打包发布
-
-**PyPI：**
+## 打包
 
 ```powershell
-uv build && uv publish
-```
-
-**PyInstaller 免安装包：**
-
-```powershell
-powershell -File scripts/build.ps1
+uv build && uv publish           # PyPI
+powershell -File scripts/build.ps1  # PyInstaller
 # → dist/edi-mcp/（edi_mcp_server.exe + _internal/ + .env）
 ```
 
@@ -219,36 +535,40 @@ powershell -File scripts/build.ps1
 
 | 文档 | 说明 |
 |---|---|
-| [部署指南](./docs/DEPLOY.md) | 打包产物使用、Claude Code / OpenClaw 配置 |
-| [API 参考](./docs/API_REFERENCE.md) | 全部工具的参数、返回值、使用示例 |
-| [实现原理](./docs/IMPLEMENTATION.md) | 每个工具的实现方式、通信流程、设计决策 |
-| [交接文档](./docs/HANDOVER.md) | 架构设计、技术栈、扩展开发 |
-| [gRPC 协议](./proto/grpc接口调用.md) | gRPC 接口调用说明 |
-| [EDI 接口汇总](./docs/EDI系统接口与外部调用汇总.md) | EDI 系统全量对外接口 |
+| [部署指南](./docs/DEPLOY.md) | 打包产物使用、客户端配置 |
+| [API 参考](./docs/API_REFERENCE.md) | 全部 41 个工具参数、返回值、示例 |
+| [实现原理](./docs/IMPLEMENTATION.md) | 5 种通信类型、校验管线、并发控制 |
+| [交接文档](./docs/HANDOVER.md) | 架构设计、技术栈、扩展开发、47 条注意事项 |
+| [gRPC 协议](./proto/grpc接口调用.md) | ExternalCall 接口调用说明 |
+| [EDI 系统接口汇总](./docs/EDI系统接口与外部调用汇总.md) | EDI 全量对外接口 |
 
 ---
 
-## 常见问题
+## FAQ
 
-### 端口被占用
+### 端口占用
 
 ```powershell
-netstat -ano | findstr 50026         # 查找占用进程的 PID
-taskkill -f -pid <PID>               # 强制结束
-taskkill -f -im edi_mcp_server.exe   # EXE 版按名称结束
+netstat -ano | findstr 50026 && taskkill -f -pid <PID>
+taskkill -f -im edi_mcp_server.exe
 ```
 
-### 检查服务状态
+### gRPC 状态
 
 ```powershell
-netstat -ano | findstr 50055         # gRPC：有 LISTENING = EDI 运行中
-netstat -ano | findstr 50026         # MCP：有 LISTENING = 服务运行中
+netstat -ano | findstr 50055         # LISTENING = EDI 运行中
 curl http://127.0.0.1:50026/health   # 健康检查
+curl http://127.0.0.1:50026/ready    # 就绪检查
 ```
 
-### analyze_image 注意事项
+### 图片
 
-- **不会自动触发**：只有用户明确要求分析图片时才调用，AI 不应主动使用
-- **显示给我看 ≠ 上传分析**：展示图片用 `show_image`，识别内容用 `analyze_image`
-- **会上传到第三方**：图片会发送到配置的视觉模型服务
-- **未配置不可用**：需配置 `VISION_API_KEY` + `VISION_BASE_URL` + `VISION_MODEL`
+- `show_image` 始终可用，未配置工作区时提示用资源管理器打开
+- `copy_image_to_workspace` 条件注册，支持自动检测或 .env 配置
+- `analyze_image` 仅用户明确要求时调用，会上传到第三方
+
+### 服务重启
+
+- 重启后旧 MCP session 失效，客户端重新 initialize
+- 仿真任务在内存中，重启后查询返回 TASK_NOT_FOUND
+- 不自动重放工具调用

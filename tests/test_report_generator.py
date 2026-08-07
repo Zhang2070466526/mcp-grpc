@@ -7,7 +7,8 @@ from unittest.mock import patch, MagicMock
 
 from pathlib import Path
 
-from servers.report.generator import generate_simulation_report, _error
+from servers.report.generator import generate_simulation_report
+from servers.utils import tool_error as _error
 
 
 _MOCK_OK = {

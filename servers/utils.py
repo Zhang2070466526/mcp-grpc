@@ -1,4 +1,4 @@
-"""运行时配置 — CLI 参数覆盖后的统一地址 + 服务就绪状态。"""
+"""公共工具函数 — 文件校验、错误响应、地址管理、链接生成。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 # ── 服务启动时间戳 ──
 SERVER_STARTED_AT: float = time.time()
@@ -13,6 +14,30 @@ SERVER_STARTED_AT: float = time.time()
 
 def server_uptime_seconds() -> float:
     return time.time() - SERVER_STARTED_AT
+
+
+# ── 文件校验 ──
+
+def validate_file(path: str, extensions: tuple[str, ...] = ()) -> str:
+    """校验文件存在，可选限制扩展名，返回规范化绝对路径。"""
+    p = Path(path).expanduser()
+    if not p.is_file():
+        raise FileNotFoundError(f"文件不存在: {p}")
+    if extensions and p.suffix.lower() not in extensions:
+        raise ValueError(f"文件扩展名必须是 {extensions}: {p}")
+    return str(p.resolve())
+
+
+# ── 统一错误响应 ──
+
+def tool_error(code: str, message: str, retryable: bool = False, **extra) -> dict[str, Any]:
+    """构建工具统一错误响应。"""
+    result: dict[str, Any] = {"success": False, "error_code": code, "message": message}
+    if retryable:
+        result["retryable"] = True
+    if extra:
+        result.setdefault("details", {}).update(extra)
+    return result
 
 
 @dataclass
