@@ -29,6 +29,7 @@ turbocharts_convert   将 ADS 仿真 RAW 结果转为 PNG 曲线图和 CSV
 
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,8 @@ from servers.eda.config import TURBOCHARTS_PATH
 from servers.utils import build_file_link, validate_file
 from servers.turbocharts.config import run_turbocharts
 from servers import mcp
+
+_logger = logging.getLogger("turbocharts.convert")
 
 def _suggest_curves(var_name: str, var_type: str) -> list[str]:
     """Generate TurboCharts-compatible curve names for a variable.
@@ -335,6 +338,11 @@ def turbocharts_convert(
     """
     validate_file(raw_path)
     validate_file(TURBOCHARTS_PATH)
+
+    _logger.info("turbocharts_convert raw=%s img=%s type=%s linename=%s csv=%s dep=%s ac=%s",
+                 Path(raw_path).name, Path(img_path).name, chart_type,
+                 linename or "(all)", Path(csv_path).name if csv_path else "(none)",
+                 dependency or "(none)", ac_config or "(none)")
 
     # 校验输出图片扩展名
     img_ext = Path(img_path).suffix.lower()

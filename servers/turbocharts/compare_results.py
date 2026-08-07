@@ -5,11 +5,14 @@ compare_simulation_results  多个 RAW 仿真结果同一条曲线对比叠图
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 import tempfile
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger("turbocharts.compare")
 
 import matplotlib
 matplotlib.use("Agg")
@@ -78,6 +81,10 @@ def compare_simulation_results(
         return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "labels 数量与 result_paths 不一致"}
     if not all(isinstance(lb, str) for lb in labels):
         return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "labels 每个元素必须是字符串"}
+
+    _logger.info("compare_results files=%d curve=%s type=%s align=%s ref=%d csv=%s",
+                 file_count, curve, chart_type, alignment, reference_index,
+                 Path(csv_path).name if csv_path else "(none)")
 
     # 规范化输出路径
     img_path = str(Path(img_path).expanduser().resolve())

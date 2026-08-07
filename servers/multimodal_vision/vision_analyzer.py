@@ -121,10 +121,16 @@ def _call_vision(path: Path, prompt: str, detail: str, max_tokens: int) -> dict:
                  resp.status_code, VISION_MODEL, path.stat().st_size, mime, elapsed_ms)
 
     if resp.status_code in (401, 403):
+        _logger.error("vision_auth_failed status=%d model=%s body=%s",
+                      resp.status_code, VISION_MODEL, resp.text[:500])
         return tool_error("VISION_AUTH_FAILED", f"API Key 无效: {VISION_MODEL}")
     if resp.status_code == 429:
+        _logger.warning("vision_rate_limited model=%s", VISION_MODEL)
         return tool_error("VISION_RATE_LIMITED", "调用频率过高，请稍后重试")
     if resp.status_code != 200:
+        _logger.error("vision_provider_error status=%d model=%s url=%s body=%s",
+                      resp.status_code, VISION_MODEL, f"{VISION_BASE_URL}/chat/completions",
+                      resp.text[:500])
         return tool_error("VISION_PROVIDER_ERROR",
                        f"视觉模型返回 HTTP {resp.status_code}: {resp.text[:200]}")
 

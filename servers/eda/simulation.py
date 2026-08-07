@@ -24,11 +24,14 @@ get_simulation_async_result   获取结果（运行中返回部分日志，完�
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
+
+_logger = logging.getLogger("eda.simulation")
 
 from proto import ecserver_pb2
 from servers.eda.grpc_client import call_grpc
@@ -163,8 +166,11 @@ def _run_sim_task(
                 result["task_success"] = result.get("outcome_known") and result.get("status") == "SUCCEEDED"
             # 最终 result 已含完整拼接日志，清 chunk 避免双份
             task["log_chunks"] = []
+        _logger.info("task=%s status=%s outcome_known=%s task_success=%s",
+                     task_id[:12], result["status"], result.get("outcome_known"), result.get("task_success"))
 
     except Exception as exc:
+        _logger.exception("task=%s mcp_exception", task_id[:12])
         with _sim_lock:
             task = _sim_tasks.get(task_id)
             if task is None:
@@ -250,6 +256,8 @@ def start_simulation_async(
         timeout_seconds,
     )
 
+    _logger.info("task=%s status=QUEUED project=%s timeout=%ds",
+                 task_id[:12], resolved_path, timeout_seconds)
     return {
         "success": True,
         "task_id": task_id,

@@ -269,8 +269,12 @@ def generate_simulation_report(
     # 10. Call report service
     t0 = time.monotonic()
     body = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    _logger.info("report_render request: file_type=%s output_path=%s request_size=%d",
-                 file_type, str(expected_output), len(body))
+    _logger.info("report_render file=%s type=%s model=%s size=%d charts=%d comps=%d specs=%d overwrite=%s",
+                 Path(str(expected_output)).name, file_type, mn, len(body),
+                 len(valid_charts) if valid_charts else 0,
+                 len(components) if components else 0,
+                 len(spec_table) if spec_table else 0,
+                 overwrite)
     if _logger.isEnabledFor(logging.DEBUG):
         _logger.debug("REPORT_REQ payload: %s", body.decode("utf-8"))
     try:
@@ -281,9 +285,11 @@ def generate_simulation_report(
                 headers={"Content-Type": "application/json; charset=utf-8"},
             )
     except httpx.ConnectError:
+        _logger.error("report_connect_failed url=%s", _REPORT_URL)
         return tool_error("REPORT_SERVICE_UNAVAILABLE",
                        "无法连接本地报告渲染服务，请确认服务已启动。", retryable=True)
     except httpx.TimeoutException:
+        _logger.error("report_timeout timeout=%d url=%s", effective_timeout, _REPORT_URL)
         return tool_error("REPORT_RENDER_TIMEOUT",
                        f"报告渲染超时（{effective_timeout}s）", retryable=True)
     except httpx.RequestError as e:
@@ -296,12 +302,15 @@ def generate_simulation_report(
 
     # 11. Map HTTP errors
     if resp.status_code == 400:
+        _logger.error("report_validation_failed body=%s", resp.text[:500])
         return tool_error("REPORT_VALIDATION_FAILED",
                        f"报告数据校验失败: {_safe_json_text(resp)}")
     if resp.status_code == 409:
+        _logger.warning("report_file_busy path=%s", str(expected_output))
         return tool_error("OUTPUT_FILE_BUSY",
                        "输出文件无法写入（可能被占用）", retryable=True)
     if resp.status_code != 200:
+        _logger.error("report_render_failed status=%d body=%s", resp.status_code, resp.text[:500])
         return tool_error("REPORT_RENDER_FAILED",
                        f"报告渲染失败 (HTTP {resp.status_code}): {_safe_json_text(resp)}")
 
