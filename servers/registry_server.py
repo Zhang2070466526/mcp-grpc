@@ -88,7 +88,7 @@ import servers.report                     # noqa: F401 — generate_simulation_r
 import servers.resources_prompts      # noqa: F401 — @mcp.resource() / @mcp.prompt()
 
 # Web 路由
-from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list  # noqa: E402
+from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list, upload_file  # noqa: E402
 from servers.multimodal_vision import serve_image  # noqa: E402
 from servers.multimodal_vision import serve_document  # noqa: E402
 
@@ -99,3 +99,4 @@ mcp.custom_route("/chat", methods=["POST"])(chat_endpoint)
 mcp.custom_route("/tools/list", methods=["GET"])(tool_list)
 mcp.custom_route("/images/{token}", methods=["GET"])(serve_image)
 mcp.custom_route("/documents/{token}", methods=["GET"])(serve_document)
+mcp.custom_route("/upload", methods=["POST"])(upload_file)

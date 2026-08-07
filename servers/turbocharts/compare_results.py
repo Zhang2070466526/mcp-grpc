@@ -56,25 +56,25 @@ def compare_simulation_results(
             "message": f"turbocharts_app.exe 不存在: {TURBOCHARTS_PATH}",
         }
 
-    n = len(result_paths)
-    if n < 2 or n > 8:
+    file_count = len(result_paths)
+    if file_count < 2 or file_count > 8:
         return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "result_paths 需要 2-8 个文件"}
 
     if alignment not in ("intersection", "interpolation"):
         return {"success": False, "error_code": "INVALID_PARAMETERS",
                 "message": "alignment 必须是 intersection 或 interpolation"}
 
-    if reference_index < 0 or reference_index >= n:
+    if reference_index < 0 or reference_index >= file_count:
         return {"success": False, "error_code": "INVALID_PARAMETERS",
-                "message": f"reference_index={reference_index} 超出范围（0-{n - 1}）"}
+                "message": f"reference_index={reference_index} 超出范围（0-{file_count - 1}）"}
 
-    for rp in result_paths:
-        if not Path(rp).is_file():
-            return {"success": False, "error_code": "FILE_NOT_FOUND", "message": f"RAW 文件不存在: {rp}"}
+    for raw_path in result_paths:
+        if not Path(raw_path).is_file():
+            return {"success": False, "error_code": "FILE_NOT_FOUND", "message": f"RAW 文件不存在: {raw_path}"}
 
     if labels is None:
-        labels = [Path(rp).stem for rp in result_paths]
-    if len(labels) != n:
+        labels = [Path(raw_path).stem for raw_path in result_paths]
+    if len(labels) != file_count:
         return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "labels 数量与 result_paths 不一致"}
     if not all(isinstance(lb, str) for lb in labels):
         return {"success": False, "error_code": "INVALID_PARAMETERS", "message": "labels 每个元素必须是字符串"}
@@ -115,7 +115,7 @@ def compare_simulation_results(
             raw_curves.append((x_vals, y_vals))
 
     # Step 2: align data (preserve original index order)
-    curves_aligned: list[list[float] | None] = [None] * n
+    curves_aligned: list[list[float] | None] = [None] * file_count
     common_x: list[float] = []
 
     if alignment == "intersection":
@@ -153,7 +153,7 @@ def compare_simulation_results(
     # Step 3: compute metrics (each vs reference)
     metrics = []
     ref_curve = aligned[reference_index]
-    for i in range(n):
+    for i in range(file_count):
         if i == reference_index:
             continue
         diffs = [

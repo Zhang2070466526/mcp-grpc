@@ -53,7 +53,7 @@ def _get_openclaw_workspace() -> Path | None:
 
     candidates = [
         _app_root.parent / "rfclaw" / "openclaw-service" / "state" / "workspace",
-        _app_root.parent / "openclaw" / "state" / "workspace",
+        Path.home() / ".openclaw" / "workspace",
     ]
     for p in candidates:
         try:

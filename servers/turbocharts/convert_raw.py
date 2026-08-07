@@ -308,12 +308,9 @@ def turbocharts_convert(
         ├─ MV_S[2,1]          数控移相器幅度波动
         └─ PSS_S[2,1]         数控移相器移相态
 
-    CSV 导出限制:
-        DB 类曲线（DB_S[a,b]）多条可一次导出。
-        VSWR 类曲线一次 CSV 调用只保留第一条——多条 VSWR 必须
-        分次调用，每次一条（如 VSWR_S[1,1] 和 VSWR_S[2,2] 分两次导出）。
-        DB+VSWR 混用时图片正常，CSV 中 VSWR 仍只取第一条。
-        导出后务必核对 CSV 行数和列数与预期一致。
+    CSV 导出:
+        DB 类曲线多条可一次导出。
+        多条 VSWR 自动拆分为多次 CSV 调用（每次一条），导出后核对行数列数。
 
     精度配置（--ac）:
         格式: ac_type#bit#data#nv_type#nv_value
@@ -344,58 +341,99 @@ def turbocharts_convert(
     if img_ext not in (".png", ".jpg", ".jpeg", ".bmp", ".svg"):
         raise ValueError(f"img_path 扩展名不支持: {img_ext}，请使用 PNG/JPG/BMP/SVG")
 
-    cmd = [TURBOCHARTS_PATH, "--raw", raw_path, "--img", img_path, "--type", chart_type]
-
-    if csv_path:
-        cmd.extend(["--csv", csv_path])
-    if linename:
-        cmd.extend(["--linename", linename])
-    if dependency:
-        cmd.extend(["--dependcy", dependency])
-    if ac_config:
-        cmd.extend(["--ac", ac_config])
-
-    # ── VSWR CSV 限制警告 ──
     warnings: list[str] = []
-    if csv_path and linename:
-        vswr_curves = re.findall(r'VSWR_S\[\d+,\d+\]', linename)
-        if len(vswr_curves) > 1:
-            warnings.append(
-                f"CSV 导出时 VSWR 曲线只保留第一条：{vswr_curves}。"
-                f"如需多个端口的驻波数据，请分次调用，每次一条 VSWR。"
-            )
-        elif len(vswr_curves) == 1:
-            # 混合调用：DB + VSWR，CSV 中 VSWR 正常但 DB 可能受影响取决于顺序
-            non_vswr = re.findall(r'(?<!VSWR_S)\b\w+_S?\[?\d+,?\d*\]?', linename)
-            pass  # 单条 VSWR OK，不警告
-
-    result = run_turbocharts(cmd, timeout_seconds=120)
-
-    img_generated = Path(img_path).exists()
-    csv_generated = bool(csv_path) and Path(csv_path).exists()
-
-    # CSV 生成后做完整性提示
-    if csv_generated:
-        warnings.append("CSV 已生成，请核对行数和列数与预期一致后再使用数据。")
-
     artifacts: list[dict] = []
+
+    # ── VSWR CSV 自动拆分 ──
+    # turbocharts_app.exe 在 CSV 模式下多条 VSWR 只写第一条。
+    # 当检测到多条 VSWR + CSV 时，自动拆分为多次调用，每次一条 VSWR。
+    vswr_curves = re.findall(r'VSWR_S\[\d+,\d+\]', linename) if linename else []
+    non_vswr = re.sub(r'VSWR_S\[\d+,\d+\]', '', linename).strip('&') if linename else ''
+    need_split = csv_path and len(vswr_curves) > 1
+
+    # ── 第 1 步：生成 PNG 图片（所有曲线，包括 VSWR） ──
+    cmd_img = [TURBOCHARTS_PATH, "--raw", raw_path, "--img", img_path, "--type", chart_type]
+    if linename:
+        cmd_img.extend(["--linename", linename])
+    if dependency:
+        cmd_img.extend(["--dependcy", dependency])
+    if ac_config:
+        cmd_img.extend(["--ac", ac_config])
+
+    result = run_turbocharts(cmd_img, timeout_seconds=120)
+    img_generated = Path(img_path).exists()
     if img_generated:
         artifacts.append({"type": "image", "path": img_path, "name": Path(img_path).name,
                           "generated_by": "turbocharts_convert"})
-    if csv_generated:
-        artifacts.append({"type": "csv", "path": csv_path, "name": Path(csv_path).name,
-                          "generated_by": "turbocharts_convert"})
+
+    # ── 第 2 步：CSV 导出（自动拆分 VSWR） ──
+    if need_split:
+        csv_base = Path(csv_path)
+        csv_stem = csv_base.stem
+        csv_ext = csv_base.suffix
+        csv_dir = csv_base.parent
+
+        # 非 VSWR 曲线：一条调用
+        if non_vswr:
+            csv_non = str(csv_dir / f"{csv_stem}{csv_ext}")
+        else:
+            csv_non = None
+
+        # 每条 VSWR：独立调用
+        vswr_artifacts = []
+        for vswr in vswr_curves:
+            csv_vswr = str(csv_dir / f"{csv_stem}_{vswr.replace('[','').replace(']','').replace(',','_')}{csv_ext}")
+            cmd_csv = [TURBOCHARTS_PATH, "--raw", raw_path, "--img", img_path, "--type", chart_type,
+                       "--csv", csv_vswr, "--linename", vswr]
+            if dependency:
+                cmd_csv.extend(["--dependcy", dependency])
+            proc = run_turbocharts(cmd_csv, timeout_seconds=120)
+            if proc.returncode == 0 and Path(csv_vswr).exists():
+                artifacts.append({"type": "csv", "path": csv_vswr, "name": Path(csv_vswr).name,
+                                  "generated_by": "turbocharts_convert"})
+
+        # 非 VSWR 曲线 CSV
+        if csv_non and non_vswr:
+            cmd_non = [TURBOCHARTS_PATH, "--raw", raw_path, "--img", img_path, "--type", chart_type,
+                       "--csv", csv_non, "--linename", non_vswr]
+            if dependency:
+                cmd_non.extend(["--dependcy", dependency])
+            proc = run_turbocharts(cmd_non, timeout_seconds=120)
+            if proc.returncode == 0 and Path(csv_non).exists():
+                artifacts.append({"type": "csv", "path": csv_non, "name": Path(csv_non).name,
+                                  "generated_by": "turbocharts_convert"})
+
+        warnings.append(f"VSWR 曲线已自动拆分为 {len(vswr_curves)} 次 CSV 导出：{', '.join(vswr_curves)}")
+    elif csv_path:
+        # 单条 VSWR 或无 VSWR，正常调用
+        cmd_csv = [TURBOCHARTS_PATH, "--raw", raw_path, "--img", img_path, "--type", chart_type,
+                   "--csv", csv_path]
+        if linename:
+            cmd_csv.extend(["--linename", linename])
+        if dependency:
+            cmd_csv.extend(["--dependcy", dependency])
+        if ac_config:
+            cmd_csv.extend(["--ac", ac_config])
+        r = run_turbocharts(cmd_csv, timeout_seconds=120)
+        if r.returncode == 0 and Path(csv_path).exists():
+            artifacts.append({"type": "csv", "path": csv_path, "name": Path(csv_path).name,
+                              "generated_by": "turbocharts_convert"})
+
+    # CSV 完整性提示
+    csv_count = sum(1 for a in artifacts if a["type"] == "csv")
+    if csv_count > 0:
+        warnings.append(f"CSV 已生成（{csv_count} 个文件），请核对行数和列数与预期一致后再使用数据。")
 
     resp = {
         "success": result.returncode == 0,
         "return_code": result.returncode,
-        "command": " ".join(cmd),
+        "command": " ".join(cmd_img),
         "stdout": result.stdout.strip() or "",
         "stderr": result.stderr.strip() or "",
         "img_generated": img_generated,
-        "csv_generated": csv_generated,
+        "csv_generated": csv_count > 0,
         "artifacts": artifacts,
-        "output_paths": {"img": img_path} | ({"csv": csv_path} if csv_path else {}),
+        "output_paths": {"img": img_path} | ({"csv": csv_path} if csv_path and not need_split else {}),
         "message": "曲线图已生成。" if img_generated else "图表生成失败，请检查 RAW 文件和参数。",
     }
     if warnings:

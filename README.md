@@ -80,7 +80,7 @@ OPENCLAW_WORKSPACE=          # 留空自动检测，或手动指定
 自动检测规则：
 - `EDI_PATH`：项目同级找 `EDI.exe` → `EDA-PMDS.exe` → `CAIS.exe`
 - `TURBOCHARTS_PATH`：项目同级找 `turbocharts_app.exe` → `TurboCharts.exe`
-- `OPENCLAW_WORKSPACE`：项目同级找 `rfclaw/openclaw-service/state/workspace`
+- `OPENCLAW_WORKSPACE`：edi-mcp 同级 `rfclaw/openclaw-service/state/workspace`，回退 `~/.openclaw/workspace`
 
 ### 启动
 
@@ -246,6 +246,7 @@ Streamable HTTP 模式启用 `stateless_http=True`，服务不保留 MCP 会话�
 | `/tools/list` | GET | 已注册工具列表 | `[{"name":"list_epp_projects","description":"..."}]` |
 | `/images/{token}` | GET | 临时图片访问（10 分钟有效） | 图片文件 |
 | `/documents/{token}` | GET | 临时文档访问（10 分钟有效） | PDF/DOCX 文件 |
+| `/upload` | POST | 文件上传（multipart/form-data） | `{"success":true,"file_path":"C:/...","file_name":"..."}` |
 
 ### MCP Resources（3 个，只读上下文）
 
@@ -424,7 +425,7 @@ mcp-grpc/
 │   ├── turbocharts/                    #   ADS RAW 图表工具 (3 个)
 │   │   ├── __init__.py                 #     公共 API re-export
 │   │   ├── config.py                   #     run_turbocharts() 串行信号量执行器
-│   │   ├── convert_raw.py              #     RAW→曲线图+CSV，RAW 曲线查询，VSWR CSV 限制警告
+│   │   ├── convert_raw.py              #     RAW→曲线图+CSV，VSWR 自动拆分，曲线查询
 │   │   └── compare_results.py          #     多 RAW 对比叠图 (Matplotlib), alignment 校验
 │   │
 │   ├── ansys/                          #   ANSYS HFSS 工具 (6 个, COM 附着)
@@ -449,7 +450,7 @@ mcp-grpc/
 │       ├── __init__.py                 #     包标识
 │       ├── service.py                  #     ChatService 单例：会话管理、LLM 调用、工具闭环
 │       │                               #     _auto_build_chat_tools() 从 MCP 元数据自动生成
-│       ├── routes.py                   #     Web 路由：/chat /ui /health /tools/list
+│       ├── routes.py                   #     Web 路由：/chat /upload /ui /health /tools/list
 │       └── index.html                  #     聊天前端页面
 │
 ├── docs/                               # 项目文档

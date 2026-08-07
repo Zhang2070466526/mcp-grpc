@@ -70,33 +70,34 @@ def _validate(image_path: str) -> tuple[Path | None, dict | None]:
     return path, None
 
 
-def _encode(path: Path) -> tuple[str, str] | tuple[None, dict]:
+def _encode(path: Path) -> tuple[str | None, dict | None]:
     ext = path.suffix.lower()
     mime = _MIME_MAP.get(ext, "application/octet-stream")
     try:
         data = base64.b64encode(path.read_bytes()).decode("ascii")
     except OSError as e:
         return None, tool_error("INVALID_IMAGE", f"读取图片失败: {e}")
-    return f"data:{mime};base64,{data}", mime
+    return f"data:{mime};base64,{data}", None
 
 
 # ── 视觉模型调用 ──
 
 def _call_vision(path: Path, prompt: str, detail: str, max_tokens: int) -> dict:
-    data_url, error = _encode(path)
-    if error:
-        return error
+    data_url, err = _encode(path)
+    if err:
+        return err
 
     mime = _MIME_MAP.get(path.suffix.lower(), "image/png")
 
     payload = {
         "model": VISION_MODEL,
         "max_tokens": max_tokens,
+        "modalities": ["text"],  # DashScope Omni 系列必须指定输出模态
         "messages": [
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": [
-                {"type": "text", "text": prompt},
                 {"type": "image_url", "image_url": {"url": data_url, "detail": detail}},
+                {"type": "text", "text": prompt},
             ]},
         ],
     }
@@ -104,7 +105,7 @@ def _call_vision(path: Path, prompt: str, detail: str, max_tokens: int) -> dict:
     t0 = time.monotonic()
     try:
         resp = httpx.post(
-            f"{VISION_BASE_URL}/v1/chat/completions",
+            f"{VISION_BASE_URL}/chat/completions",
             json=payload,
             headers={"Authorization": f"Bearer {VISION_API_KEY}",
                      "Content-Type": "application/json"},
@@ -136,14 +137,31 @@ def _call_vision(path: Path, prompt: str, detail: str, max_tokens: int) -> dict:
     choices = data.get("choices", [])
     if not choices:
         return tool_error("INVALID_VISION_RESPONSE", "返回为空")
-    content = choices[0].get("message", {}).get("content", "")
-    if not content:
-        return tool_error("INVALID_VISION_RESPONSE", "未返回分析文字")
+
+    raw_content = choices[0].get("message", {}).get("content", "")
+    # DashScope 可能返回数组格式 [{"type":"text","text":"..."}]
+    if isinstance(raw_content, list):
+        text_parts = []
+        for part in raw_content:
+            if isinstance(part, dict) and part.get("type") == "text":
+                text_parts.append(str(part.get("text", "")))
+        content = "".join(text_parts)
+    elif isinstance(raw_content, str):
+        content = raw_content
+    else:
+        content = str(raw_content)
+
+    _logger.info("vision_response content_len=%d preview=%s",
+                 len(content), content[:200] if content else "(empty)")
+
+    if not content or len(content) < 5:
+        return tool_error("INVALID_VISION_RESPONSE",
+                         f"视觉模型返回内容过短或为空: {content!r}")
 
     return {
         "success": True,
         "model": VISION_MODEL,
-        "analysis": str(content).strip(),
+        "analysis": content.strip(),
         "image": {"name": path.name, "mime_type": mime, "size_bytes": path.stat().st_size},
         "usage": {
             "prompt_tokens": usage.get("prompt_tokens", 0),
@@ -159,7 +177,7 @@ def _call_vision(path: Path, prompt: str, detail: str, max_tokens: int) -> dict:
 @mcp.tool()
 def analyze_image(
     image_path: str,
-    prompt: str = "请描述图片中的主要内容。",
+    prompt: str = "请详细描述这张图片中的全部内容：文字、数据、图表、曲线、数值、错误信息等。不要遗漏任何细节。",
     detail: str = "auto",
     max_tokens: int = 2048,
 ) -> dict[str, Any]:

@@ -117,6 +117,15 @@ body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg
 #sendBtn:hover{opacity:.85}
 #sendBtn:disabled{opacity:.4}
 #sendBtn.stop{background:var(--red)}
+#uploadBtn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px 8px;transition:color .2s;border-radius:4px}
+#uploadBtn:hover{color:var(--blue);background:var(--overlay)}
+#attachBar{display:none;align-items:center;gap:8px;padding:6px 8px 2px}
+#attachPreview{width:40px;height:40px;border-radius:4px;object-fit:cover;border:1px solid var(--border);background:var(--overlay)}
+#attachInfo{flex:1;min-width:0}
+#attachName{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#attachSize{font-size:10px;color:var(--muted)}
+#attachRemove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px}
+#attachRemove:hover{color:var(--red);background:var(--overlay)}
 </style>
 </head>
 <body>
@@ -155,10 +164,22 @@ body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg
     </div>
     <div class="input-wrap">
         <div class="input-row">
-            <textarea id="q" rows="3" placeholder="输入消息...&#10;Enter 发送 · Shift+Enter 换行"
+            <div id="attachBar">
+                <img id="attachPreview" src="" alt="">
+                <div id="attachInfo">
+                    <div id="attachName"></div>
+                    <div id="attachSize"></div>
+                </div>
+                <button id="attachRemove" onclick="clearFile()" title="移除">✕</button>
+            </div>
+            <textarea id="q" rows="3" placeholder="输入消息，支持粘贴图片、拖拽文件&#10;Enter 发送 · Shift+Enter 换行"
                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
             <div class="input-foot">
-                <span class="input-hint"><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行</span>
+                <span class="input-hint" style="display:flex;align-items:center;gap:6px">
+                  <input type="file" id="fileInput" style="display:none" accept="image/*,.pdf,.docx,.csv,.txt,.log" onchange="onFilePicked()">
+                  <button id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="添加图片或文件">📎</button>
+                  <span><kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行</span>
+                </span>
                 <button id="sendBtn" onclick="send()">发送</button>
             </div>
         </div>
@@ -352,10 +373,100 @@ function showTyping() {
 }
 function hideTyping() { document.getElementById("typing")?.remove(); }
 
+// File upload — 支持点击、拖拽、粘贴
+let pickedFile = null;
+
+function onFilePicked() {
+    let f = document.getElementById("fileInput").files[0];
+    if (!f) return;
+    setPickedFile(f);
+}
+
+function setPickedFile(file) {
+    pickedFile = file;
+    let bar = document.getElementById("attachBar");
+    bar.style.display = "flex";
+    document.getElementById("attachName").textContent = file.name;
+    let size = file.size > 1024*1024 ? (file.size/1024/1024).toFixed(1)+" MB" : (file.size/1024).toFixed(0)+" KB";
+    document.getElementById("attachSize").textContent = size;
+    // 图片预览
+    let preview = document.getElementById("attachPreview");
+    if (file.type.startsWith("image/")) {
+        let reader = new FileReader();
+        reader.onload = function(e) { preview.src = e.target.result; };
+        reader.readAsDataURL(file);
+        preview.style.display = "block";
+    } else {
+        preview.style.display = "none";
+    }
+}
+
+function clearFile() {
+    pickedFile = null;
+    document.getElementById("fileInput").value = "";
+    document.getElementById("attachBar").style.display = "none";
+    document.getElementById("attachPreview").src = "";
+}
+
+// 粘贴图片
+document.getElementById("q").addEventListener("paste", function(e) {
+    let items = e.clipboardData?.items;
+    if (!items) return;
+    for (let item of items) {
+        if (item.type.startsWith("image/")) {
+            e.preventDefault();
+            let blob = item.getAsFile();
+            setPickedFile(new File([blob], "clipboard_" + Date.now() + ".png", {type: blob.type}));
+            return;
+        }
+    }
+});
+
+// 拖拽文件
+let inputWrap = document.querySelector(".input-wrap");
+inputWrap.addEventListener("dragover", function(e) { e.preventDefault(); });
+inputWrap.addEventListener("drop", function(e) {
+    e.preventDefault();
+    let files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+        setPickedFile(files[0]);
+    }
+});
+
 async function send() {
     let q = document.getElementById("q"), m = q.value.trim();
-    if (!m) return;
+    let file = pickedFile;
+    if (!m && !file) return;
+
+    // 上传文件到服务器获取本地路径
+    let filePath = null;
+    if (file) {
+        showTyping();
+        try {
+            let fd = new FormData();
+            fd.append("file", file);
+            let r = await fetch(location.origin + "/upload", {method:"POST",body:fd});
+            let d = await r.json();
+            hideTyping();
+            if (d.success) {
+                filePath = d.file_path;
+                if (file.type.startsWith("image/")) {
+                    m = m ? m + "\n\n请使用 analyze_image 分析这张图片: " + d.file_path : "请使用 analyze_image 分析图片: " + d.file_path;
+                } else {
+                    m = m ? m + "\n\n请使用 open_document 查看这个文件: " + d.file_path : "请查看文件: " + d.file_path;
+                }
+            } else {
+                addMsg("assistant", "文件上传失败: " + (d.error || "未知错误"));
+            }
+        } catch (e) {
+            addMsg("assistant", "文件上传失败: " + e.message);
+        }
+        hideTyping();
+    }
+
     q.value = ""; q.style.height = "auto";
+    clearFile();
+    if (!m) return;
     addMsg("user", m);
     showTyping();
     let btn = document.getElementById("sendBtn");

@@ -105,12 +105,13 @@ _CHAT_EXCLUDED_TOOLS = {
 _CHAT_TOOL_DESCRIPTIONS: dict[str, str] = {
     "turbocharts_convert": (
         "ADS RAW 转曲线图和 CSV。"
-        "VSWR 类曲线 CSV 一次只取第一条，多条需分次导出。导出后核对行数列数"
+        "多条 VSWR 自动拆分为多次导出。导出后核对行数列数"
     ),
     "show_image": "读取本地图片，返回 MCP ImageContent（不要自行生成 MEDIA）",
     "analyze_image": (
         "调用视觉模型分析图片内容（会上传到第三方）。"
-        "仅用户明确要求分析时调用，不得自动触发。显示图片用 show_image"
+        "仅用户明确要求分析时调用，显示用 show_image。"
+        "prompt 参数尽量具体，如'详细描述图中的曲线数据、文字标注、数值范围'"
     ),
     "generate_simulation_report": (
         "生成本地仿真报告（PDF/DOCX）。"
@@ -399,12 +400,10 @@ class ChatService:
 
         session = self._get_or_create(session_id)
         if session is None:
-            _logger.warning("MCP_SESSION_NOT_FOUND session=%s", session_id[:12])
-            return ChatResponse(
-                success=False, session_id=session_id, request_id=request_id,
-                reply=(f"Session not found ({session_id[:12]}...)。"
-                       "服务重启后旧会话已失效，请重新 initialize。"),
-            )
+            # 旧 session 失效（重启/过期），自动创建新会话，对用户透明
+            _logger.warning("MCP_SESSION_NOT_FOUND session=%s — auto-creating new", session_id[:12])
+            session = self._get_or_create("")
+            session_id = session.session_id  # 更新为新 session_id
 
         # ── 会话锁：同 session 串行（先锁，再处理确认/正常消息）──
         try:

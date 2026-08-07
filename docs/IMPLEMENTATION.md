@@ -214,7 +214,7 @@ QUEUED → ACCEPTED → RUNNING → SUCCEEDED / FAILED
 
 **任务快照隔离**：查询状态/结果时，`_get_task_snapshot()` 在锁内创建 `dict(task)` + `list(log_chunks)` 的浅拷贝，然后脱离锁返回。写入方只改原始字典，读取方只看快照。
 
-#### 网络仿真
+#### 网表仿真
 
 `simulate_netlist`：
 1. MCP 校验 `netlist_path` 存在 → `call_grpc(SIMULATE_NETLIST, {"netlist_path": ...})`
@@ -628,7 +628,7 @@ HFSS 任务队列：串行 worker 线程从 `queue.Queue(maxsize=10)` 取任务�
 
 ### 6.2 copy_image_to_workspace
 
-条件注册（`OPENCLAW_WORKSPACE` 有效时，支持 `.env` 配置或自动检测 `rfclaw/openclaw-service/state/workspace`）。复制到 `{workspace}/media/edi/mcp-cache/`。
+条件注册（`OPENCLAW_WORKSPACE` 有效时，支持 `.env` 配置或自动检测：edi-mcp 同级 `rfclaw/openclaw-service/state/workspace`，回退到 `~/.openclaw/workspace`）。复制到 `{workspace}/media/edi/mcp-cache/`。
 
 返回关键字段：
 - `media_path`：相对工作区的路径（如 `media/edi/mcp-cache/S11.png`），客户端可直接用于 MEDIA 指令
@@ -742,9 +742,10 @@ Chat 工具列表和 Schema 从 MCP 注册表自动生成（`_auto_build_chat_to
 
 | 路由 | 功能 |
 |---|---|
-| `GET /ui` | 返回单页聊天应用（工具面板 + 聊天界面） |
+| `GET /ui` | 返回单页聊天应用（工具面板 + 聊天界面，支持 📎 文件上传） |
 | `GET /health` | TCP 检测 gRPC 端口 + 检查 `turbocharts_app.exe` 存在 → JSON |
 | `POST /chat` | `{session_id, message}` → `ChatResponse(reply, activities, media, context)` |
+| `POST /upload` | multipart/form-data → 保存到 `%TEMP%/mcp/uploads/`，返回本地路径 |
 | `GET /tools/list` | MCP 工具名和描述 JSON 列表 |
 | `GET /images/{token}` | 临时图片访问（10 分钟过期，inline 渲染） |
 
@@ -993,8 +994,8 @@ failure_source 异常来源："mcp" 表示 MCP 自身异常，不是 EDI 业务�
 `OPENCLAW_WORKSPACE` 查找顺序：
 
 1. `.env` 中 `OPENCLAW_WORKSPACE` 配置路径（优先）
-2. 自动检测：edi-mcp 同级目录下查找 `rfclaw/openclaw-service/state/workspace`
-3. 回退检测：edi-mcp 同级目录下查找 `openclaw/state/workspace`
+2. edi-mcp 同级 `rfclaw/openclaw-service/state/workspace`
+3. 用户目录 `~/.openclaw/workspace`（兜底）
 
 只要任一目录存在且有效，`copy_image_to_workspace` 即自动注册。
 

@@ -102,3 +102,38 @@ async def chat_endpoint(request: Request):
 
     response = await ChatService.instance().chat(session_id, message)
     return JSONResponse(response.to_dict())
+
+
+# ── 文件上传 ──
+import tempfile  # noqa: E402
+import uuid as _uuid  # noqa: E402
+import shutil as _shutil  # noqa: E402
+
+
+async def upload_file(request: Request):
+    """POST /upload — 上传文件到临时目录，返回本地路径供 Chat 工具使用。"""
+    try:
+        form = await request.form()
+        uploaded = form.get("file")
+        if uploaded is None:
+            return JSONResponse({"error": "no file"}, status_code=400)
+
+        name = uploaded.filename or "uploaded_file"
+        suffix = Path(name).suffix or ".tmp"
+        safe_name = f"{_uuid.uuid4().hex[:8]}_{Path(name).stem}{suffix}"
+
+        dest_dir = Path(tempfile.gettempdir()) / "mcp" / "uploads"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / safe_name
+
+        with open(dest, "wb") as f:
+            _shutil.copyfileobj(uploaded.file, f)
+
+        return JSONResponse({
+            "success": True,
+            "file_path": str(dest.resolve()),
+            "file_name": name,
+            "file_size": dest.stat().st_size,
+        })
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
