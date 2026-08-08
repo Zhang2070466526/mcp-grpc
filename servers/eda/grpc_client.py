@@ -54,6 +54,11 @@ _channel_cache: dict[str, grpc.Channel] = {}
 _channel_lock = threading.Lock()
 
 
+def _is_queue_busy() -> bool:
+    """EDA 执行槽是否被占用（公开接口，不依赖私有 API）。"""
+    return _EDA_LOCK._is_owned()
+
+
 @mcp.tool()
 def get_service_status() -> dict[str, Any]:
     """返回 EDI gRPC 连接状态和队列信息（只读，不占执行槽位）。
@@ -73,7 +78,7 @@ def get_service_status() -> dict[str, Any]:
         "grpc_target": target,
         "channel_state": state,
         "channel_cached": ch is not None,
-        "queue_locked": _EDA_LOCK._is_owned(),
+        "queue_locked": _is_queue_busy(),
         "max_receive_mb": 256,
     }
 
@@ -498,8 +503,20 @@ def _call_grpc_unlocked(
     except grpc.RpcError as exc:
         code = exc.code().name if exc.code() else "UNKNOWN"
         code_enum = exc.code()
-        # 区分超时、断连、不可达三种异常，超时保留已收日志
-        # 注意：RESOURCE_EXHAUSTED（消息过大）也会走到这里，归为 GRPC_UNAVAILABLE
+        # 消息过大（如长仿真日志超过 256MB 上限）
+        if code_enum == grpc.StatusCode.RESOURCE_EXHAUSTED:
+            _logger.error("task=%s phase=PAYLOAD_TOO_LARGE", task_id[:12])
+            return _terminal_result(
+                success=False, status="PAYLOAD_TOO_LARGE",
+                message=f"EDI 返回的消息过大（>256MB），日志已部分接收",
+                client_uuid=client_uuid, task_id=task_id,
+                task_type_name=task_type_name,
+                project_path=latest_details.get("project_path", payload.get("project_path", "")),
+                result_path=latest_details.get("result_path", ""),
+                ads_output="".join(ads_output_chunks), log_complete=False,
+                latest_details=latest_details,
+            )
+        # 区分超时、断连、不可达三种异常
         if code_enum == grpc.StatusCode.DEADLINE_EXCEEDED:
             _logger.warning("task=%s phase=TIMEOUT", task_id[:12])
             return _terminal_result(

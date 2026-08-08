@@ -1044,6 +1044,21 @@ failure_source 异常来源："mcp" 表示 MCP 自身异常，不是 EDI 业务�
 
 Chat 工具调用日志对路径做脱敏处理（只记录文件名），不暴露用户目录结构。
 
+### 11.15 gRPC 通道管理
+
+- 模块级 channel 缓存：`_EDA_LOCK` 串行化下复用同一 channel，避免每次 TCP 握手
+- `_get_channel()` 含健康检查（`grpc.channel_ready_future`），EDI 重启后自动重建
+- `_ChannelHandle` 上下文管理器：退出时不关闭缓存 channel
+- `_is_queue_busy()` 公开函数：封装私有 `_is_owned()`，供状态查询使用
+- 异常分类：`DEADLINE_EXCEEDED`→TIMEOUT，`RESOURCE_EXHAUSTED`→PAYLOAD_TOO_LARGE，其余按已受理/未受理区分
+
+### 11.16 诊断工具
+
+- `get_service_status`：gRPC 通道状态 + 队列占用 + 上限信息
+- `edi://reference/error-codes`：10 种状态码的含义 + 建议动作 Markdown 表
+- `edi://service/status`：实时运行时状态（JSON，与 get_service_status 同源）
+- `troubleshoot_edi_error(status)`：按 5 种错误类型提供诊断步骤的 Prompt
+
 ### 11.14 新增工具：attach_out_component
 
 `ATTACH_OUT_COMPONENT(17)` — 为指定器件的目标引脚挂载 Out 器件并自动连线。

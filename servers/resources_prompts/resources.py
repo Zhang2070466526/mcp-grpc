@@ -95,7 +95,7 @@ def resource_operation_guide() -> str:
 def resource_service_status() -> dict[str, Any]:
     """返回运行时状态，与 get_service_status 共享数据源。"""
     from servers.eda.config import EDA_GRPC_SERVER as _gs
-    from servers.eda.grpc_client import _channel_cache, _EDA_LOCK
+    from servers.eda.grpc_client import _channel_cache, _is_queue_busy
 
     target = _gs
     ch = _channel_cache.get(target)
@@ -111,7 +111,7 @@ def resource_service_status() -> dict[str, Any]:
         "grpc_target": target,
         "channel_state": state,
         "channel_cached": ch is not None,
-        "queue_locked": _EDA_LOCK._is_owned(),
+        "queue_locked": _is_queue_busy(),
     }
 
 
@@ -135,6 +135,7 @@ def resource_error_codes() -> str:
         "| TIMEOUT | 总超时，EDI 结果未知 | 延长 timeout 或检查仿真进度 |\n"
         "| STREAM_DISCONNECTED | FetchEvent 流中断，结果未知 | 确认 EDI 进程存活，可重试一次 |\n"
         "| GRPC_UNAVAILABLE | 无法连接 EDI gRPC | 确认 EDI 已启动，确认地址端口正确 |\n"
+        "| PAYLOAD_TOO_LARGE | EDI 返回消息过大（>256MB） | 日志已部分接收，考虑延长仿真时间或减少日志量 |\n"
         "| PROTOCOL_MISMATCH | client_uuid/task_id/event_type 不一致 | 调用链错误，不要重试，先排查代码 |\n"
         "| TASK_NOT_FOUND | 任务不存在（过期/重启） | 重新提交仿真任务 |\n"
         "\n"
