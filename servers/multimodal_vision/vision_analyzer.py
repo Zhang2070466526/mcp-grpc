@@ -71,13 +71,16 @@ def _validate(image_path: str) -> tuple[Path | None, dict | None]:
 
 
 def _encode(path: Path) -> tuple[str | None, dict | None]:
+    """返回 (data_url, None) 成功，或 (None, error_dict) 失败。
+    注意：成功时第二个值是 None，不是 MIME 字符串——
+    之前版本返回 (data_url, mime_str) 导致 mime 被当作 error 返回。"""
     ext = path.suffix.lower()
     mime = _MIME_MAP.get(ext, "application/octet-stream")
     try:
         data = base64.b64encode(path.read_bytes()).decode("ascii")
     except OSError as e:
         return None, tool_error("INVALID_IMAGE", f"读取图片失败: {e}")
-    return f"data:{mime};base64,{data}", None
+    return f"data:{mime};base64,{data}", None  # 成功：第二个值 None ≠ 错误
 
 
 # ── 视觉模型调用 ──

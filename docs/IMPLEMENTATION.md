@@ -1025,3 +1025,29 @@ failure_source 异常来源："mcp" 表示 MCP 自身异常，不是 EDI 业务�
 - 旧 session_id 返回 `Session not found`，客户端需重新 initialize
 - 重启后仿真任务状态丢失（内存），查询旧 task_id 返回 TASK_NOT_FOUND
 - 不自动生成文件、不自动修改工程、不自动重放工具调用
+
+### 11.13 日志系统
+
+所有模块统一使用 `logging.getLogger(__name__)`，输出到 `%TEMP%/edi/data/log/edi_mcp_YYYYMM.log`（RotatingFileHandler，10MB × 5 备份）。
+
+| 模块 | Logger | 记录内容 |
+|---|---|---|
+| `start_servers` | `edi_mcp` | 生命周期：STARTING → READY → STOPPING → STOPPED |
+| `grpc_client` | `eda.grpc_client` | SUBSCRIBING → ACCEPTED → SUCCEEDED/FAILED/TIMEOUT |
+| `simulation` | `eda.simulation` | 任务创建 + 完成/异常 + outcome_known |
+| `turbocharts` | `turbocharts` | 命令行执行 + return_code + 耗时 |
+| `turbocharts.convert` | `turbocharts.convert` | raw/img/type/linename/csv/dep/ac 全参数 |
+| `turbocharts.compare` | `turbocharts.compare` | files/curve/type/align/ref/csv 全参数 |
+| `vision` | `multimodal.analyze` | API 状态码 + 模型名 + 图片大小 + 耗时 + 错误响应体 |
+| `report` | `report.generator` | 文件类型 + 模型名 + 图表数 + 器件数 + 规格行数 |
+| `chat_service` | `chat_service` | request_id + 工具名 + 脱敏参数 + 耗时 |
+
+Chat 工具调用日志对路径做脱敏处理（只记录文件名），不暴露用户目录结构。
+
+### 11.14 新增工具：attach_out_component
+
+`ATTACH_OUT_COMPONENT(17)` — 为指定器件的目标引脚挂载 Out 器件并自动连线。
+
+参数：`project_path`、`target_instance_name`、可选 `pin_index`（0 开始）。
+
+服务端行为：自动判断引脚朝向 → 计算放置位置（100 坐标单位） → 顺时针尝试四个方向（各向外扩展 10 单位检测重叠） → 创建器件和网线在同一撤销组内。单引脚器件可省略 `pin_index`，多引脚器件必须提供。

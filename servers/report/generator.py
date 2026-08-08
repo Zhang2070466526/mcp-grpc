@@ -190,14 +190,21 @@ def generate_simulation_report(
     overwrite: bool = False,
     timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
-    """生成本地仿真报告（PDF/DOCX），调用本地报告渲染服务。"""
+    """生成本地仿真报告（PDF/DOCX），调用本地报告渲染服务。
 
-    # 1. output_path
+    校验流程（16 步）：
+    1-7 校验输入参数 → 8 处理超时 → 9 构建 payload → 10-16 调用服务并验证结果
+    只负责校验数据并调用渲染服务，不会自动执行仿真或编造数据。
+    """
+
+    # ── 校验阶段（1-7：所有校验在 HTTP 调用前完成，避免无效请求）──
+
+    # 1. 输出路径：绝对路径、扩展名 .pdf/.docx、父目录存在、overwrite 检查
     file_type, err = _validate_output(output_path, overwrite)
     if err:
         return err
 
-    # 2. model_name
+    # 2. model_name：非空字符串，最长 200 字符
     if not isinstance(model_name, str):
         return tool_error("INVALID_REPORT_PARAMETERS", "model_name 必须是字符串")
     mn = model_name.strip()
@@ -206,7 +213,7 @@ def generate_simulation_report(
     if len(mn) > 200:
         return tool_error("INVALID_REPORT_PARAMETERS", "model_name 最长 200 字符")
 
-    # 3. type checks + length limits
+    # 3. description/conclusion：类型检查 + 长度限制
     for field, max_len in _MAX_FIELD_LENGTHS.items():
         val = locals().get(field, "")
         if not isinstance(val, str):
@@ -216,34 +223,35 @@ def generate_simulation_report(
     if not isinstance(overwrite, bool):
         return tool_error("INVALID_REPORT_PARAMETERS", "overwrite 必须是布尔值")
 
-    # 4. spec_table
+    # 4. spec_table：二维数组，固定 7 列，单元格类型检查
     err = _validate_spec_table(spec_table)
     if err:
         return err
 
-    # 5. charts
+    # 5. charts：对象数组 {path, title}，图片路径绝对、后缀合法、最多 50 张
     valid_charts, chart_warnings, chart_error = _validate_charts(charts)
     if chart_error:
         return chart_error
 
-    # 6. components
+    # 6. components：对象数组 {type, model, manufacturer, specs}，四项全字符串
+    #    支持中英文 key 映射（如 "器件类型" → "type"）
     err = _validate_components(components)
     if err:
         return err
 
-    # 7. schematic
+    # 7. schematic：绝对路径、图片后缀，缺失时记录 warning 不阻塞
     schematic_path, schematic_missing, s_err = _validate_schematic(schematic)
     if s_err:
         return s_err
 
-    # 8. Resolve timeout
+    # 8. 超时解析：默认 45s，范围 5-120s
     effective_timeout = _REPORT_TIMEOUT
     if timeout_seconds is not None:
         if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int):
             return tool_error("INVALID_REPORT_PARAMETERS", "timeout_seconds 必须是整数")
         effective_timeout = max(5, min(timeout_seconds, 120))
 
-    # 9. Build payload
+    # 9. 构建请求 payload
     expected_output = Path(output_path).expanduser().resolve()
     report_obj: dict = {"model_name": mn}
     if description:
@@ -266,7 +274,9 @@ def generate_simulation_report(
         "report": report_obj,
     }
 
-    # 10. Call report service
+    # ── 调用阶段（10-16：HTTP 请求 → 响应校验 → 文件确认）──
+
+    # 10. 调用本地报告渲染服务
     t0 = time.monotonic()
     body = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
     _logger.info("report_render file=%s type=%s model=%s size=%d charts=%d comps=%d specs=%d overwrite=%s",

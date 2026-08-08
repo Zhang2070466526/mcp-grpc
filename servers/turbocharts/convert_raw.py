@@ -353,13 +353,16 @@ def turbocharts_convert(
     artifacts: list[dict] = []
 
     # ── VSWR CSV 自动拆分 ──
-    # turbocharts_app.exe 在 CSV 模式下多条 VSWR 只写第一条。
-    # 当检测到多条 VSWR + CSV 时，自动拆分为多次调用，每次一条 VSWR。
+    # turbocharts_app.exe 的限制：CSV 模式下多条 VSWR_S 只输出第一条。
+    # 因此当 linename 包含多条 VSWR 且需要 CSV 时，自动拆分为多次调用：
+    #   - PNG 图片：所有曲线一起画（图片不受此限制）
+    #   - CSV：每条 VSWR 独立一次调用，避免数据丢失
+    #   - 非 VSWR 曲线：合并为一次调用
     vswr_curves = re.findall(r'VSWR_S\[\d+,\d+\]', linename) if linename else []
     non_vswr = re.sub(r'VSWR_S\[\d+,\d+\]', '', linename).strip('&') if linename else ''
-    need_split = csv_path and len(vswr_curves) > 1
+    need_split = csv_path and len(vswr_curves) > 1  # 需要拆分：有 CSV 且多条 VSWR
 
-    # ── 第 1 步：生成 PNG 图片（所有曲线，包括 VSWR） ──
+    # ── 第 1 步：生成 PNG 图片（所有曲线一次性合并，VSWR 不受影响）──
     cmd_img = [TURBOCHARTS_PATH, "--raw", raw_path, "--img", img_path, "--type", chart_type]
     if linename:
         cmd_img.extend(["--linename", linename])

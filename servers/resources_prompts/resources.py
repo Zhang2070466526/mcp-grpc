@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import grpc
+
 from servers import mcp, __version__ as SERVER_VERSION
 from servers.eda.simulation_components import _load_catalog
 from servers.eda.config import EDA_GRPC_SERVER
@@ -80,4 +82,65 @@ def resource_operation_guide() -> str:
         "- 只有用户明确要求复制到工作区时才能调用 `copy_image_to_workspace`。\n"
         "- 不要检查或读取服务端环境变量。\n"
         "- 不要猜测工程文件路径，先通过 `list_epp_projects` 获取。\n"
+    )
+
+
+@mcp.resource(
+    "edi://service/status",
+    name="Service Status",
+    title="EDI MCP 实时状态",
+    description="当前 gRPC 通道状态、队列占用、通道缓存等运行时信息。",
+    mime_type="application/json",
+)
+def resource_service_status() -> dict[str, Any]:
+    """返回运行时状态，与 get_service_status 共享数据源。"""
+    from servers.eda.config import EDA_GRPC_SERVER as _gs
+    from servers.eda.grpc_client import _channel_cache, _EDA_LOCK
+
+    target = _gs
+    ch = _channel_cache.get(target)
+    state = "unknown"
+    if ch is not None:
+        try:
+            grpc.channel_ready_future(ch).result(timeout=1)
+            state = "ready"
+        except Exception:
+            state = "unhealthy"
+
+    return {
+        "grpc_target": target,
+        "channel_state": state,
+        "channel_cached": ch is not None,
+        "queue_locked": _EDA_LOCK._is_owned(),
+    }
+
+
+@mcp.resource(
+    "edi://reference/error-codes",
+    name="Error Code Reference",
+    title="gRPC 错误码词典",
+    description="所有 gRPC 工具返回的状态码含义、原因及建议动作。",
+    mime_type="text/markdown",
+)
+def resource_error_codes() -> str:
+    """错误码词典：帮助 LLM 根据 status 选择合适的重试/排查策略。"""
+    return (
+        "# EDI MCP 错误码词典\n\n"
+        "| 状态 | 含义 | 建议动作 |\n"
+        "|---|---|---|\n"
+        "| SUCCEEDED | 任务成功完成 | — |\n"
+        "| FAILED | EDI 明确返回失败 | 查看 message/ads_output，修正参数后重试 |\n"
+        "| REJECTED | EDI 未受理（参数/权限） | 检查参数，不要直接重试 |\n"
+        "| QUEUE_TIMEOUT | 等待执行槽位超时 | 稍后重试，检查是否有长任务卡住 |\n"
+        "| TIMEOUT | 总超时，EDI 结果未知 | 延长 timeout 或检查仿真进度 |\n"
+        "| STREAM_DISCONNECTED | FetchEvent 流中断，结果未知 | 确认 EDI 进程存活，可重试一次 |\n"
+        "| GRPC_UNAVAILABLE | 无法连接 EDI gRPC | 确认 EDI 已启动，确认地址端口正确 |\n"
+        "| PROTOCOL_MISMATCH | client_uuid/task_id/event_type 不一致 | 调用链错误，不要重试，先排查代码 |\n"
+        "| TASK_NOT_FOUND | 任务不存在（过期/重启） | 重新提交仿真任务 |\n"
+        "\n"
+        "重要原则：\n"
+        "- TIMEOUT / STREAM_DISCONNECTED 时 outcome_known=false，"
+        "task_success=null，不要假设仿真失败。\n"
+        "- 非幂等操作（create/delete/generate）禁止自动重试。\n"
+        "- 查询类操作（list/get_status）可以安全重试一次。\n"
     )

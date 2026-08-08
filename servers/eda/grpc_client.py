@@ -29,12 +29,84 @@ from typing import Any
 import grpc
 
 from proto import ecserver_pb2, ecserver_pb2_grpc
+from servers import mcp
 from servers.eda.config import EDA_GRPC_SERVER
 
 _logger = logging.getLogger("eda.grpc_client")
 
 # EDA 操作全局锁 — 确保同一时间只进行一项 gRPC 状态操作
 _EDA_LOCK = threading.RLock()
+
+# gRPC 通道配置：默认接收上限 4MB，长仿真日志可能会超过，导致
+# RESOURCE_EXHAUSTED 被误判为 STREAM_DISCONNECTED，结果丢失。
+# keepalive 防止防火墙/NAT 空闲超时掐断 FetchEvent 长连接流。
+_CHANNEL_OPTIONS = [
+    ("grpc.max_receive_message_length", 256 * 1024 * 1024),  # 4MB -> 256MB
+    ("grpc.max_send_message_length", 64 * 1024 * 1024),
+    ("grpc.keepalive_time_ms", 30_000),
+    ("grpc.keepalive_timeout_ms", 10_000),
+    ("grpc.keepalive_permit_without_calls", 1),
+]
+
+# 模块级 channel 缓存：_EDA_LOCK 已串行化所有调用，复用同一 channel
+# 避免每次调用重新 TCP 握手，高频操作下减少延迟叠加
+_channel_cache: dict[str, grpc.Channel] = {}
+_channel_lock = threading.Lock()
+
+
+@mcp.tool()
+def get_service_status() -> dict[str, Any]:
+    """返回 EDI gRPC 连接状态和队列信息（只读，不占执行槽位）。
+
+    用于诊断：通道是否健康、是否有任务在排队。
+    """
+    target = EDA_GRPC_SERVER
+    ch = _channel_cache.get(target)
+    state = "unknown"
+    if ch is not None:
+        try:
+            grpc.channel_ready_future(ch).result(timeout=1)
+            state = "ready"
+        except (grpc.FutureTimeoutError, grpc.RpcError):
+            state = "unhealthy"
+    return {
+        "grpc_target": target,
+        "channel_state": state,
+        "channel_cached": ch is not None,
+        "queue_locked": _EDA_LOCK._is_owned(),
+        "max_receive_mb": 256,
+    }
+
+
+def _get_channel(target: str) -> grpc.Channel:
+    with _channel_lock:
+        ch = _channel_cache.get(target)
+        if ch is not None:
+            # 健康检查：channel 可能因 EDI 重启而断开
+            try:
+                grpc.channel_ready_future(ch).result(timeout=2)
+            except (grpc.FutureTimeoutError, grpc.RpcError):
+                _logger.warning("grpc channel unhealthy, reconnecting %s", target)
+                try:
+                    ch.close()
+                except Exception:
+                    pass  # close 失败也不影响后续重建
+                ch = None
+        if ch is None:
+            ch = grpc.insecure_channel(target, options=_CHANNEL_OPTIONS)
+            _channel_cache[target] = ch
+        return ch
+
+
+class _ChannelHandle:
+    """上下文管理器包装：退出时不关闭缓存的 channel。"""
+    def __init__(self, ch: grpc.Channel):
+        self._ch = ch
+    def __enter__(self) -> grpc.Channel:
+        return self._ch
+    def __exit__(self, *args: object) -> None:
+        pass  # 缓存复用，不关闭
+
 
 # 回调类型
 GrpcEventCallback = Callable[[dict[str, Any]], None]
@@ -148,22 +220,13 @@ def call_grpc(
     actual_task_id = task_id or str(uuid.uuid4())
     actual_client_uuid = client_uuid or str(uuid.uuid4())
 
+    # 全局串行锁：EDI 同一时间只能执行一个 gRPC 操作
+    # 超时包含排队时间——client 调用时设置的 timeout_seconds 是"从请求到响应"的总时长
     deadline = time.monotonic() + timeout_seconds
 
     acquired = _EDA_LOCK.acquire(timeout=timeout_seconds)
     if not acquired:
-        return _terminal_result(
-            success=False, status="QUEUE_TIMEOUT",
-            message=f"等待 EDA 执行槽位超时（{timeout_seconds:.0f}s）",
-            client_uuid=actual_client_uuid, task_id=actual_task_id,
-            task_type_name=ecserver_pb2.EventType.Name(task_type),
-            project_path=payload.get("project_path", ""),
-            result_path="", ads_output="", log_complete=False,
-            latest_details={},
-        )
-    if time.monotonic() >= deadline:
-        _EDA_LOCK.release()
-        return _terminal_result(
+        return _terminal_result(  # 排队超时，未获取锁
             success=False, status="QUEUE_TIMEOUT",
             message=f"等待 EDA 执行槽位超时（{timeout_seconds:.0f}s）",
             client_uuid=actual_client_uuid, task_id=actual_task_id,
@@ -173,6 +236,17 @@ def call_grpc(
             latest_details={},
         )
     try:
+        if time.monotonic() >= deadline:
+            # 排队耗时耗尽预算，未开始执行（几乎不可达：acquire 成功意味着未超时）
+            return _terminal_result(
+                success=False, status="QUEUE_TIMEOUT",
+                message=f"等待 EDA 执行槽位超时（{timeout_seconds:.0f}s）",
+                client_uuid=actual_client_uuid, task_id=actual_task_id,
+                task_type_name=ecserver_pb2.EventType.Name(task_type),
+                project_path=payload.get("project_path", ""),
+                result_path="", ads_output="", log_complete=False,
+                latest_details={},
+            )
         return _call_grpc_unlocked(
             task_type, payload, deadline,
             task_id=actual_task_id,
@@ -216,7 +290,7 @@ def _call_grpc_unlocked(
         return max(0.1, deadline - time.monotonic())
 
     try:
-        with grpc.insecure_channel(EDA_GRPC_SERVER) as channel:
+        with _ChannelHandle(_get_channel(EDA_GRPC_SERVER)) as channel:
             stub = ecserver_pb2_grpc.ExternalCallStub(channel)
 
             # ── 1. 先建立 FetchEvent 订阅 ──
@@ -312,10 +386,12 @@ def _call_grpc_unlocked(
             })
 
             # ── 6. 消费已建立的事件流 ──
+            # 三重筛选：client_uuid + task_id + event_type 全部匹配才处理
+            # 增量收集 ads_output（不 strip、不覆写），终态事件使用完整日志
             chunk_count = 0
             action_accepted = response.code == 0
             for event in event_stream:
-                chunk = ""  # 初始化，防止终态事件先到达时 UnboundLocalError
+                chunk = ""  # 防止终态事件先于普通事件到达时 UnboundLocalError
                 if event.client_uuid != client_uuid:
                     continue
                 if event.task_id != task_id:
@@ -422,6 +498,8 @@ def _call_grpc_unlocked(
     except grpc.RpcError as exc:
         code = exc.code().name if exc.code() else "UNKNOWN"
         code_enum = exc.code()
+        # 区分超时、断连、不可达三种异常，超时保留已收日志
+        # 注意：RESOURCE_EXHAUSTED（消息过大）也会走到这里，归为 GRPC_UNAVAILABLE
         if code_enum == grpc.StatusCode.DEADLINE_EXCEEDED:
             _logger.warning("task=%s phase=TIMEOUT", task_id[:12])
             return _terminal_result(

@@ -189,6 +189,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 |---|---|
 | `replace_models_from_csv` | 按 CSV 批量替换模型 |
 | `launch_edi` | 启动 EDI 客户端并等待 gRPC 就绪 |
+| `get_service_status` | 返回 gRPC 通道状态、队列信息 |
 
 ### ANSYS HFSS（6 个）
 

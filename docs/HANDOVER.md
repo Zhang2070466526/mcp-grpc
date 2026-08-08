@@ -255,6 +255,30 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 36. `start_servers.py` 使用私有属性 _tool_manager，MCP 版本升级后需验证
 37. 工具数量由启动时动态统计，不在文档中写死
 
+### 新增接口
+38. `attach_out_component` (ATTACH_OUT_COMPONENT=17)：为器件引脚挂载 Out 器件并自动连线
+39. proto 重编译后需手动修复 `ecserver_pb2_grpc.py` 的 import 路径（`ecserver_pb2` → `from proto import ecserver_pb2`）
+
+### 日志系统
+40. 所有模块使用 `logging.getLogger(__name__)` 统一日志，输出到 `%TEMP%/edi/data/log/`
+41. Chat 记录 request_id + 工具调用参数（脱敏），turbocharts 记录命令行和耗时
+42. report 记录文件类型/模型名/图表数/器件数，vision 记录 HTTP 状态和响应体
+43. gRPC 记录 SUBSCRIBING → ACCEPTED → SUCCEEDED/FAILED/TIMEOUT 完整阶段
+44. 启动记录 MCP_STARTING → MCP_READY → MCP_STOPPING → MCP_STOPPED 生命周期
+
+### Chat 增强
+45. 支持 📎 文件上传 / 粘贴图片 / 拖拽文件，自动上传到 `%TEMP%/mcp/uploads/`
+46. 图片上传后自动提示 LLM 调用 `analyze_image`，文档提示 `open_document`
+47. session 失效自动创建新会话，对用户透明
+
+### turbocharts
+48. 多条 VSWR+CSV 自动拆分为多次调用，每次一条 VSWR，无需手动分次
+
+### analyze_image 修复
+49. `_encode()` 返回值 bug：成功时 MIME 字符串被误当作 error 返回
+50. URL 拼接双 `/v1` 修复、DashScope Omni 缺少 `modalities: ["text"]` 修复
+51. 默认 prompt 加强，content 数组兼容，短内容（<5 字符）拒绝
+
 ## 维护人
 
 - 负责人：--

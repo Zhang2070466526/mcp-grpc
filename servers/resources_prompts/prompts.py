@@ -239,3 +239,55 @@ def prompt_create_simulation_report(
     ]
 
     return [{"role": "user", "content": "\n".join(steps)}]
+
+
+@mcp.prompt(
+    name="troubleshoot_edi_error",
+    title="诊断 EDI 调用错误",
+    description="根据 gRPC 返回的 status/error_code 查错误码词典、检查服务状态，给出排查建议。",
+)
+def prompt_troubleshoot_edi_error(
+    status: str,
+    error_code: str = "",
+) -> list[dict[str, Any]]:
+    """诊断 EDI 工具调用失败的工作流模板。
+
+    Args:
+        status: gRPC 返回的 status（如 TIMEOUT/STREAM_DISCONNECTED/GRPC_UNAVAILABLE）。
+        error_code: 工具的 error_code（如 FILE_NOT_FOUND/INVALID_PARAMETERS）。
+    """
+    steps = [
+        f"诊断目标：status={status}" + (f", error_code={error_code}" if error_code else ""),
+        "",
+        "步骤：",
+        "1. 读取 `edi://reference/error-codes` 资源，查找该状态码的含义和建议动作。",
+        "2. 调用 `get_service_status` 检查 gRPC 通道是否健康、是否有任务在排队。",
+    ]
+
+    if status in ("TIMEOUT", "STREAM_DISCONNECTED"):
+        steps += [
+            "3. 不要自动重试。告知用户：EDI 任务结果未知（outcome_known=false）。",
+            "4. 建议：确认 EDI 是否仍在运行，查看 ads_output 尾部有无报错。",
+        ]
+    elif status == "GRPC_UNAVAILABLE":
+        steps += [
+            "3. 确认 EDI 是否已启动、gRPC 地址端口是否正确。",
+            "4. 如 EDI 确认运行中，可调用 `launch_edi` 尝试重新启动。",
+        ]
+    elif status in ("QUEUE_TIMEOUT",):
+        steps += [
+            "3. 调用 `list_eda_tasks` 查看是否有长任务卡住执行槽位。",
+            "4. 如无任务运行，稍后重试即可。",
+        ]
+    elif status == "REJECTED":
+        steps += [
+            "3. 查看返回的 message 了解拒绝原因（通常是参数错误或权限问题）。",
+            "4. 修正参数后重试，不要用相同参数反复调用。",
+        ]
+    else:
+        steps += [
+            "3. 根据 error_code 判断是 MCP 层校验错误还是 EDI 业务错误。",
+            "4. MCP 层问题（FILE_NOT_FOUND/INVALID_PARAMETERS 等）修正参数重试。",
+        ]
+
+    return [{"role": "user", "content": "\n".join(steps)}]
