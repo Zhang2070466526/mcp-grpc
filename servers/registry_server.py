@@ -84,6 +84,11 @@ import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
 import servers.multimodal_vision          # noqa: F401 — show_image + copy + analyze + open_document + open_local_document
 import servers.report                     # noqa: F401 — generate_simulation_report
+# 知识库暂不注册为 MCP 工具，仅 Chat 内部使用
+# try:
+#     import servers.knowledge
+# except ImportError:
+#     pass
 
 # Resources & Prompts
 import servers.resources_prompts      # noqa: F401 — @mcp.resource() / @mcp.prompt()
@@ -101,3 +106,4 @@ mcp.custom_route("/tools/list", methods=["GET"])(tool_list)
 mcp.custom_route("/images/{token}", methods=["GET"])(serve_image)
 mcp.custom_route("/documents/{token}", methods=["GET"])(serve_document)
 mcp.custom_route("/upload", methods=["POST"])(upload_file)
+

@@ -1,7 +1,8 @@
-"""文档访问工具 — 本地文档的 HTTP 链接 + 本地程序打开。
+"""文档访问工具 — HTTP 临时链接 + 系统默认程序打开。
 
-open_document         生成临时 HTTP 链接，PDF 在线预览、DOCX 下载。
-open_local_document   使用系统默认程序打开本地文档（Word/WPS/PDF 阅读器等）。
+open_document         — 为 PDF/DOCX 生成 10 分钟 HTTP Token，PDF inline 预览、DOCX 下载
+open_local_document   — 使用 os.startfile() 调用系统默认程序打开（10 种格式支持）
+register_document_url — 供 report 等模块注册文档 Token 并返回预览链接
 """
 
 from __future__ import annotations
@@ -111,14 +112,19 @@ def open_document(
     file_path: str,
     disposition: str = "inline",
 ) -> dict[str, Any]:
-    """为本地 PDF/DOCX 文件生成临时 HTTP 链接。
+    """为 PDF/DOCX 生成 10 分钟临时 HTTP 链接。PDF inline 预览，DOCX 下载。
+
+    用法："帮我打开这个 PDF"、"生成这个报告的可分享链接"
 
     链接 10 分钟后自动失效。不会自动打开浏览器。
     只生成链接，不自动打开。仅当用户明确要求查看文档时调用。
-
-    Args:
+     Args:
         file_path: 本地 PDF/DOCX 文件绝对路径。
         disposition: inline（浏览器内预览）或 attachment（触发下载）。
+
+    Returns:
+        {"success": True, "file_name": "report.pdf", "url": "http://127.0.0.1:50026/documents/xxx",
+         "markdown_link": "[report.pdf](http://...)", "expires_in": 600}
     """
     try:
         path = _validate_path(file_path, _LINK_EXTENSIONS)
@@ -153,7 +159,10 @@ def open_document(
 
 @mcp.tool()
 def open_local_document(file_path: str) -> dict[str, Any]:
-    """使用当前电脑的默认关联程序打开本地文档。
+    """用系统默认程序打开本地文档（os.startfile）。支持 10 种格式。
+
+    用法："用 Word 打开这个报告"、"帮我打开这个 PDF"
+    注意：仅用户明确要求时才调用，生成报告后不得自动打开。
 
     Windows 会根据文件关联自动选择程序：.docx→Word/WPS, .pdf→默认阅读器。
     仅当用户明确要求"打开文件"时调用。不得在生成报告、查询文件或返回链接后自动调用。
@@ -162,6 +171,9 @@ def open_local_document(file_path: str) -> dict[str, Any]:
 
     Args:
         file_path: 本地文档绝对路径。
+
+    Returns:
+        {"success": True, "status": "OPEN_REQUESTED", "file_path": "C:/...", "file_type": ".pdf"}
     """
     try:
         path = _validate_path(file_path, _LOCAL_EXTENSIONS)
@@ -193,6 +205,7 @@ def open_local_document(file_path: str) -> dict[str, Any]:
 # ═══════════════════════════════════════════════════════════
 
 async def serve_document(request: Request) -> FileResponse | JSONResponse:
+    """GET /documents/{token} — 根据 Token 返回文档文件，10 分钟过期。"""
     token = request.path_params.get("token", "")
     _cleanup_expired()
     with _TOKEN_LOCK:

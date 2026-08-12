@@ -1,4 +1,10 @@
-"""仿真报告渲染工具 — 调用本地报告渲染服务生成 PDF/DOCX。"""
+"""仿真报告渲染 — 16 步校验管线 → POST 本地渲染服务 → 自动注册预览 Token。
+
+校验顺序：output_path → model_name → description/conclusion → spec_table（固定7列）
+→ charts（绝对路径+后缀）→ components（四项全字符串，支持中英文key）→ schematic
+调用后自验证：文件存在、非空、路径一致。
+返回：preview_url（10 分钟 HTTP Token）+ markdown_link + artifacts + 本地路径兜底。
+"""
 
 from __future__ import annotations
 
@@ -190,11 +196,18 @@ def generate_simulation_report(
     overwrite: bool = False,
     timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
-    """生成本地仿真报告（PDF/DOCX），调用本地报告渲染服务。
+    """生成本地仿真报告（PDF/DOCX），16 步校验后调用本地渲染服务。
 
-    校验流程（16 步）：
-    1-7 校验输入参数 → 8 处理超时 → 9 构建 payload → 10-16 调用服务并验证结果
-    只负责校验数据并调用渲染服务，不会自动执行仿真或编造数据。
+    用法："帮我生成这个工程的仿真报告"、"输出 PDF 报告到 C:/report.pdf"
+
+    spec_table：二维数组固定 7 列（指标/数值/单位/规格/规格单位/结论/状态）
+    charts：[{"path": "C:/.../gain.png", "title": "增益曲线"}]
+    components：type/model/manufacturer/specs 四项全字符串，manufacturer 不知道填 "N/A"
+    默认禁止覆盖已有文件（overwrite=false）
+
+    Returns:
+        {"success": True, "file_path": "C:/.../report.pdf", "preview_url": "http://...",
+         "markdown_link": "[打开PDF报告](http://...)", "message": "..."}
     """
 
     # ── 校验阶段（1-7：所有校验在 HTTP 调用前完成，避免无效请求）──

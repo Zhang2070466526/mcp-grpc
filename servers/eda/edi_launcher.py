@@ -1,17 +1,6 @@
-r"""EDA 启动工具。
+r"""EDA 启动工具 — 启动 EDI 客户端并等待 gRPC 服务就绪。
 
-launch_edi     启动 EDI 客户端应用程序，自动等待 gRPC 服务就绪。
-               如果 EDI 已在运行则跳过启动，避免重复。
-
-自然语言使用示例：
-  帮我启动 EDI
-  帮我启动 EDI 客户端，等 60 秒确认 gRPC 就绪
-  检查一下 EDI 是否已经在运行
-
-参数说明：
-  edi_path         EDI.exe 路径，默认使用 .env 中配置的 EDI_PATH
-  wait_for_grpc    是否等待 gRPC 服务端口就绪，默认 True
-  wait_timeout     等待 gRPC 就绪的超时秒数，默认 30 秒
+如果 EDI 已在运行则跳过启动，避免重复进程。
 """
 
 from __future__ import annotations
@@ -32,12 +21,18 @@ def launch_edi(
     wait_for_grpc: bool = True,
     wait_timeout: int = 30,
 ) -> dict[str, Any]:
-    """启动 EDI 客户端应用程序，等待 gRPC 服务就绪。
+    """启动 EDI 客户端并等待 gRPC 就绪。已运行时跳过启动。
+
+    用法："启动 EDI"、"打开 EDI 客户端"
 
     Args:
         edi_path: EDI.exe 路径，默认使用配置的 EDI_PATH。
         wait_for_grpc: 是否等待 gRPC 服务端口就绪，默认 True。
         wait_timeout: 等待 gRPC 就绪的超时秒数，默认 30 秒。
+
+    Returns:
+        {"process_started": True, "grpc_ready": True, "success": True,
+         "message": "EDI 已在运行（gRPC 127.0.0.1:50055 已就绪）"}
     """
     exe = edi_path or EDI_PATH
     exe_path = Path(exe).expanduser()

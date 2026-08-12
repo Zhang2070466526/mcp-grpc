@@ -1,6 +1,7 @@
-"""仿真结果对比工具。
+"""仿真结果对比工具 — 2-8 个 RAW 文件同曲线对比叠图。
 
-compare_simulation_results  多个 RAW 仿真结果同一条曲线对比叠图
+流程：逐 RAW 调 turbocharts 导出 CSV → 依赖轴对齐（intersection/interpolation）
+→ Matplotlib 叠图 → 计算 max/mean/rms 差异 → 可选 CSV 导出
 """
 
 from __future__ import annotations

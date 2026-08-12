@@ -1,4 +1,9 @@
-"""工作区复制 — 复制图片到 OpenClaw 工作区 media/edi/mcp-cache/。"""
+"""工作区图片复制 — 将图片复制到 OpenClaw 工作区 media/edi/mcp-cache/。
+
+条件注册：只有 OPENCLAW_WORKSPACE 有效时才注册为 MCP 工具。
+自动检测：edi-mcp 同级 rfclaw/.../workspace → ~/.openclaw/workspace。
+缓存策略：24h TTL + MD5 去重，避免重复复制。
+"""
 
 from __future__ import annotations
 

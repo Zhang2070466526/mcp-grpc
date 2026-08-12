@@ -1,4 +1,10 @@
-"""ANSYS 公共工具 — 进程检测、COM 附着、Setup 模块。"""
+"""ANSYS HFSS 基础设施 — 进程检测、COM 附着（多 ProgID 回退）、锁文件管理。
+
+核心功能：
+- AEDT 路径检测：环境变量 → 注册表 → 默认目录（按版本号取最新）
+- COM 附着：AnsoftHfss.HfssScriptInterface / Ansoft.ElectronicsDesktop 双 PID 回退
+- 锁文件管理：读取 .aedt.lock 中的 DesktopProcessID，PID 存活时绝不删除
+"""
 
 from __future__ import annotations
 
@@ -25,6 +31,7 @@ _LAST_PID: int | None = None
 
 # -- 路径 --
 def _find_aedt() -> str:
+    """自动检测 AEDT 安装路径：环境变量 → Windows 注册表 → 默认目录（按版本号取最新）。"""
     from_env = get_settings().aedt_path
     if from_env and Path(from_env).is_file():
         return from_env
@@ -60,6 +67,7 @@ AEDT_PATH = _find_aedt()
 
 # -- 进程 --
 def get_aedt_pids() -> list[int]:
+    """返回所有 ansysedt.exe 进程的 PID 列表。"""
     try:
         return [p.pid for p in psutil.process_iter(["name"]) if p.info["name"] == "ansysedt.exe"]
     except Exception:
@@ -67,6 +75,7 @@ def get_aedt_pids() -> list[int]:
 
 
 def aedt_is_running() -> bool:
+    """检查是否有 ansysedt.exe 进程正在运行。"""
     return len(get_aedt_pids()) > 0
 
 

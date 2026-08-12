@@ -61,9 +61,13 @@ def _is_queue_busy() -> bool:
 
 @mcp.tool()
 def get_service_status() -> dict[str, Any]:
-    """返回 EDI gRPC 连接状态和队列信息（只读，不占执行槽位）。
+    """返回 EDI gRPC 通道状态和队列占用信息（只读，不占执行槽位），用于诊断：通道是否健康、是否有任务在排队。
 
-    用于诊断：通道是否健康、是否有任务在排队。
+    用法："EDI 服务正常吗"、"检查 gRPC 连接状态"、"有没有任务在排队"
+
+    Returns:
+        {"grpc_target": "127.0.0.1:50055", "channel_state": "ready/unhealthy/unknown",
+         "channel_cached": True, "queue_locked": False, "max_receive_mb": 256}
     """
     target = EDA_GRPC_SERVER
     ch = _channel_cache.get(target)
@@ -105,10 +109,13 @@ def _get_channel(target: str) -> grpc.Channel:
 
 class _ChannelHandle:
     """上下文管理器包装：退出时不关闭缓存的 channel。"""
+
     def __init__(self, ch: grpc.Channel):
         self._ch = ch
+
     def __enter__(self) -> grpc.Channel:
         return self._ch
+
     def __exit__(self, *args: object) -> None:
         pass  # 缓存复用，不关闭
 
@@ -202,7 +209,13 @@ def call_grpc(
     client_uuid: str | None = None,
     on_event: GrpcEventCallback | None = None,
 ) -> dict[str, Any]:
-    """通用 gRPC 调用（带锁串行化）。
+    """所有 gRPC 工具的统一入口。全局 RLock 串行化，先 FetchEvent 后 PerformAction。
+
+    流程：获取锁 → 建立流式订阅（FetchEvent）→ 提交任务（PerformAction）
+    → 三重回显校验（client_uuid/task_id/event_type）→ 消费事件流 → 终态返回
+
+    异常分类：DEADLINE_EXCEEDED→TIMEOUT, RESOURCE_EXHAUSTED→PAYLOAD_TOO_LARGE,
+    已受理后断开→STREAM_DISCONNECTED, 未受理→GRPC_UNAVAILABLE
 
     Args:
         task_type: EventType 枚举值。
@@ -214,8 +227,8 @@ def call_grpc(
         on_event: 事件回调，接收每个 FetchEvent 事件的增量信息。
 
     Returns:
-        统一结构：success / completed / client_uuid / task_id / task_type
-        / status / message / project_path / result_path / ads_output / log_complete / details
+        {"success": bool, "completed": True, "outcome_known": bool, "task_success": bool|null,
+         "status": "SUCCEEDED/FAILED/TIMEOUT/...", "ads_output": "...", "log_complete": bool}
     """
     if timeout_seconds < 1:
         raise ValueError("timeout_seconds 必须大于 0")

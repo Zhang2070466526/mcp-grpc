@@ -23,11 +23,13 @@ _logger = logging.getLogger("settings")
 
 
 def _read_str(name: str, default: str = "") -> str:
+    """读取字符串环境变量，为空时返回默认值。"""
     raw = os.getenv(name, "").strip()
     return raw if raw else default
 
 
 def _read_bool(name: str, default: bool) -> bool:
+    """读取布尔环境变量（true/yes/1/on → True）。"""
     raw = os.getenv(name, "").strip().lower()
     if not raw:
         return default
@@ -35,6 +37,7 @@ def _read_bool(name: str, default: bool) -> bool:
 
 
 def _read_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    """读取整数环境变量，带范围限制和非法值警告。"""
     raw = os.getenv(name, "").strip()
     if not raw:
         return default
@@ -110,4 +113,5 @@ class Settings:
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    """返回全局唯一配置单例（lru_cache 缓存）。"""
     return Settings()

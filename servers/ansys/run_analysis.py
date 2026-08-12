@@ -39,6 +39,7 @@ def _prune_hfss_tasks() -> None:
 
 
 def _start_hfss_worker() -> None:
+    """启动 HFSS 仿真后台 worker 线程（单例）。"""
     global _HFSS_WORKER_STARTED
     with _HFSS_WORKER_LOCK:
         if _HFSS_WORKER_STARTED:
@@ -49,6 +50,7 @@ def _start_hfss_worker() -> None:
 
 
 def _hfss_worker_loop() -> None:
+    """后台 worker 主循环：阻塞等待队列中的任务并执行。"""
     while True:
         task_id = _HFSS_QUEUE.get()
         if task_id is None:
@@ -57,6 +59,7 @@ def _hfss_worker_loop() -> None:
 
 
 def _run_hfss_analysis_task(task_id: str) -> None:
+    """执行单个 HFSS 仿真任务：COM 附着→验证 setup→Analyze→校验结果。"""
     with _HFSS_TASKS_LOCK:
         task = _HFSS_TASKS.get(task_id)
         if task is None:
@@ -118,6 +121,7 @@ def _run_hfss_analysis_task(task_id: str) -> None:
 
 
 def _validate_setups(project_path: str, design_name: str) -> dict:
+    """校验 HFSS 项目和 Setup 是否存在，返回 setup 列表。"""
     pythoncom.CoInitialize()
     try:
         _, desktop = _attach_aedt()
@@ -150,6 +154,7 @@ def _validate_setups(project_path: str, design_name: str) -> dict:
 
 
 def _any_hfss_running() -> bool:
+    """检查是否有 HFSS 仿真正在运行或排队。"""
     with _HFSS_TASKS_LOCK:
         for t in _HFSS_TASKS.values():
             if t["status"] in ("QUEUED", "STARTING", "RUNNING"):

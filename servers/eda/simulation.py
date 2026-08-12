@@ -1,4 +1,8 @@
-r"""EDA 仿真工具。
+r"""EDA 仿真引擎 — 同步/异步仿真、网表仿真、ADS 控制器。
+
+异步仿真：ThreadPoolExecutor(1) 串行执行，最多 8 个排队任务。
+任务生命周期：QUEUED → ACCEPTED → RUNNING → SUCCEEDED/FAILED → 2h 后清理。
+
 
 simulate_project              对 .epp 工程执行仿真，等待结果返回
 simulate_netlist              仿真网表，自动返回 RAW 结果和仿真器日志
@@ -208,12 +212,21 @@ def start_simulation_async(
     log_source: str = "mcp_client",
     timeout_seconds: int = 600,
 ) -> dict[str, Any]:
-    """启动异步仿真，立即返回 task_id。通过 get_simulation_async_status 查询进度。
+    """启动异步仿真，立即返回 task_id 供get_simulation_async_status后续查询进度。
+
+    用法："帮我跑一下这个工程的仿真"、"启动仿真，超时设 10 分钟"
+
+    任务生命周期：QUEUED → ACCEPTED → RUNNING → SUCCEEDED/FAILED → 2h 后自动清理
+    最多 8 个排队任务，超限返回 SIMULATION_QUEUE_FULL
+    通过 get_simulation_async_status(task_id) 查进度，get_simulation_async_result 取结果
 
     Args:
         project_path: EDA 服务所在机器上的 .epp 工程文件绝对路径。
         log_source: 调用方日志标识。
         timeout_seconds: 最长等待秒数，默认 600。
+
+    Returns:
+        {"success": True, "task_id": "abc123...", "client_uuid": "...", "status": "QUEUED"}
     """
     resolved_path = validate_project_path(project_path)
 
@@ -269,10 +282,14 @@ def start_simulation_async(
 
 @mcp.tool()
 def get_simulation_async_status(task_id: str) -> dict[str, Any]:
-    """查询异步仿真任务状态。
+    """查询异步仿真进度和实时日志。运行中即可调用，不阻塞。
 
-    返回字段包括 status、当前已接收的 ads_output、log_complete 等。
-    运行中即可查询到实时日志。
+    用法："查一下 task_id 为 xxx 的仿真进度"、"仿真跑完了吗"
+
+    Returns:
+        {"success": True, "completed": False, "task_success": null,
+         "outcome_known": False, "status": "RUNNING", "ads_output": "...", "log_complete": False}
+        completed=True 且 outcome_known=False 表示 MCP 已退出但 EDI 结果未知（如 TIMEOUT）
     """
     _prune_tasks()
     task = _get_task_snapshot(task_id)
@@ -321,10 +338,16 @@ def get_simulation_async_status(task_id: str) -> dict[str, Any]:
 
 @mcp.tool()
 def get_simulation_async_result(task_id: str) -> dict[str, Any]:
-    """获取已完成的异步仿真结果。
+    """获取异步仿真最终结果。运行中返回当前状态和已接收的部分日志，完成后返完整的仿真结果和日志(ads_output)。
 
-    任务运行中时返回当前状态和已接收的部分日志；
-    完成后返回完整的仿真结果和日志。
+    用法："仿真结果出来了吗"、"把 task_id xxx 的完整日志给我"
+
+    Returns:
+        完成时：{"success": True, "completed": True, "outcome_known": True,
+                  "status": "SUCCEEDED", "result_path": ".../result.raw", "ads_output": "..."}
+        运行中：{"success": True, "completed": False, "outcome_known": False,
+                  "status": "RUNNING", "ads_output": "部分日志..."}
+        超时/断连：{"success": True, "outcome_known": False, "task_success": null}
     """
     _prune_tasks()
     task = _get_task_snapshot(task_id)
@@ -372,7 +395,11 @@ def simulate_project(
     log_source: str = "mcp_client",
     timeout_seconds: int = 600,
 ) -> dict[str, Any]:
-    """对 EDA .epp 工程执行仿真，等待仿真完成并返回结果。
+    """同步执行 EDA 工程仿真，阻塞等待完成。长仿真建议用 start_simulation_async。
+
+    用法："跑一下这个工程的仿真"（同步等待）
+
+    注意：同步阻塞，HTTP 请求可能等待数分钟，交互场景建议异步版本。
 
     FetchEvent 长连接期间实时收集 ads_output 增量日志，
     成功或失败均返回完整日志。
@@ -381,6 +408,10 @@ def simulate_project(
         project_path: EDA 服务所在机器上的 .epp 工程文件绝对路径。
         log_source: 调用方日志标识。
         timeout_seconds: 最长等待时间，默认 600 秒。
+
+    Returns:
+        {"success": True, "completed": True, "outcome_known": True,
+         "status": "SUCCEEDED", "result_path": ".../result.raw", "ads_output": "..."}
     """
     resolved_path = validate_project_path(project_path)
     return call_grpc(
@@ -396,14 +427,14 @@ def simulate_netlist(
     netlist_path: str,
     timeout_seconds: int = 600,
 ) -> dict[str, Any]:
-    """仿真指定的 netlist.log，返回 RAW 结果和仿真器输出日志。
+    """仿真指定 netlist.log 文件，不需打开 .epp 工程。返回 RAW 结果+日志。
 
-    服务端自动将网表复制到临时目录 → 执行 ADS 仿真 → 复制 RAW 到原网表同级
-    history/result.raw → 清理临时目录。ads_output 在最终事件中返回。
+    用法："帮我跑一下这个网表文件"、"仿真 C:/test/netlist.log"
+    服务端：网表→临时目录→ADS仿真→RAW归档到原网表同级 history/result.raw→清理临时目录
 
-    Args:
-        netlist_path: 网表文件路径（必须已存在）。
-        timeout_seconds: 最长等待秒数，默认 600。
+    Returns:
+        {"success": True, "status": "SUCCEEDED", "result_path": ".../history/result.raw",
+         "ads_output": "ADS simulator output..."}
     """
     resolved_netlist = validate_file(netlist_path)
     return call_grpc(
@@ -438,14 +469,18 @@ def simulate_netlist_with_ads(
 
 @mcp.tool()
 def list_eda_tasks(status: str = "") -> dict[str, Any]:
-    """列出当前 MCP 进程中已提交的异步仿真任务。
+    """列出当前所有异步仿真任务，可选按状态过滤。不阻塞。
 
-    可用于查看长时间仿真进度、排查卡住的任务或确认任务是否还在运行。
+    用法："现在有哪些仿真在跑"、"列出所有失败的任务"
 
     Args:
         status: 按状态过滤，为空返回全部。
                可选：QUEUED / ACCEPTED / RUNNING / SUCCEEDED / FAILED /
                TIMEOUT / STREAM_DISCONNECTED / REJECTED。
+
+    Returns:
+        {"success": True, "total": 3, "tasks": [
+            {"task_id": "abc", "status": "RUNNING", "project_path": "...", ...}]}
     """
     _VALID_STATUSES = {"", "QUEUED", "QUEUE_TIMEOUT", "ACCEPTED", "RUNNING", "SUCCEEDED",
                        "FAILED", "TIMEOUT", "STREAM_DISCONNECTED", "REJECTED",

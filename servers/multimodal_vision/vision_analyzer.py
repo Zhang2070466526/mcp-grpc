@@ -1,4 +1,9 @@
-"""图片视觉分析 — 调用视觉模型分析图片内容，返回结构化文字。"""
+"""图片视觉分析 — 调用 Vision API（OpenAI 兼容格式）分析图片内容。
+
+流程：校验路径 → Base64 编码 → POST /v1/chat/completions → 解析 choices[0].message.content
+并发控制：BoundedSemaphore(2)，超限返回 VISION_BUSY
+_encode 返回值：成功 (data_url, None)，失败 (None, error_dict) — 注意第二个值是 None 不是 MIME
+"""
 
 from __future__ import annotations
 

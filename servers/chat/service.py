@@ -236,6 +236,7 @@ class ChatSession:
 
 @dataclass
 class ChatResponse:
+    """Chat 响应数据类，包含回复文本、工具执行摘要、上下文和媒体。"""
     success: bool
     session_id: str
     request_id: str
@@ -313,6 +314,7 @@ ERROR_CODES = {
 
 
 def _tool_error(code: str, detail: str = "") -> dict:
+    """构建工具调用错误响应。"""
     return {
         "success": False,
         "error": {
@@ -860,6 +862,7 @@ def _is_duplicate_tool_call(
 
 
 def _safe_json(raw: str) -> dict:
+    """安全解析 JSON，解析失败返回空 dict。"""
     try:
         val = _json.loads(raw)
         return val if isinstance(val, dict) else {}
@@ -932,6 +935,7 @@ def _tool_args_summary(tool_name: str, args: dict) -> str:
 
 
 def _tool_label(name: str) -> str:
+    """返回工具的中文显示标签。"""
     return _TOOL_LABELS.get(name, name)
 
 
@@ -981,6 +985,7 @@ def _confirmation_text(pending: PendingAction) -> str:
 
 
 def _is_cancel(text: str) -> bool:
+    """检查用户输入是否为取消操作。"""
     return _norm_confirmation(text) in _CANCEL_WORDS
 
 
@@ -1000,6 +1005,7 @@ def _serialize_result(result: Any) -> str:
 
 
 def _result_summary(act: Activity) -> str:
+    """根据 Activity 生成简洁结果摘要。"""
     if act.status == "error":
         return act.error or "执行失败"
     r = act.result

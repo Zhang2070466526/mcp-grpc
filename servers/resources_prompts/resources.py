@@ -1,8 +1,11 @@
-"""MCP Resources — 只读上下文，客户端主动获取。
+"""MCP Resources — 只读上下文，客户端通过 resources/list 和 resources/read 访问。
 
-  edi://service/overview                 服务能力概览
-  edi://reference/simulation-components  仿真器件参数目录
-  edi://reference/operation-guide        操作规则
+5 个 Resource：
+  edi://service/overview              — 服务版本、协议版本、gRPC 目标、安全规则
+  edi://service/status                — 实时运行时状态（gRPC 通道、队列占用）
+  edi://reference/simulation-components — 仿真器件参数目录（与 get_schema 同源）
+  edi://reference/operation-guide     — 操作安全约束（创建/删除/导入规则）
+  edi://reference/error-codes         — 错误码词典（状态码→含义→建议动作）
 """
 
 from __future__ import annotations

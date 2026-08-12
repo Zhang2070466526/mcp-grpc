@@ -1,4 +1,10 @@
-"""图片显示 — 纯 MCP ImageContent，不调模型，不复制文件。"""
+"""图片显示 — 返回 MCP ImageContent（Base64 内嵌），不调模型，不复制文件。
+
+功能：
+  show_image           — 读取本地图片，≤10MB 返回 ImageContent，>10MB 返回本地路径提示
+  register_image_url   — 生成临时 HTTP Token（10 分钟有效），供 Chat 前端渲染
+  _workspace_note      — 根据 OPENCLAW_WORKSPACE 配置返回自适应提示文案
+"""
 
 from __future__ import annotations
 
@@ -99,6 +105,7 @@ def _base_url() -> str:
 
 
 def register_image_url(img_path: str) -> str:
+    """注册图片临时 Token（10 分钟有效），供 Chat 前端通过 /images/{token} 访问。"""
     p = validate_image_path(img_path)
     _cleanup_expired()
     token = secrets.token_urlsafe(24)
@@ -119,6 +126,7 @@ def _cleanup_expired() -> None:
 # ═══════════════════════════════════════════════════════════
 
 async def serve_image(request: Request) -> FileResponse | JSONResponse:
+    """GET /images/{token} — 根据 Token 返回图片文件，10 分钟过期。"""
     token = request.path_params.get("token", "")
     _cleanup_expired()
     with _TOKEN_LOCK:

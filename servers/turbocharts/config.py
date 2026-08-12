@@ -1,4 +1,8 @@
-"""Turbocharts 串行执行器 — 使用信号量限制并发进程数。"""
+"""Turbocharts 串行执行器 — 使用信号量限制并发进程数。
+
+turbocharts_app.exe 一次只能运行一个实例，本模块封装 subprocess 调用，
+确保同一时间只有一个 turbocharts 进程在运行。
+"""
 
 from __future__ import annotations
 

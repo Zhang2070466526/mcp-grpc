@@ -38,7 +38,17 @@ from servers import mcp
 
 @mcp.tool()
 def list_epp_projects(folder_path: str) -> dict[str, Any]:
-    """扫描指定文件夹，列出其中所有 .epp 工程文件（最多 1000 个）。"""
+    """扫描指定文件夹中的 .epp 工程文件。
+
+    用法："帮我看看 C:/Projects 下有哪些工程"、"扫描 EDI-Workspace 目录"
+
+    Args:
+        folder_path: 要扫描的文件夹绝对路径。
+
+    Returns:
+        {"success": True, "folder": "C:/...", "count": 3,
+         "projects": [{"name": "demo1", "path": "C:/.../demo1.epp", "size": 0}, ...]}
+    """
     if not folder_path or not folder_path.strip():
         raise ValueError("folder_path 不能为空，请提供要扫描的目录")
     root = Path(folder_path).expanduser()
@@ -224,12 +234,20 @@ def get_project_summary(
     include_component_types: bool = True,
     include_latest_result: bool = True,
 ) -> dict[str, Any]:
-    """获取 .epp 工程的完整概览。
+    """获取 .epp 工程完整概览：元数据、原理图、元件统计、仿真配置、最近结果。
+
+    用法："帮我看看这个工程的概览"、"查看工程信息"
 
     Args:
         project_path: .epp 工程文件绝对路径。
         include_component_types: 是否统计元件类型分布。
         include_latest_result: 是否包含最近仿真结果信息。
+
+    Returns:
+        {"success": True, "project": {...}, "schematics": {"count": 1, "names": ["main"]},
+         "components": {"total": 15, "by_type": {"ResG": 5}},
+         "simulation": [{"component_type": "SParameter", "Freq": "1 GHz", ...}],
+         "latest_result": {"path": ".../result.raw", "exists": True, "size": 2048}}
     """
     reader = ProjectReader(project_path)
     metadata = reader.read_metadata()
@@ -377,3 +395,57 @@ def analyze_variables(project_path: str) -> dict[str, Any]:
         "references": references,
         "sweeps": sweeps,
     }
+
+
+# ═══════════════════════════════════════════════════════════
+# gRPC 原理图器件查询（v2）
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool()
+def list_schematic_components(
+    project_path: str,
+    timeout_seconds: int = 60,
+) -> dict[str, Any]:
+    """通过 gRPC 查询原理图全部器件（含完整参数），比本地文件读取更实时。
+
+    用法："列出这个工程原理图上的所有器件"、"查看原理图器件"
+
+    Returns:
+        {"success": True, "component_count": 5, "components": [
+            {"instance_name": "R1", "component_type": "R",
+             "active_state": 0, "state": "NORMAL", "parameters": {...}}, ...]}
+    """
+    resolved_path = validate_project_path(project_path)
+    return call_grpc(
+        ecserver_pb2.LIST_SCHEMATIC_COMPONENTS,
+        {"project_path": resolved_path},
+        timeout_seconds,
+        max_timeout_seconds=300,
+    )
+
+
+@mcp.tool()
+def get_schematic_component_info(
+    project_path: str,
+    instance_name: str,
+    timeout_seconds: int = 60,
+) -> dict[str, Any]:
+    """通过 gRPC 按实例名查询单个器件的完整信息。
+
+    用法："查看 R1 这个器件的参数"、"U1 是什么类型的器件"
+
+    Returns:
+        {"success": True, "instance_name": "R1", "component": {
+            "instance_name": "R1", "component_type": "R",
+            "active_state": 0, "state": "NORMAL", "parameters": {"R": {"Value": "50", "Unit": "Ohm"}}}}
+    """
+    resolved_path = validate_project_path(project_path)
+    if not instance_name or not instance_name.strip():
+        return {"success": False, "error_code": "EMPTY_INSTANCE_NAME",
+                "message": "instance_name 不能为空"}
+    return call_grpc(
+        ecserver_pb2.GET_SCHEMATIC_COMPONENT_INFO,
+        {"project_path": resolved_path, "instance_name": instance_name.strip()},
+        timeout_seconds,
+        max_timeout_seconds=300,
+    )

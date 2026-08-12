@@ -1,15 +1,11 @@
-"""EDA 工具公用函数与配置。
+"""EDA 基础配置 — 路径检测、S-expression 解析器、ProjectReader。
 
-导出的配置常量：
-  EDA_GRPC_SERVER       gRPC 服务地址，默认 localhost:50055
-  EDI_PATH              EDI 客户端可执行文件路径
-  MCP_TRANSPORT         MCP 传输方式（stdio / streamable-http）
-
-导出的公共函数：
-  validate_project_path(path)  校验 .epp 工程路径，返回规范化绝对路径
-
-使用方式：
-  from servers.eda.config import EDA_GRPC_SERVER, validate_project_path
+核心组件：
+  EDI_PATH / TURBOCHARTS_PATH — 环境变量优先，否则自动检测同级 EXE
+  parse_sexp() — 递归下降 S-expression 解析器（处理 EDI 的 Lisp 风格原理图文件）
+  ProjectReader — 读取 .epp 工程目录（metadata、原理图列表、网表）
+  parse_paramsinfo() — 统一解析元件参数 JSON（兼容 Var 变量和普通参数）
+  parse_components() — 从原理图 S-expression 提取所有元件
 """
 
 from __future__ import annotations
@@ -81,12 +77,14 @@ class ProjectReader:
         self.workspace = self.epp_path.parent
 
     def read_text(self, relative_path: str) -> str | None:
+        """读取工程目录下的文件内容，不存在返回 None。"""
         p = self.workspace / relative_path
         if not p.is_file():
             return None
         return p.read_text(encoding="utf-8")
 
     def read_metadata(self) -> dict[str, Any]:
+        """读取工程元数据（project_id、name、author、version、created）。"""
         raw = self.read_text("project/metadata.ep") or ""
         items = list(parse_sexp(raw))
         if not items:
@@ -115,17 +113,21 @@ class ProjectReader:
         return names
 
     def read_schematic(self, name: str = "main") -> str | None:
+        """读取指定原理图内容（安全检查：拒绝 .. 和路径分隔符）。"""
         if ".." in name or "/" in name or "\\" in name:
             return None
         return self.read_text(f"schematics/{name}/schematic.ep")
 
     def read_netlist(self) -> str | None:
+        """读取工程网表文件内容。"""
         return self.read_text("netlist.log")
 
     def file_exists(self, relative_path: str) -> bool:
+        """检查工程内文件是否存在。"""
         return (self.workspace / relative_path).is_file()
 
     def file_size(self, relative_path: str) -> int:
+        """返回工程内文件的字节大小。"""
         p = self.workspace / relative_path
         return p.stat().st_size if p.is_file() else 0
 

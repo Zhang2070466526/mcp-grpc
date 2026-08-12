@@ -26,6 +26,7 @@ else:
 
 
 async def _check_tcp(endpoint: str) -> bool:
+    """TCP 端口连通性检查。"""
     try:
         host, port_text = endpoint.rsplit(":", 1)
         reader, writer = await asyncio.wait_for(
@@ -42,6 +43,7 @@ async def _check_tcp(endpoint: str) -> bool:
 # ── 静态页面 ──
 
 async def ui_page(request: Request):
+    """GET /ui — 返回 Chat 聊天界面（单页应用）。"""
     if _CLIENT_HTML_PATH.is_file():
         return HTMLResponse(_CLIENT_HTML_PATH.read_text(encoding="utf-8"))
     return HTMLResponse("<h2>chat_client.html not found</h2>", status_code=404)
@@ -50,6 +52,7 @@ async def ui_page(request: Request):
 # ── 工具列表 ──
 
 async def tool_list(request: Request):
+    """GET /tools/list — 返回已注册 MCP 工具名称和描述列表。"""
     tools = [{"name": t.name, "description": t.description or ""}
              for t in mcp._tool_manager._tools.values()]
     return JSONResponse(tools)
@@ -58,6 +61,7 @@ async def tool_list(request: Request):
 # ── 健康检查 ──
 
 async def health_check(request: Request):
+    """GET /health — 健康检查：gRPC + TurboCharts 状态 + 版本号。"""
     eda_ready = await _check_tcp(EDA_GRPC_SERVER)
     turbocharts_ready = bool(TURBOCHARTS_PATH) and Path(TURBOCHARTS_PATH).is_file()
     return JSONResponse({

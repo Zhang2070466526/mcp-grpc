@@ -1,4 +1,7 @@
-"""公共工具函数 — 文件校验、错误响应、地址管理、链接生成。"""
+"""公共工具层 — 文件校验、统一错误响应、运行时地址管理、file:// 链接生成。
+
+全项目复用的基础函数，无外部依赖。
+"""
 
 from __future__ import annotations
 
@@ -13,6 +16,7 @@ SERVER_STARTED_AT: float = time.time()
 
 
 def server_uptime_seconds() -> float:
+    """返回服务启动以来的运行秒数。"""
     return time.time() - SERVER_STARTED_AT
 
 
@@ -42,6 +46,7 @@ def tool_error(code: str, message: str, retryable: bool = False, **extra) -> dic
 
 @dataclass
 class ServerAddress:
+    """运行时服务器地址（host + port），由 start_servers.py 通过 set_server_address() 设置。"""
     host: str = "127.0.0.1"
     port: int = 50026
 

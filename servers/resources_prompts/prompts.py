@@ -1,9 +1,11 @@
-"""MCP Prompts — 可复用工作流模板，用户主动选择。
+"""MCP Prompts — 可复用工作流模板，用户通过 prompts/get 主动选择。
 
-  inspect_edi_project         检查 EDI 工程
-  run_and_review_simulation   执行并检查仿真
-  configure_simulation_component  配置仿真器件
-  create_simulation_report    生成仿真报告
+5 个 Prompt：
+  inspect_edi_project       — 只读检查：概览→变量→器件→仿真配置
+  run_and_review_simulation — 异步仿真+日志分析，含轮询限制
+  configure_simulation_component — Schema→参数映射→确认→创建/更新
+  create_simulation_report  — 查询工程→生成曲线→渲染 PDF/DOCX
+  troubleshoot_edi_error    — 错误诊断：读 error-codes → 查服务状态 → 建议动作
 """
 
 from __future__ import annotations

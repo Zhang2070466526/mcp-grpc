@@ -1,4 +1,10 @@
-"""ANSYS 工程管理工具 — 打开/关闭/启动 AEDT。"""
+"""ANSYS HFSS 工程管理 — 打开/关闭/启动 AEDT，COM 附着操作。
+
+open_hfss_project: 锁文件检查 → COM 附着打开或 subprocess 启动
+close_hfss_project: COM 关闭 → 等待锁文件释放 → 清理残留锁
+launch_aedt: 已运行则返回状态，否则 subprocess 启动
+get_hfss_project_info: 只读查询，不启动 AEDT
+"""
 
 from __future__ import annotations
 
@@ -53,12 +59,14 @@ def open_hfss_project(
     aedt_path: str = "",
     wait_timeout: int = 30,
 ) -> dict[str, Any]:
-    """启动 AEDT 并打开 .aedt 项目（COM 附着，subprocess 单启动）。
+    """启动 AEDT 并打开 .aedt 项目（COM 附着优先，subprocess 单次启动兜底）。
 
-    Args:
-        project_path: .aedt/.aedtz 项目文件绝对路径。
-        aedt_path: AEDT 可执行文件路径，默认自动查找。
-        wait_timeout: 超时秒数（1-120）。
+    流程：检查锁文件→清理失效锁→COM 附着打开或 subprocess 启动→轮询确认工程打开
+    用法："帮我打开 C:/demo.aedt"、"在 AEDT 中打开这个 HFSS 项目"
+
+    Returns:
+        {"success": True, "status": "opened/already_open", "project_opened": True,
+         "method": "com/subprocess", "duration_s": 1.2}
     """
     t0 = time.monotonic()
     wait_timeout = max(1, min(wait_timeout, 120))

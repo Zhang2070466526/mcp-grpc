@@ -1,19 +1,6 @@
-r"""EDA 模型替换工具。
+r"""EDA 模型替换工具 — 按 CSV 文件批量替换工程中的元件模型。
 
-replace_models_from_csv     根据 CSV 文件内容，批量替换工程中的元件模型
-
-自然语言使用示例：
-  帮我用 C:\models\replace_list.csv 替换 EDA 工程 C:\...\EDI_TEST.epp 中的模型
-  帮我按照这个 CSV 文件替换模型
-
-CSV 格式参考：模型替换_LJ.csv（项目根目录）
-  列：original_model_type, original_model_name, original_model_id,
-       alternative_model_type, alternative_model_name, alternative_model_id
-
-参数说明：
-  project_path     EDA 服务所在机器上的 .epp 工程文件绝对路径
-  csv_path         模型替换 CSV 文件绝对路径
-  timeout_seconds  最长等待秒数，无上限，默认 60 秒
+调用 gRPC MODEL_REPLACE 事件，将 CSV 中指定的旧模型替换为新模型。
 """
 
 from __future__ import annotations
@@ -32,12 +19,19 @@ def replace_models_from_csv(
     csv_path: str,
     timeout_seconds: int = 60,
 ) -> dict[str, Any]:
-    """按 CSV 文件对 EDA 工程执行模型替换。
+    """按 CSV 文件批量替换工程中的元件模型。
+
+    用法："用这个 CSV 替换工程里的模型"、"批量更新器件型号"
+    CSV 列：original_model_type, original_model_name, original_model_id,
+            alternative_model_type, alternative_model_name, alternative_model_id
 
     Args:
         project_path: EDA 服务所在机器上的 .epp 工程文件绝对路径。
         csv_path: 模型替换 CSV 文件绝对路径。
         timeout_seconds: 最长等待时间，默认 60 秒。
+
+    Returns:
+        gRPC 统一返回结构：{"success": True, "completed": True, "status": "SUCCEEDED", ...}
     """
     resolved_path = validate_project_path(project_path)
     resolved_csv = validate_file(csv_path, (".csv",))

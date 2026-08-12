@@ -1,7 +1,7 @@
-r"""EDA 分析工具。
+r"""EDA 分析工具 — 网表导出 + 原理图截图（gRPC 调用）。
 
+capture_schematic  截取工程原理图并保存为图片 返回 artifacts（含 build_file_link），图片生成后自动添加 file:// 链接。
 export_project_netlist  查看/导出 .epp 工程的网表文件
-capture_schematic     截取工程原理图并保存为图片
 
 自然语言使用示例：
   帮我查看 EDA 工程 C:\...\EDI_TEST.epp 的网表
