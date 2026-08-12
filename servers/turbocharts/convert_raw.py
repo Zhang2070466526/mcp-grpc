@@ -286,7 +286,11 @@ def turbocharts_convert(
     dependency: str = "",
     ac_config: str = "",
 ) -> dict[str, Any]:
-    """将 ADS RAW 仿真结果文件转换为曲线图和可选的 CSV 数据。
+    """ADS RAW 转曲线图+CSV（SP/HB/XDB）。多条 VSWR 自动拆分 CSV，导出后核对数据。
+
+    用法："把 result.raw 转成增益曲线"、"生成驻波图同时导出 CSV"
+    CSV 注意：多条 VSWR 自动逐条分次导出，DB 类可一次多条。导出后核对行数列数。
+    精度配置格式：ac_type#bit#data#nv_type#nv_value（如 phase#3#S[2,1]#fv#0.1）
 
     支持的转换类型（--type）:
         SP  - S 参数分析（增益、驻波、时延、噪声等）
@@ -295,11 +299,9 @@ def turbocharts_convert(
 
     曲线名格式（--linename）:
         格式为 单位_曲线名[端口]，多条曲线用 & 分隔。
-
         常用单位前缀: DB（dB值）、real（实数）、VSWR（驻波）、
                      APS（附加相移）、MAS（衰减态幅度）、
                      MV（幅度波动）、PSS（移相态）
-
         常用曲线示例:
         ├─ DB_S[2,1]          S参数输出增益
         ├─ DB_S[1,2]          S参数反向增益
@@ -334,7 +336,9 @@ def turbocharts_convert(
         ac_config: 可选，精度配置，格式 ac_type#bit#data#nv_type#nv_value。
 
     Returns:
-        包含 success / return_code / output_paths / img_generated / csv_generated 的结果字典。
+        {"success": True, "img_generated": True, "csv_generated": True,
+         "artifacts": [{"type":"image","path":"...","generated_by":"turbocharts_convert"}, ...],
+         "warnings": ["CSV 已生成（2 个文件），请核对..."], "output_paths": {"img":"...","csv":"..."}}
     """
     validate_file(raw_path)
     validate_file(TURBOCHARTS_PATH)
