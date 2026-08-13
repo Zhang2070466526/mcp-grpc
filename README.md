@@ -8,7 +8,7 @@
 
 ## 为什么用这个项目
 
-电子设计自动化（EDA）工具通常需要人工在图形界面中操作——打开工程、配置器件、执行仿真、导出结果。本项目将这些操作封装为 41 个 MCP 工具，接入 Claude Code 或 OpenClaw 后，只需用自然语言描述需求，AI 就能自动完成：
+电子设计自动化（EDA）工具通常需要人工在图形界面中操作——打开工程、配置器件、执行仿真、导出结果。本项目将这些操作封装为 42 个 MCP 工具，接入 Claude Code 或 OpenClaw 后，只需用自然语言描述需求，AI 就能自动完成：
 
 > "帮我看看 C:/Projects 下有哪些 .epp 工程，打开第一个，查看 S 参数仿真器件的配置，设置频率 1-10GHz、步长 0.1GHz，然后跑仿真"
 
@@ -34,7 +34,7 @@ AI 客户端 (Claude Code / OpenClaw)
    │  Streamable HTTP (stateless) 或 stdio
    │  POST /mcp  │  initialize → tools/list → tools/call
    ▼
-EDI MCP 服务 (FastMCP, 41 工具, 3 Resource, 4 Prompt)
+EDI MCP 服务 (FastMCP, 42 工具, 5 Resource, 5 Prompt)
    │
    ├── EDA gRPC 工具 (15) ──→ EDI 客户端 (127.0.0.1:50055)
    │     FetchEvent ← PerformAction 异步模型，增量 ads_output
@@ -97,7 +97,7 @@ curl http://127.0.0.1:50026/health     # 进程 + gRPC 状态
 → {"status":"ok","mcp_ready":true,"eda_grpc_ready":true}
 
 curl http://127.0.0.1:50026/ready      # 初始化完成 (启动中 503)
-→ {"status":"ready","transport":"streamable-http","stateless":true,"tool_count":41}
+→ {"status":"ready","transport":"streamable-http","stateless":true,"tool_count":42}
 ```
 
 ### 客户端接入
@@ -120,7 +120,7 @@ curl http://127.0.0.1:50026/ready      # 初始化完成 (启动中 503)
 
 | 方式 | 说明 |
 |---|---|
-| **MCP 客户端** | Claude Code / OpenClaw 接入后，自然语言调用全部 41 个工具 |
+| **MCP 客户端** | Claude Code / OpenClaw 接入后，自然语言调用全部 42 个工具 |
 | **聊天界面** | 浏览器访问 `http://127.0.0.1:50026/ui`，内置 LLM 多轮工具闭环 |
 | **Python 调用** | `from servers.eda import list_epp_projects` 直接调用 |
 
@@ -136,7 +136,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 
 ---
 
-## 工具一览（41 个）
+## 工具一览（42 个）
 
 ### 工程管理（7 个）
 
@@ -155,7 +155,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | 工具 | 说明 |
 |---|---|
 | `get_simulation_component_schema` | 查询 SP/HB/XDB 支持的参数和权限 |
-| `list_simulation_components` | 查询工程中的仿真器件 |
+| `list_simulation_components` | 列出全部器件，支持过滤/分页/隐藏参数（本地读） |
 | `create_simulation_component` | 新增器件（EDI 默认参数，创建后 update 设参） |
 | `update_simulation_component` | 按实例名更新参数（三路类型推断） |
 | `delete_simulation_component` | 按实例名删除器件 |
@@ -241,7 +241,7 @@ Streamable HTTP 模式启用 `stateless_http=True`，服务不保留 MCP 会话�
 | 路由 | 方法 | 说明 | 响应示例 |
 |---|---|---|---|
 | `/health` | GET | 进程存活 + gRPC 连接状态 | `{"status":"ok","mcp_ready":true,"eda_grpc_ready":true}` |
-| `/ready` | GET | 服务是否完成初始化（启动中返回 503） | `{"status":"ready","transport":"streamable-http","stateless":true,"tool_count":41}` |
+| `/ready` | GET | 服务是否完成初始化（启动中返回 503） | `{"status":"ready","transport":"streamable-http","stateless":true,"tool_count":42}` |
 | `/mcp` | POST | MCP 协议端点（Streamable HTTP） | MCP JSON-RPC 响应 |
 | `/ui` | GET | 内置聊天界面 | HTML 页面 |
 | `/chat` | POST | 聊天 API（LLM 多轮工具闭环） | `{"success":true,"reply":"...","activities":[...]}` |
@@ -250,7 +250,7 @@ Streamable HTTP 模式启用 `stateless_http=True`，服务不保留 MCP 会话�
 | `/documents/{token}` | GET | 临时文档访问（10 分钟有效） | PDF/DOCX 文件 |
 | `/upload` | POST | 文件上传（multipart/form-data） | `{"success":true,"file_path":"C:/...","file_name":"..."}` |
 
-### MCP Resources（3 个，只读上下文）
+### MCP Resources（5 个，只读上下文）
 
 客户端通过 `resources/list` 和 `resources/read` 访问。
 
@@ -259,8 +259,10 @@ Streamable HTTP 模式启用 `stateless_http=True`，服务不保留 MCP 会话�
 | `edi://service/overview` | `application/json` | 服务版本、gRPC 协议 v2、工具 API v3、安全规则、工作区状态 |
 | `edi://reference/simulation-components` | `application/json` | SP/HB/XDB 参数目录，与 `get_simulation_component_schema` 同源 |
 | `edi://reference/operation-guide` | `text/markdown` | 操作安全约束：创建/删除/网表导入规则 |
+| `edi://service/status` | `application/json` | 实时运行时状态（gRPC 通道、队列占用） |
+| `edi://reference/error-codes` | `text/markdown` | gRPC 状态码词典及建议动作 |
 
-### MCP Prompts（4 个，可复用工作流）
+### MCP Prompts（5 个，可复用工作流）
 
 | Prompt | 参数 | 说明 |
 |---|---|---|
@@ -268,6 +270,7 @@ Streamable HTTP 模式启用 `stateless_http=True`，服务不保留 MCP 会话�
 | `run_and_review_simulation` | `project_path`, `execution_mode`, `analyze_log` | 异步仿真 + 日志分析，含轮询限制 |
 | `configure_simulation_component` | `project_path`, `action`, `component_type`, `instance_name`, `requirements` | Schema → 参数映射 → 确认 → 创建/更新 |
 | `create_simulation_report` | `project_path`, `output_path`, `overwrite` | 查询工程 → 确认结果 → 生成曲线 → 渲染 PDF/DOCX |
+| `troubleshoot_edi_error` | `status`, `error_code` | 按状态码查错误词典、检查服务状态、给排查建议 |
 
 ---
 
@@ -405,8 +408,8 @@ mcp-grpc/
 │   │
 │   ├── resources_prompts/              #   MCP Resource & Prompt
 │   │   ├── __init__.py                 #     导入触发 @mcp.resource() / @mcp.prompt() 注册
-│   │   ├── resources.py                #     3 个 Resource：服务概览 / 参数目录 / 操作规则
-│   │   └── prompts.py                  #     4 个 Prompt：检查工程 / 执行仿真 / 配置器件 / 生成报告
+│   │   ├── resources.py                #     5 个 Resource：服务概览 / 参数目录 / 操作规则 / 服务状态 / 错误码
+│   │   └── prompts.py                  #     5 个 Prompt：检查工程 / 执行仿真 / 配置器件 / 生成报告 / 错误诊断
 │   │
 │   ├── eda/                            #   EDI gRPC 工具 (26 个)
 │   │   ├── __init__.py                 #     公共 API re-export
@@ -457,8 +460,8 @@ mcp-grpc/
 │
 ├── docs/                               # 项目文档
 │   ├── DEPLOY.md                       #   部署指南（打包产物使用、客户端配置）
-│   ├── API_REFERENCE.md                #   API 参考（41 个工具完整签名+返回值示例）
-│   ├── IMPLEMENTATION.md               #   实现原理（5 种通信类型、校验管线、并发控制）
+│   ├── API_REFERENCE.md                #   API 参考（42 个工具完整签名+返回值示例）
+│   ├── IMPLEMENTATION.md               #   实现原理（通信类型、校验管线、并发控制、工具动机与依赖）
 │   ├── HANDOVER.md                     #   交接文档（架构设计、技术栈、47 条注意事项）
 │   └── EDI系统接口与外部调用汇总.md    #   EDI 系统全量对外接口
 │
@@ -539,8 +542,8 @@ powershell -File scripts/build.ps1  # PyInstaller
 | 文档 | 说明 |
 |---|---|
 | [部署指南](./docs/DEPLOY.md) | 打包产物使用、客户端配置 |
-| [API 参考](./docs/API_REFERENCE.md) | 全部 41 个工具参数、返回值、示例 |
-| [实现原理](./docs/IMPLEMENTATION.md) | 5 种通信类型、校验管线、并发控制 |
+| [API 参考](./docs/API_REFERENCE.md) | 全部 42 个工具参数、返回值、示例 |
+| [实现原理](./docs/IMPLEMENTATION.md) | 5 种通信类型、校验管线、并发控制、工具动机与依赖 |
 | [交接文档](./docs/HANDOVER.md) | 架构设计、技术栈、扩展开发、47 条注意事项 |
 | [gRPC 协议](./proto/grpc接口调用.md) | ExternalCall 接口调用说明 |
 | [EDI 系统接口汇总](./docs/EDI系统接口与外部调用汇总.md) | EDI 全量对外接口 |

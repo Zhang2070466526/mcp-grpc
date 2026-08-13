@@ -807,23 +807,27 @@ attach_out_component(project_path: str, target_instance_name: str, pin_index: in
 
 除了 Tool（启动时动态统计，当前 42 个），服务还注册了只读 Resource 和可复用 Prompt 工作流模板。
 
-### Resources（3 个）
+### Resources（5 个）
 
 | URI | MIME | 说明 |
 |---|---|---|
 | `edi://service/overview` | `application/json` | 服务版本、协议版本、gRPC 目标、安全规则 |
 | `edi://reference/simulation-components` | `application/json` | 仿真器件参数目录（与 `get_simulation_component_schema` 同源） |
 | `edi://reference/operation-guide` | `text/markdown` | Markdown 操作规则：创建/删除/网表导入的安全约束 |
+| `edi://service/status` | `application/json` | 实时运行时状态（gRPC 通道、队列占用） |
+| `edi://reference/error-codes` | `text/markdown` | gRPC 状态码词典及建议动作 |
 
 > Resource 是只读上下文，由客户端主动拉取。标准 MCP 客户端可通过 `resources/list` 和 `resources/read` 访问。
 
-### Prompts（3 个）
+### Prompts（5 个）
 
 | Prompt | 参数 | 用途 |
 |---|---|---|
 | `inspect_edi_project` | `project_path`, `detail_level` | 只读检查工程（概览→变量→器件→仿真配置） |
 | `run_and_review_simulation` | `project_path`, `execution_mode`, `analyze_log` | 统一异步仿真流程 + 日志分析 |
 | `configure_simulation_component` | `project_path`, `action`, `component_type`, `instance_name`, `requirements` | Schema→参数→确认→创建/更新 |
+| `create_simulation_report` | `project_path`, `output_path`, `overwrite` | 查询工程 → 生成曲线 → 渲染 PDF/DOCX |
+| `troubleshoot_edi_error` | `status`, `error_code` | 按状态码查错误词典、检查服务状态、给排查建议 |
 
 > Prompt 是用户主动选择的工作流模板。标准 MCP 客户端可通过 `prompts/list` 和 `prompts/get` 访问。
 

@@ -19,7 +19,7 @@ servers/
   registry_server.py     # 工具注册 + Web 路由注册
   utils.py                # 公共工具函数
   settings.py             # 统一配置加载
-  resources_prompts/       # 3 个 Resource + 4 个 Prompt
+  resources_prompts/       # 5 个 Resource + 5 个 Prompt
   multimodal_vision/      # 图片 + 视觉分析 + 文档工具
   report/                 # 仿真报告生成
   eda/                   # EDI 工程工具（26 个）

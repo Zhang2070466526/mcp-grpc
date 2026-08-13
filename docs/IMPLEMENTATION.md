@@ -782,6 +782,8 @@ MCP 协议除了 Tool，还定义了 Resource（只读上下文）和 Prompt（�
 | `edi://service/overview` | `application/json` | 动态生成 | `server_version`, `protocol_version`, `grpc_target`, `workspace_copy_enabled`, `safety_rules` |
 | `edi://reference/simulation-components` | `application/json` | `_load_catalog()` | 与 `get_simulation_component_schema` 同源 |
 | `edi://reference/operation-guide` | `text/markdown` | 静态维护 | 创建/删除/网表导入安全性约束 |
+| `edi://service/status` | `application/json` | 动态生成 | 与 `get_service_status` 同源（gRPC 通道、队列占用） |
+| `edi://reference/error-codes` | `text/markdown` | 静态维护 | gRPC 状态码词典及建议动作 |
 
 `workspace_copy_enabled` 的判断逻辑：
 
@@ -1066,3 +1068,239 @@ Chat 工具调用日志对路径做脱敏处理（只记录文件名），不暴
 参数：`project_path`、`target_instance_name`、可选 `pin_index`（0 开始）。
 
 服务端行为：自动判断引脚朝向 → 计算放置位置（100 坐标单位） → 顺时针尝试四个方向（各向外扩展 10 单位检测重叠） → 创建器件和网线在同一撤销组内。单引脚器件可省略 `pin_index`，多引脚器件必须提供。
+
+---
+
+## 十二、工具设计动机与数据依赖
+
+> 本节从「为什么需要这个工具」的视角，说明每个工具的设计动机、它解决的问题，以及它与其它工具的数据依赖关系（谁为它提供输入、它的输出供谁使用）。实现细节见上文对应章节。
+
+### 12.0 核心依赖链（总览）
+
+```
+list_epp_projects ──(工程路径)──> open_edi_project ──(已打开工程)──┬─> simulate_project / start_simulation_async
+                                                                   ├─> 器件操作（create/update/delete/...）
+                                                                   ├─> capture_schematic / export_project_netlist
+                                                                   └─> list_schematic_components
+
+start_simulation_async ──(task_id)──> get_simulation_async_status / get_simulation_async_result
+simulate_* / simulate_netlist ──(result.raw)──> list_result_curves ──(曲线名)──> turbocharts_convert / compare_simulation_results
+
+get_simulation_component_schema ──(参数 schema)──> create/update_simulation_component
+list_simulation_components / list_schematic_components ──(instance_name)──> update/delete/set_state/attach_out
+
+get_project_summary + turbocharts_convert + capture_schematic + simulate_* ──> generate_simulation_report ──(PDF/DOCX)──> open_document / open_local_document
+```
+
+### 12.1 工程管理（7 个）
+
+| 工具 | 动机（为什么） | 解决的功能 | 依赖（输入来自） | 被依赖（输出供） |
+|---|---|---|---|---|
+| `list_epp_projects` | AI 不知道工作区有哪些工程，一切操作的入口 | 扫描 `.epp` 工程返回路径清单 | —（入口工具） | 几乎所有需要 `project_path` 的工具 |
+| `open_edi_project` | gRPC 操作要求工程已在 EDI 打开 | 打开工程到 EDI | `list_epp_projects`（工程路径） | 仿真/器件操作/截图/网表等 |
+| `close_edi_project` | 释放 EDI 资源、落盘保存 | 关闭工程（可选保存） | `list_epp_projects`（工程路径） | —（收尾操作） |
+| `list_schematic_components` | 本地读磁盘看不到 EDI 未保存修改和运行态 | gRPC 实时列器件（含 active_state/state） | 已打开的工程 | LLM 判断器件实时状态 |
+| `get_schematic_component_info` | 按实例名单查器件详情（实时） | gRPC 单查器件完整信息 | `list_schematic_components`（instance_name） | LLM 查器件详情 |
+| `get_project_summary` | 一次看全工程概览，避免零散多轮查询 | 聚合元数据/原理图/器件/仿真配置/最新结果 | —（本地读） | LLM 了解全貌、`generate_simulation_report` |
+| `analyze_variables` | EDA 参数化设计依赖 Var/Sweep，需理解变量关系 | 分析 Var 定义、引用、Sweep 配置 | —（本地读） | LLM 理解参数化设计 |
+
+### 12.2 仿真器件（9 个）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `get_simulation_component_schema` | AI 不知道器件支持哪些参数/单位/权限 | 返回 SP/HB/XDB 参数 schema | —（读 catalog） | `create/update_simulation_component` 参数校验 |
+| `list_simulation_components` | 本地快速列器件（不占 EDI 槽位），看已保存配置 | 本地列器件，支持过滤/分页/隐藏参数 | —（本地读） | `update/delete/set_state/attach_out` 提供 instance_name |
+| `create_simulation_component` | AI 需要新建仿真器件 | 用 EDI 工厂默认参数创建 | `get_simulation_component_schema`（类型） | `update_simulation_component`（创建后设参） |
+| `update_simulation_component` | 修改器件参数 | 按实例名更新参数（三路类型推断） | `list_simulation_components`（instance_name）、`get_simulation_component_schema`（校验）、`create_simulation_component`（创建后） | — |
+| `delete_simulation_component` | 删除不需要的器件 | 按实例名删器件及连线 | `list_simulation_components`（instance_name） | — |
+| `set_component_active_state` | 仿真时临时禁用/短路器件（不改参数） | 确定性设置 NORMAL/DISABLED/SHORTED | `list_simulation_components`（instance_name） | — |
+| `generate_schematic_from_netlist` | 从网表快速重建/追加原理图 | 网表导入生成 main 原理图 | `export_project_netlist`/`simulate_netlist`（netlist 文件） | — |
+| `replace_port_component` | 端口类型切换（TermG↔P_nToneG）保留连线 | 替换端口器件类型 | `list_schematic_components`（instance_name） | — |
+| `attach_out_component` | 给器件引脚挂 Out 器件观察输出 | 挂载 Out 并自动连线 | `list_schematic_components`（instance_name） | — |
+
+### 12.3 仿真（7 个）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `simulate_project` | 执行工程仿真 | 同步阻塞仿真，实时收日志 | `open_edi_project`（已打开工程） | 结果 RAW → 图表/报告 |
+| `start_simulation_async` | 长仿真不能同步阻塞 | 异步启动，返回 task_id | `open_edi_project` | `get_simulation_async_status/result`（依赖 task_id） |
+| `get_simulation_async_status` | 查进度和实时日志 | 查询异步仿真状态 | `start_simulation_async`（task_id） | LLM 判断进度 |
+| `get_simulation_async_result` | 取最终结果和完整日志 | 获取仿真结果 | `start_simulation_async`（task_id） | `list_result_curves`/`turbocharts_convert`/报告 |
+| `list_eda_tasks` | 看有哪些仿真在跑/排队 | 列出异步任务 | — | LLM 判断仿真状态 |
+| `simulate_netlist` | 不打开工程直接仿真网表 | 仿真网表，归档 result.raw | `export_project_netlist`（netlist 文件） | `list_result_curves`/`turbocharts_convert` |
+| `simulate_netlist_with_ads` | 直接调 ADS 控制器 | ADS 仿真网表 | `export_project_netlist`（netlist 文件） | — |
+
+### 12.4 导出分析（2 个）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `export_project_netlist` | 查看/导出工程网表 | 导出网表文件路径 | `open_edi_project` | `simulate_netlist`/`generate_schematic_from_netlist` |
+| `capture_schematic` | 截图原理图供分析/报告 | 截取原理图为图片 | `open_edi_project` | `generate_simulation_report`、`show_image`/`analyze_image` |
+
+### 12.5 模型 / 启动 / 诊断（3 个）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `replace_models_from_csv` | 批量替换元件模型（CSV 驱动） | 按 CSV 批量替换 | CSV 文件 | — |
+| `launch_edi` | 确保 EDI 在运行（gRPC 可用） | 启动 EDI 并等 gRPC 就绪 | — | 所有 gRPC 工具（前提） |
+| `get_service_status` | 诊断 gRPC 通道/队列健康 | 只读查通道状态和队列占用 | — | `troubleshoot_edi_error` Prompt、LLM 诊断 |
+
+### 12.6 图表（3 个）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `list_result_curves` | RAW 曲线名难猜，画图前要先解析 | 解析 RAW 返回可用曲线名 | `simulate_*` 生成的 result.raw | `turbocharts_convert`/`compare_simulation_results` |
+| `turbocharts_convert` | RAW → 曲线图/CSV | 转图（支持 VSWR 自动拆分） | `list_result_curves`（曲线名）+ result.raw | `generate_simulation_report` |
+| `compare_simulation_results` | 对比多个仿真的同一条曲线 | 多 RAW 对比叠图 + 差异指标 | `list_result_curves`（曲线名）+ 多个 result.raw | — |
+
+### 12.7 ANSYS HFSS（6 个）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `launch_aedt` | 确保 AEDT 运行 | 启动 AEDT | — | ANSYS 其它工具前提 |
+| `open_hfss_project` | 打开 HFSS 工程 | COM 附着打开 `.aedt` | `launch_aedt`（AEDT 运行） | `start_hfss_analysis_async` |
+| `close_hfss_project` | 关闭 HFSS 工程释放锁 | COM 关闭 + 锁清理 | 工程名/路径 | — |
+| `get_hfss_project_info` | 只读查 AEDT 项目/设计 | 查项目列表和活动设计 | AEDT 运行 | LLM 了解 AEDT 状态 |
+| `start_hfss_analysis_async` | 异步跑 HFSS 仿真 | 提交 setup 分析任务 | `open_hfss_project`（工程打开） | `get_hfss_analysis_status` |
+| `get_hfss_analysis_status` | 查 HFSS 仿真状态 | 查任务状态（可选刷新 AEDT） | `start_hfss_analysis_async`（task_id） | LLM 判断 HFSS 进度 |
+
+### 12.8 图片（3 个，1 个条件注册）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `show_image` | 把本地图片返回给客户端渲染 | 返回 MCP ImageContent | — | 查看 `capture_schematic` 等生成的图片 |
+| `analyze_image` | 让视觉模型理解图片内容（如原理图） | 调用视觉模型分析 | —（图片路径） | 分析 `capture_schematic` 截图 |
+| `copy_image_to_workspace`（条件） | OpenClaw 需要图片在工作区目录 | 复制到工作区 media/edi | — | OpenClaw 附件发送 |
+
+### 12.9 文档（2 个）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `open_document` | PDF/DOCX 需要 HTTP 链接预览 | 生成 10 分钟临时链接 | `generate_simulation_report`（PDF/DOCX） | LLM 查看报告 |
+| `open_local_document` | 用系统默认程序打开文档 | `os.startfile` 打开 | `generate_simulation_report` | LLM 本地查看报告 |
+
+### 12.10 报告（1 个）
+
+| 工具 | 动机 | 功能 | 依赖 | 被依赖 |
+|---|---|---|---|---|
+| `generate_simulation_report` | 把仿真结果整理成正式 PDF/DOCX 报告 | 聚合数据 + 调渲染服务 | `get_project_summary`（工程信息）、`turbocharts_convert`（曲线图）、`capture_schematic`（拓扑图）、`simulate_*`（结果数据） | `open_document`/`open_local_document`（查看报告） |
+
+### 12.11 解析文件类工具详解
+
+有 6 个本地读取类工具的核心工作是「从磁盘文件里解析结构化数据」。它们不经过 gRPC，直接读 `.epp` 工程目录或 RAW 结果文件。下面是各自「解析什么文件、怎么解析、为什么解析」。
+
+**通用解析能力**（都在 `servers/eda/config.py`，被下面多个工具复用）：
+
+| 函数 | 作用 |
+|---|---|
+| `ProjectReader` | 定位 `.epp` 工程目录，按相对路径读取 metadata/schematic/netlist 文件 |
+| `parse_sexp()` | 递归下降解析 EDI 的 Lisp 风格 S-expression（处理嵌套括号、引号转义、裸词） |
+| `parse_paramsinfo()` | 解析 paramsinfo JSON（兼容普通参数和 Var 变量的两种结构） |
+| `parse_components()` | 从 schematic.ep 的 S-expression 中提取所有 `(component ...)` 节点 |
+
+**逐工具解析说明**：
+
+| 工具 | 解析的文件 | 怎么解析 | 为什么解析 |
+|---|---|---|---|
+| `list_epp_projects` | 文件夹下的 `*.epp` | `Path.rglob("*.epp")` 递归遍历 + `stat()` 读大小 | 拿到工程路径清单，是后续所有操作的入口 |
+| `get_project_summary` | `.epp` 目录（metadata.ep / schematics.ep / schematic.ep / netlist.log / `*.raw`） | `parse_sexp` 解析元数据 → `parse_components` 统计器件 → `rglob` 找 RAW | 一次聚合工程全貌（元数据/器件分布/仿真配置/最新结果） |
+| `analyze_variables` | 各原理图的 schematic.ep | `parse_components` 提取器件 → `parse_paramsinfo` 解析参数 → 识别 Var/Sweep 类型 | 理解参数化设计（Var 定义、引用关系、Sweep 扫描配置） |
+| `list_simulation_components` | 各原理图的 schematic.ep | `parse_components` 提取器件 → `parse_paramsinfo` 解析参数 → wire→public 名称映射 | 本地快速查看已保存器件配置（不占 EDI 槽位） |
+| `list_result_curves` | ADS RAW 文件头（MDS / XML 两种格式） | `_parse_raw_header` 读前 64KB → 识别 MDS（逐行解析 Plotname/Variables/Values）或 XML（正则匹配 `<Number/Complex/Real name=...>`） | 拿到可用曲线名，避免画图时猜错曲线名 |
+| `compare_simulation_results` | turbocharts 导出的 CSV | `_read_curve_csv_xy` 读前两列（x / y） | 对齐多个仿真的同一条曲线，计算差异指标 |
+
+**关键文件格式示例**：
+
+S-expression（schematic.ep 里的 component 节点）：
+```lisp
+(component uuid-001
+  (type "ResG")
+  (name "R1")
+  (pin 1)
+  (pin 2)
+  (paramsinfo "{\"R\":{\"Value\":\"50\",\"CurrentUnit\":\"Ohm\"}}"))
+```
+
+paramsinfo JSON（两种结构，`parse_paramsinfo` 统一为小写 key）：
+```json
+// 普通参数
+{"Value": "50", "CurrentUnit": "Ohm", "Tunable": "false"}
+// Var 变量
+{"Initial": "29", "Max": "", "Min": "", "Status": "Disable"}
+```
+
+ADS RAW 文件头（MDS 格式，`list_result_curves` 解析的对象）：
+```
+File Format: MDS
+Plotname: SP SP1[1] freq=(1 GHz->10 GHz)
+No. Variables: 11
+Variables:
+    0 freq frequency type=real indep=yes
+    1 S[1,1] s-param type=complex indep=no
+```
+
+> 其余「解析文件」发生在 EDI gRPC 服务端而非 MCP 本地：`replace_models_from_csv` 由服务端解析 CSV、`generate_schematic_from_netlist`/`simulate_netlist` 由服务端解析 netlist.log，MCP 只负责校验文件存在并传路径。
+
+### 12.12 通信与执行机制详解
+
+除了「解析文件」，其余工具按底层执行方式分为 6 类。每类的核心机制、以及「为什么这样设计」如下。
+
+#### (1) gRPC 异步调用（15 个 EDA 工具）
+
+**为什么这样设计**：EDI 是单实例桌面程序，同一时间只能做一件事，且操作耗时不定（仿真可能几分钟）。用「提交 + 流式推送」的异步模型，避免长连接阻塞 MCP 服务。
+
+**核心机制**：
+- 调用顺序固定：先 `FetchEvent` 建立流式订阅，再 `PerformAction` 提交任务（否则 EDI 报 "external handler not ready"）
+- 全局 `RLock` 串行化：所有 gRPC 调用排队，同一时间只有一个在执行
+- 三重回显校验：`client_uuid`/`task_id`/`event_type` 全部匹配才消费事件流
+- 增量日志：`ads_output` 通过事件流增量推送，原样拼接不 strip
+- 异常分类：超时→TIMEOUT、消息过大→PAYLOAD_TOO_LARGE、断连→STREAM_DISCONNECTED、未受理→GRPC_UNAVAILABLE
+- `outcome_known`/`task_success`：区分「EDI 明确失败」和「结果未知」，禁止把超时误判为失败
+
+#### (2) subprocess 调用（3 个 turbocharts 工具）
+
+**为什么这样设计**：`turbocharts_app.exe` 一次只能运行一个实例（多开会冲突），必须串行。
+
+**核心机制**：
+- `BoundedSemaphore(1)` 串行化进程
+- `subprocess.run` 捕获 stdout/stderr，Windows 下 `CREATE_NO_WINDOW` 不弹黑框
+- 命令行参数：`--raw/--img/--type/--csv/--linename/--dependcy/--ac`（注意 `--dependcy` 是真实参数名，少个 n）
+
+#### (3) COM 自动化（6 个 ANSYS 工具）
+
+**为什么这样设计**：AEDT 是 Windows COM 程序，没有 gRPC 接口，只能通过 COM 附着操作；同时 AEDT 用锁文件防止工程被多进程同时打开。
+
+**核心机制**：
+- 多 ProgID 回退附着：先 `GetActiveObject(AnsoftHfss.HfssScriptInterface)`，失败再试 `Ansoft.ElectronicsDesktop`
+- 每次 COM 调用独立 `pythoncom.CoInitialize()/CoUninitialize()`
+- 锁文件管理：读 `.aedt.lock` 里的 `DesktopProcessID`，PID 存活时**绝不删除**，进程退出后才清理残留锁
+- 进程/路径检测：`psutil` 遍历找 `ansysedt.exe`；路径按「环境变量 → 注册表 → 默认目录（按版本取最新）」检测
+
+#### (4) 异步任务队列（2 个：start_simulation_async / start_hfss_analysis_async）
+
+**为什么这样设计**：仿真可能几分钟到几小时，不能让 MCP 请求一直阻塞。用「提交即返回 task_id + 后台线程执行」解耦提交和查询。
+
+**核心机制**：
+- 单工作线程（`ThreadPoolExecutor(max_workers=1)` / `queue.Queue`）串行执行，避免多任务同时抢 EDI/COM
+- 内存任务注册表（`_sim_tasks`/`_HFSS_TASKS`）+ 锁保护
+- TTL 2 小时自动清理；队列上限 8（EDA）/ 50（HFSS）
+- 查询时在锁内做浅拷贝快照，避免并发读写冲突
+
+#### (5) HTTP 调用 + 临时 Token（报告、视觉分析、文档）
+
+**为什么这样设计**：报告渲染、视觉分析是独立服务，只能走 HTTP；PDF/图片要能在浏览器预览，需要临时 URL。
+
+**核心机制**：
+- 报告：16 步校验 → `httpx.post` 渲染服务 → 自校验输出文件
+- 视觉分析：路径 + Pillow 校验 → Base64 编码 → `httpx.post` 视觉模型（`BoundedSemaphore(2)` 限流）
+- Token：`secrets.token_urlsafe` 生成随机 token，内存字典存 `{token: path, expires_at}`，10 分钟过期自动清理
+- 路由：`/documents/{token}`、`/images/{token}` 按 token 返回文件
+
+#### (6) 参数校验管线（器件参数、报告）
+
+**为什么这样设计**：AI 传参容易错（参数名拼错、单位不对、类型不符），在 MCP 层前置校验能拦掉大部分无效调用，减少 gRPC 往返和错误轮次。
+
+**核心机制**：
+- 器件参数 11 步校验：类型 → 空值 → 存在 → 解析 → 权限 → 结构 → value → 类型 → 枚举 → 单位 → 别名冲突
+- 报告 16 步校验：路径 → 模型名 → 字段 → spec_table → charts → components → schematic → 超时 → payload → HTTP → 文件确认
+- wire→public 映射：公开名 `Freq` 自动转底层名 `Freq[1]`，AI 无需关心 EDI 内部命名
