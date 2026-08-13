@@ -101,6 +101,7 @@ def show_image(image_path: str) -> list[Any]:
 # ═══════════════════════════════════════════════════════════
 
 def _base_url() -> str:
+    """返回当前 HTTP 服务的 base URL。"""
     return get_server_base_url()
 
 
@@ -115,6 +116,7 @@ def register_image_url(img_path: str) -> str:
 
 
 def _cleanup_expired() -> None:
+    """清理已过期的图片 Token。"""
     now = time.time()
     with _TOKEN_LOCK:
         for t in [t for t, v in _IMAGE_TOKENS.items() if v["expires_at"] < now]:

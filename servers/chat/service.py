@@ -36,8 +36,8 @@ load_dotenv()
 from servers.eda.project_manage import (  # noqa: E402
     open_edi_project, close_edi_project,
     list_epp_projects,
-    list_project_components,
-    get_component_parameters, get_project_summary,
+    list_schematic_components, get_schematic_component_info,
+    get_project_summary,
     analyze_variables,
 )
 from servers.eda.simulation_components import (  # noqa: E402
@@ -186,6 +186,49 @@ def _auto_build_chat_tools() -> tuple[dict[str, Any], list[dict]]:
 
 CHAT_TOOL_MAP, CHAT_TOOLS_SCHEMA = _auto_build_chat_tools()
 
+
+def _ensure_chat_tools() -> None:
+    """每次 Chat 请求时刷新工具列表（原地更新，所有引用可见）。
+    可选模块（如 knowledge）在 MCP 注册之后注入到 Chat 工具映射中。
+    """
+    new_map, new_schema = _auto_build_chat_tools()
+
+    # 注入知识库工具（不注册为 MCP 工具，仅 Chat 内部可用）
+    try:
+        from servers.knowledge.rag.rag_mcp_tools import (
+            search_knowledge, ask_knowledge, add_knowledge, list_knowledge_sources
+        )
+        new_map["search_knowledge"] = search_knowledge
+        new_map["ask_knowledge"] = ask_knowledge
+        new_map["add_knowledge"] = add_knowledge
+        new_map["list_knowledge_sources"] = list_knowledge_sources
+        new_schema.extend([
+            {"type": "function", "function": {"name": "search_knowledge",
+                "description": "语义检索知识库", "parameters": {"type": "object",
+                "properties": {"query": {"type": "string"}, "top_k": {"type": "integer"}},
+                "required": ["query"]}}},
+            {"type": "function", "function": {"name": "ask_knowledge",
+                "description": "基于知识库生成回答（检索 + LLM）", "parameters": {"type": "object",
+                "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+            {"type": "function", "function": {"name": "add_knowledge",
+                "description": "向知识库追加文档", "parameters": {"type": "object",
+                "properties": {"content": {"type": "string"}, "file_path": {"type": "string"},
+                "source_name": {"type": "string"}}, "required": []}}},
+            {"type": "function", "function": {"name": "list_knowledge_sources",
+                "description": "列出已入库的文档来源", "parameters": {"type": "object",
+                "properties": {}, "required": []}}},
+        ])
+    except ImportError:
+        pass
+
+    CHAT_TOOL_MAP.clear()
+    CHAT_TOOL_MAP.update(new_map)
+    CHAT_TOOLS_SCHEMA.clear()
+    CHAT_TOOLS_SCHEMA.extend(new_schema)
+
+# 模块加载时填充一次
+_ensure_chat_tools()
+
 # ---------------------------------------------------------------------------
 # 数据结构
 # ---------------------------------------------------------------------------
@@ -214,6 +257,7 @@ class PendingAction:
     expires_at: float = 0.0
 
     def __post_init__(self):
+        """未显式指定 expires_at 时按 TTL 计算过期时间。"""
         if not self.expires_at:
             self.expires_at = self.created_at + _PENDING_ACTION_TTL
 
@@ -246,6 +290,7 @@ class ChatResponse:
     media: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
+        """序列化为 dict，供 JSON 响应返回。"""
         return {
             "success": self.success,
             "session_id": self.session_id,
@@ -281,6 +326,7 @@ _SYSTEM_PROMPT = (
 
 
 def _system_with_context(session: ChatSession) -> str:
+    """拼接系统提示词 + 当前会话上下文（工程/目录/仿真任务）。"""
     ctx_parts = []
     if session.current_project_path:
         ctx_parts.append(f"当前工程：{session.current_project_name or session.current_project_path}")
@@ -336,12 +382,14 @@ class ChatService:
     _lock = threading.Lock()
 
     def __init__(self) -> None:
+        """初始化会话字典、会话锁和清理时间戳。"""
         self._sessions: dict[str, ChatSession] = {}
         self._session_lock = threading.Lock()
         self._last_prune = time.time()
 
     @classmethod
     def instance(cls) -> ChatService:
+        """返回全局单例（双重检查锁）。"""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -369,6 +417,7 @@ class ChatService:
             return s
 
     def _prune(self) -> None:
+        """按 TTL 清理过期会话，超过上限时删最旧的。"""
         now = time.time()
         if now - self._last_prune < _PRUNE_INTERVAL:
             return
@@ -392,6 +441,7 @@ class ChatService:
     # ── 主入口 ──
 
     async def chat(self, session_id: str, message: str) -> ChatResponse:
+        """主入口：输入校验 → 会话锁串行 → 处理确认/正常消息。"""
         request_id = uuid.uuid4().hex[:12]
 
         # ── 输入校验 ──
@@ -443,6 +493,8 @@ class ChatService:
     async def _chat_locked(
         self, session: ChatSession, message: str, request_id: str,
     ) -> ChatResponse:
+        """已持会话锁：执行多轮 LLM 工具调用闭环（最多 _MAX_ROUNDS 轮）。"""
+        _ensure_chat_tools()  # 每次请求刷新，包含可选模块（如 knowledge）
         activities: list[Activity] = []
         called_fingerprints: set[str] = set()
         media: list[dict] = []
@@ -703,15 +755,15 @@ class ChatService:
         _PROJECT_PATH_TOOLS = {
             "open_edi_project", "close_edi_project",
             "get_project_summary", "analyze_variables",
-            "list_project_components", "get_component_parameters",
             "capture_schematic", "export_project_netlist",
             "start_simulation_async", "simulate_project",
             "list_simulation_components",
+            "list_schematic_components", "get_schematic_component_info",
             "create_simulation_component", "update_simulation_component",
             "delete_simulation_component", "set_component_active_state",
             "generate_schematic_from_netlist",
             "replace_models_from_csv",
-            "replace_port_component",
+            "replace_port_component", "attach_out_component",
         }
         if tool_name in _PROJECT_PATH_TOOLS:
             if not args.get("project_path"):
@@ -765,12 +817,14 @@ class ChatService:
     # ── 破坏性工具确认（ChatService 方法）──
 
     def _is_confirmation(self, text: str, pending: PendingAction) -> bool:
+        """判断用户输入是否为确认（肯定词或「确认 action_id」）。"""
         norm = _norm_confirmation(text)
         return norm in _CONFIRM_WORDS or norm == f"确认 {pending.action_id}"
 
     async def _execute_pending(
         self, session: ChatSession, pending: PendingAction, request_id: str,
     ) -> ChatResponse:
+        """执行已确认的破坏性操作（过期则拒绝）。"""
         if time.time() > pending.expires_at:
             return ChatResponse(success=False, session_id=session.session_id,
                                 request_id=request_id, reply="操作已过期，请重新发起。")
@@ -803,6 +857,7 @@ class ChatService:
         )
 
     def _build_context(self, session: ChatSession) -> dict:
+        """构建响应中的上下文（当前工程/仿真状态/日志尾部）。"""
         sim_status = None
         sim_ads_output = ""
         sim_log_complete = False
@@ -875,8 +930,6 @@ _TOOL_LABELS: dict[str, str] = {
     "list_epp_projects": "扫描工程",
     "open_edi_project": "打开工程",
     "close_edi_project": "关闭工程",
-    "list_project_components": "列出元件",
-    "get_component_parameters": "查询参数",
     "get_project_summary": "工程概览",
     "start_simulation_async": "启动仿真",
     "get_simulation_async_status": "查询进度",
@@ -886,6 +939,7 @@ _TOOL_LABELS: dict[str, str] = {
     "export_project_netlist": "导出网表",
     "replace_models_from_csv": "替换模型",
     "launch_edi": "启动 EDI",
+    "get_service_status": "服务状态",
     "compare_simulation_results": "对比结果",
     "list_result_curves": "RAW 曲线",
     "turbocharts_convert": "RAW 转图",
@@ -896,12 +950,15 @@ _TOOL_LABELS: dict[str, str] = {
     "open_local_document": "本地打开",
     "get_simulation_component_schema": "控件参数",
     "list_simulation_components": "查询器件",
+    "list_schematic_components": "实时器件列表",
+    "get_schematic_component_info": "查器件详情",
     "create_simulation_component": "新增器件",
     "update_simulation_component": "更新器件",
     "delete_simulation_component": "删除器件",
     "set_component_active_state": "设置状态",
     "generate_schematic_from_netlist": "生成原理图",
     "replace_port_component": "替换端口",
+    "attach_out_component": "挂载Out器件",
 }
 if OPENCLAW_WORKSPACE_PATH is not None:
     _TOOL_LABELS["copy_image_to_workspace"] = "复制到工作区"
@@ -946,10 +1003,12 @@ _CANCEL_WORDS: set[str] = {"取消", "不要执行", "no", "cancel"}
 
 
 def _norm_confirmation(text: str) -> str:
+    """归一化确认输入（去空格、小写），用于匹配确认/取消词。"""
     return " ".join(text.strip().lower().split())
 
 
 def _create_pending(tool_name: str, args: dict) -> PendingAction:
+    """为破坏性操作生成待确认对象（含 action_id 和操作摘要）。"""
     summary = {
         "delete_simulation_component":
             f"从工程中删除器件 {args.get('instance_name', '?')} 及其连接线",
@@ -971,6 +1030,7 @@ def _create_pending(tool_name: str, args: dict) -> PendingAction:
 
 
 def _confirmation_text(pending: PendingAction) -> str:
+    """生成破坏性操作的确认提示文案。"""
     target = {
         "delete_simulation_component": f"{pending.summary}。此操作无法由 MCP 自动恢复。",
         "replace_models_from_csv": f"{pending.summary}。此操作将修改工程中的模型。",

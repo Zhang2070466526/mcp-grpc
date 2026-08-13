@@ -145,8 +145,8 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `list_epp_projects` | 扫描文件夹中的 .epp 工程 |
 | `open_edi_project` | 打开 .epp 工程 |
 | `close_edi_project` | 关闭工程 |
-| `list_project_components` | 列出工程中的元件 |
-| `get_component_parameters` | 查询单个元件的完整参数 |
+| `list_schematic_components` | 查询原理图全部器件（gRPC，含完整参数） |
+| `get_schematic_component_info` | 按实例名查询器件完整信息（gRPC） |
 | `get_project_summary` | 工程概览（元数据/原理图/仿真配置） |
 | `analyze_variables` | 分析变量定义、引用和 Sweep 配置 |
 

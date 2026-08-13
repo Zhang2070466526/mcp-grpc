@@ -89,66 +89,70 @@ close_edi_project(project_path: str, need_save: bool = False, timeout_seconds: i
 
 ---
 
-### `list_project_components`
+### `list_schematic_components`
 
 ```python
-from servers.eda.project_manage import list_project_components
+from servers.eda.project_manage import list_schematic_components
 
-list_project_components(
-    project_path: str,
-    schematic_name: str = "main",
-    component_type: str = "",
-    name_contains: str = "",
-    offset: int = 0,
-    limit: int = 100,
-) -> dict
+list_schematic_components(project_path: str, timeout_seconds: int = 60) -> dict
 ```
 
-列出原理图中的元件（不含完整参数，避免响应过大）。
+通过 gRPC 查询原理图全部器件（含完整参数），比本地文件读取更实时，能看到 EDI 未保存的修改和运行态（active_state/state）。
 
 | 参数 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|
 | `project_path` | str | 是 | — | `.epp` 文件绝对路径 |
-| `schematic_name` | str | 否 | "main" | 原理图名称 |
-| `component_type` | str | 否 | "" | 按类型过滤（如 "TermG"） |
-| `name_contains` | str | 否 | "" | 按名称模糊匹配 |
-| `offset` | int | 否 | 0 | 分页偏移 |
-| `limit` | int | 否 | 100 | 每页上限（最大 500） |
+| `timeout_seconds` | int | 否 | 60 | 最长等待秒数 |
 
-返回：
+返回（gRPC 统一结构，业务字段在 `details` 中）：
 ```python
 {
     "success": True,
-    "total": 15,
-    "components": [
-        {"component_id": "uuid", "name": "R1", "type": "ResG", "model_id": "..."}
-    ]
+    "status": "SUCCEEDED",
+    "details": {
+        "component_count": 5,
+        "components": [
+            {"instance_name": "R1", "component_type": "R",
+             "general_type": "", "sub_type": "",
+             "active_state": 0, "state": "NORMAL", "parameters": {...}}
+        ]
+    }
 }
 ```
 
 ---
 
-### `get_component_parameters`
+### `get_schematic_component_info`
 
 ```python
-from servers.eda.project_manage import get_component_parameters
+from servers.eda.project_manage import get_schematic_component_info
 
-get_component_parameters(
-    project_path: str,
-    component_id: str,
-    schematic_name: str = "main",
-    include_hidden: bool = False,
-) -> dict
+get_schematic_component_info(project_path: str, instance_name: str, timeout_seconds: int = 60) -> dict
 ```
 
-查询单个元件的完整参数列表。
+通过 gRPC 按实例名查询单个器件的完整信息（实时，含未保存修改和 active_state/state）。
 
 | 参数 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|
 | `project_path` | str | 是 | — | `.epp` 文件绝对路径 |
-| `component_id` | str | 是 | — | 元件 UUID（从 `list_project_components` 获取） |
-| `schematic_name` | str | 否 | "main" | 原理图名称 |
-| `include_hidden` | bool | 否 | False | 是否包含隐藏参数 |
+| `instance_name` | str | 是 | — | 器件实例名（如 "R1"） |
+| `timeout_seconds` | int | 否 | 60 | 最长等待秒数 |
+
+返回（gRPC 统一结构，业务字段在 `details` 中）：
+```python
+{
+    "success": True,
+    "status": "SUCCEEDED",
+    "details": {
+        "instance_name": "R1",
+        "component": {
+            "instance_name": "R1", "component_type": "R",
+            "general_type": "", "sub_type": "",
+            "active_state": 0, "state": "NORMAL", "parameters": {...}
+        }
+    }
+}
+```
 
 ---
 
@@ -695,10 +699,18 @@ get_simulation_component_schema(component_type: str, parameter_name: str = "") -
 ```python
 from servers.eda.simulation_components import list_simulation_components
 
-list_simulation_components(project_path: str, component_type: str = "") -> dict
+list_simulation_components(
+    project_path: str,
+    component_type: str = "",
+    name_contains: str = "",
+    schematic_name: str = "",
+    offset: int = 0,
+    limit: int = 100,
+) -> dict
 ```
 
-本地读取原理图，查询仿真器件（SParameter / HarmonicBalance / XDB）及其当前参数。
+本地读取原理图，列出全部器件（SP/HB/XDB/Var/Sweep/P_nToneG/TermG 等）及其当前参数。
+已知类型做 wire→public 映射；其他类型返回原始 paramsinfo。支持按类型过滤、名称模糊匹配、原理图过滤和分页。
 
 ### `create_simulation_component`
 

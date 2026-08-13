@@ -3,8 +3,6 @@ r"""EDA 工程管理工具。
 list_epp_projects             扫描文件夹中的所有 .epp 工程文件
 open_edi_project              打开 .epp 工程，等待返回成功或失败
 close_edi_project             关闭已打开的工程，可选择是否保存
-list_project_components       列出工程中的元件（不含完整参数）
-get_component_parameters      查询单个元件的完整参数列表
 get_project_summary           工程概览（元数据、原理图、仿真配置）
 
 自然语言使用示例：
@@ -18,7 +16,6 @@ get_project_summary           工程概览（元数据、原理图、仿真配�
 参数说明：
   project_path     EDA 服务所在机器上的 .epp 工程文件绝对路径
   folder_path      要扫描的文件夹绝对路径（list_epp_projects）
-  component_id     元件 UUID（get_component_parameters）
   schematic_name   原理图名称，默认 main
   timeout_seconds  最长等待秒数，默认 60 秒
   need_save        关闭前是否保存工程（close_edi_project），默认 False
@@ -26,7 +23,6 @@ get_project_summary           工程概览（元数据、原理图、仿真配�
 
 from __future__ import annotations
 
-from itertools import islice
 from pathlib import Path
 from typing import Any
 
@@ -55,20 +51,28 @@ def list_epp_projects(folder_path: str) -> dict[str, Any]:
     if not root.is_dir():
         raise FileNotFoundError(f"文件夹不存在: {folder_path}")
 
+    _MAX_PROJECTS = 1000
+    all_epp = sorted(root.rglob("*.epp"))
+    total = len(all_epp)
     projects = []
-    for epp in sorted(islice(root.rglob("*.epp"), 1000)):
+    for epp in all_epp[:_MAX_PROJECTS]:
         projects.append({
             "name": epp.stem,
             "path": str(epp.resolve()),
             "size": epp.stat().st_size,
         })
 
-    return {
+    result: dict[str, Any] = {
         "success": True,
         "folder": str(root.resolve()),
         "count": len(projects),
         "projects": projects,
     }
+    if total > _MAX_PROJECTS:
+        result["truncated"] = True
+        result["total"] = total
+        result["message"] = f"共检测到 {total} 个工程，已截断到前 {_MAX_PROJECTS} 个，可缩小扫描范围获取全部"
+    return result
 
 
 @mcp.tool()
@@ -112,120 +116,6 @@ def close_edi_project(
         timeout_seconds,
         max_timeout_seconds=300,
     )
-
-
-@mcp.tool()
-def list_project_components(
-    project_path: str,
-    schematic_name: str = "main",
-    component_type: str = "",
-    name_contains: str = "",
-    offset: int = 0,
-    limit: int = 100,
-) -> dict[str, Any]:
-    """列出工程原理图中的元件（不含完整参数，避免响应过大）。
-
-    Args:
-        project_path: .epp 工程文件绝对路径。
-        schematic_name: 原理图名称，默认 "main"。
-        component_type: 按类型过滤，如 "TermG"、"VIA2"。
-        name_contains: 按名称模糊匹配。
-        offset: 分页偏移。
-        limit: 每页数量上限，默认 100，最大 500。
-    """
-    limit = max(1, min(limit, 500))
-    offset = max(0, offset)
-    reader = ProjectReader(project_path)
-    raw = reader.read_schematic(schematic_name)
-    if not raw:
-        return {"success": False, "message": f"原理图 {schematic_name} 不存在"}
-
-    all_comps = parse_components(raw)
-
-    filtered = []
-    for c in all_comps:
-        if component_type and c["type"] != component_type:
-            continue
-        if name_contains and name_contains.lower() not in c["name"].lower():
-            continue
-        filtered.append({
-            "component_id": c["component_id"],
-            "name": c["name"],
-            "type": c["type"],
-            "model_id": c["model_id"],
-            "pin_count": c["pin_count"],
-            "parameter_count": c["parameter_count"],
-        })
-
-    total = len(filtered)
-    page = filtered[offset:offset + limit]
-
-    return {
-        "success": True,
-        "project_path": str(reader.epp_path.resolve()),
-        "schematic": schematic_name,
-        "total": total,
-        "offset": offset,
-        "limit": limit,
-        "components": page,
-    }
-
-
-@mcp.tool()
-def get_component_parameters(
-    project_path: str,
-    component_id: str,
-    schematic_name: str = "main",
-    include_hidden: bool = False,
-) -> dict[str, Any]:
-    """查询单个元件的完整参数列表。
-
-    Args:
-        project_path: .epp 工程文件绝对路径。
-        component_id: 元件 UUID（从 list_project_components 获取）。
-        schematic_name: 原理图名称。
-        include_hidden: 是否包含 Visible=false 的隐藏参数。
-    """
-    reader = ProjectReader(project_path)
-    raw = reader.read_schematic(schematic_name)
-    if not raw:
-        return {"success": False, "message": f"原理图 {schematic_name} 不存在"}
-
-    for comp in parse_components(raw):
-        if comp["component_id"] != component_id:
-            continue
-
-        params_info = comp.get("paramsinfo", {})
-        parameters = []
-        for key, info in params_info.items():
-            if key == "BasicParameters":
-                continue
-            if not include_hidden and str(info.get("visible", "true")).lower() == "false":
-                continue
-            parameters.append({
-                "key": key,
-                "value": info.get("value", ""),
-                "unit": info.get("unit", ""),
-                "default_unit": info.get("default_unit", ""),
-                "tunable": info.get("tunable", False),
-                "visible": info.get("visible", True),
-                "initial": info.get("initial", ""),
-                "max": info.get("max", ""),
-                "min": info.get("min", ""),
-                "status": info.get("status", ""),
-            })
-
-        return {
-            "success": True,
-            "component": {
-                "component_id": comp["component_id"],
-                "name": comp["name"],
-                "type": comp["type"],
-            },
-            "parameters": parameters,
-        }
-
-    return {"success": False, "message": f"未找到元件 {component_id}"}
 
 
 @mcp.tool()
@@ -283,7 +173,7 @@ def get_project_summary(
                 for key, info in pi.items():
                     if key == "BasicParameters" or not isinstance(info, dict):
                         continue
-                    entry[key] = f"{info.get('Value', info.get('Initial',''))} {info.get('CurrentUnit', info.get('DefaultUnit',''))}".strip()
+                    entry[key] = f"{info.get('value', '')} {info.get('unit', '')}".strip()
                 simulation_info.append(entry)
 
     latest_result: dict[str, Any] = {}
@@ -411,9 +301,11 @@ def list_schematic_components(
     用法："列出这个工程原理图上的所有器件"、"查看原理图器件"
 
     Returns:
-        {"success": True, "component_count": 5, "components": [
-            {"instance_name": "R1", "component_type": "R",
-             "active_state": 0, "state": "NORMAL", "parameters": {...}}, ...]}
+        gRPC 统一返回结构（业务字段在 details 中）：
+        {"success": True, "status": "SUCCEEDED",
+         "details": {"component_count": 5, "components": [
+             {"instance_name": "R1", "component_type": "R",
+              "active_state": 0, "state": "NORMAL", "parameters": {...}}, ...]}}
     """
     resolved_path = validate_project_path(project_path)
     return call_grpc(
@@ -435,14 +327,16 @@ def get_schematic_component_info(
     用法："查看 R1 这个器件的参数"、"U1 是什么类型的器件"
 
     Returns:
-        {"success": True, "instance_name": "R1", "component": {
-            "instance_name": "R1", "component_type": "R",
-            "active_state": 0, "state": "NORMAL", "parameters": {"R": {"Value": "50", "Unit": "Ohm"}}}}
+        gRPC 统一返回结构（业务字段在 details 中）：
+        {"success": True, "status": "SUCCEEDED",
+         "details": {"instance_name": "R1", "component": {
+             "instance_name": "R1", "component_type": "R",
+             "active_state": 0, "state": "NORMAL", "parameters": {...}}}}
     """
-    resolved_path = validate_project_path(project_path)
     if not instance_name or not instance_name.strip():
         return {"success": False, "error_code": "EMPTY_INSTANCE_NAME",
                 "message": "instance_name 不能为空"}
+    resolved_path = validate_project_path(project_path)
     return call_grpc(
         ecserver_pb2.GET_SCHEMATIC_COMPONENT_INFO,
         {"project_path": resolved_path, "instance_name": instance_name.strip()},

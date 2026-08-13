@@ -46,6 +46,7 @@ _MIME_TYPES: dict[str, tuple[str, str]] = {
 # ═══════════════════════════════════════════════════════════
 
 def _validate_path(file_path: str, allowed: set[str]) -> Path:
+    """校验文档路径（绝对、拒绝网络路径、存在、扩展名白名单）。"""
     raw = Path(file_path).expanduser()
     if not raw.is_absolute():
         raise ValueError("file_path 必须是绝对路径")
@@ -64,6 +65,7 @@ def _validate_path(file_path: str, allowed: set[str]) -> Path:
 # ═══════════════════════════════════════════════════════════
 
 def _cleanup_expired() -> None:
+    """清理已过期的文档 Token。"""
     now = time.time()
     with _TOKEN_LOCK:
         for t in [t for t, v in _DOC_TOKENS.items() if v["expires_at"] < now]:
@@ -71,10 +73,12 @@ def _cleanup_expired() -> None:
 
 
 def _base_url() -> str:
+    """返回当前 HTTP 服务的 base URL。"""
     return get_server_base_url()
 
 
 def _register_token(path: Path, disposition: str) -> tuple[str, str]:
+    """注册一个文档临时 Token，返回 (token, url)。"""
     _cleanup_expired()
     token = secrets.token_urlsafe(24)
     with _TOKEN_LOCK:

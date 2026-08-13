@@ -91,6 +91,7 @@ def _encode(path: Path) -> tuple[str | None, dict | None]:
 # ── 视觉模型调用 ──
 
 def _call_vision(path: Path, prompt: str, detail: str, max_tokens: int) -> dict:
+    """编码图片并调用视觉模型 API，返回分析结果或错误。"""
     data_url, err = _encode(path)
     if err:
         return err

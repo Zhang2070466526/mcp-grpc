@@ -39,6 +39,7 @@ _MIME_MAP: dict[str, str] = {
 # ═══════════════════════════════════════════════════════════
 
 def _get_openclaw_workspace() -> Path | None:
+    """检测 OpenClaw 工作区：.env 配置 → 同级 rfclaw → ~/.openclaw/workspace。"""
     # 1. 优先 .env 配置
     value = get_settings().openclaw_workspace
     if value:
@@ -80,6 +81,7 @@ else:
 
 
 def _copy_to_workspace(source: Path, workspace: Path) -> str:
+    """复制图片到工作区 mcp-cache 目录，返回目标路径；超限返回空串。"""
     if source.stat().st_size > _MAX_WORKSPACE_IMAGE_SIZE:
         return ""
 

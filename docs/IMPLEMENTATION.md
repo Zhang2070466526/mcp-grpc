@@ -234,6 +234,8 @@ QUEUED → ACCEPTED → RUNNING → SUCCEEDED / FAILED
 | `generate_schematic_from_netlist` | GENERATE(13) | **双重确认**：`clear_before_import=true` 必须同时 `confirm_clear=true`。`confirm_clear` 不进入 gRPC payload。默认追加到 main 原理图 |
 | `replace_port_component` | REPLACE_PORT_COMPONENT(16) | payload: `project_path`, `target_instance_name`, `replacement_component_type`(TermG/P_nToneG), `parameters`。Chat 层需确认 |
 | `attach_out_component` | ATTACH_OUT_COMPONENT(17) | payload: `project_path`, `target_instance_name`, 可选 `pin_index`。自动创建 Out 器件并连线 |
+| `list_schematic_components` | LIST_SCHEMATIC_COMPONENTS(18) | payload: `project_path`。返回原理图全部器件及完整参数 |
+| `get_schematic_component_info` | GET_SCHEMATIC_COMPONENT_INFO(19) | payload: `project_path`, `instance_name`。返回单个器件完整信息 |
 
 **update 类型推断的完整流程**：
 
@@ -377,11 +379,9 @@ if ".." in name or "/" in name or "\\" in name:
 | 工具 | 读取内容 | 特点 |
 |---|---|---|
 | `list_epp_projects` | 文件夹扫描 | `rglob("*.epp")`，最多 1000 个，返回名称/路径/大小 |
-| `list_project_components` | `main` 原理图 | `parse_components` → 按 type/name 过滤 → 分页（offset/limit）→ 不含完整参数 |
-| `get_component_parameters` | 原理图 | 按 `component_id` 精确匹配 → 返回完整 `paramsinfo`（可选包含隐藏参数） |
 | `get_project_summary` | metadata + schematics + netlist + RAW | 聚合：元数据、原理图列表、元件类型分布、仿真器件配置、最新 RAW 文件 |
 | `analyze_variables` | 所有原理图 | 识别 Var 元件定义 → 找到引用该变量的参数 → 列出 Sweep 配置 |
-| `list_simulation_components` | 所有原理图 | `parse_components` 过滤 SP/HB/XDB → `_format_component_parameters` → 返回公开参数名 |
+| `list_simulation_components` | 所有原理图 | `parse_components` → 支持类型/名称模糊/原理图过滤 + 分页；SP/HB/XDB 做 wire→public 映射 |
 
 ---
 

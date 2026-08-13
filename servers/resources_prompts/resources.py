@@ -98,10 +98,10 @@ def resource_operation_guide() -> str:
 def resource_service_status() -> dict[str, Any]:
     """返回运行时状态，与 get_service_status 共享数据源。"""
     from servers.eda.config import EDA_GRPC_SERVER as _gs
-    from servers.eda.grpc_client import _channel_cache, _is_queue_busy
+    from servers.eda.grpc_client import _get_cached_channel, _is_queue_busy
 
     target = _gs
-    ch = _channel_cache.get(target)
+    ch = _get_cached_channel(target)
     state = "unknown"
     if ch is not None:
         try:

@@ -59,6 +59,12 @@ def _is_queue_busy() -> bool:
     return _EDA_LOCK._is_owned()
 
 
+def _get_cached_channel(target: str) -> grpc.Channel | None:
+    """线程安全地读取缓存的 channel（不触发重建）。"""
+    with _channel_lock:
+        return _channel_cache.get(target)
+
+
 @mcp.tool()
 def get_service_status() -> dict[str, Any]:
     """返回 EDI gRPC 通道状态和队列占用信息（只读，不占执行槽位），用于诊断：通道是否健康、是否有任务在排队。
@@ -70,7 +76,7 @@ def get_service_status() -> dict[str, Any]:
          "channel_cached": True, "queue_locked": False, "max_receive_mb": 256}
     """
     target = EDA_GRPC_SERVER
-    ch = _channel_cache.get(target)
+    ch = _get_cached_channel(target)
     state = "unknown"
     if ch is not None:
         try:
@@ -88,6 +94,10 @@ def get_service_status() -> dict[str, Any]:
 
 
 def _get_channel(target: str) -> grpc.Channel:
+    """获取缓存的 gRPC channel，不健康时关闭并重建。
+
+    由 _channel_lock 串行化；复用模块级 _channel_cache，避免每次调用重新 TCP 握手。
+    """
     with _channel_lock:
         ch = _channel_cache.get(target)
         if ch is not None:
@@ -111,12 +121,15 @@ class _ChannelHandle:
     """上下文管理器包装：退出时不关闭缓存的 channel。"""
 
     def __init__(self, ch: grpc.Channel):
+        """包装一个 channel，供 with 语句使用。"""
         self._ch = ch
 
     def __enter__(self) -> grpc.Channel:
+        """返回被包装的 channel。"""
         return self._ch
 
     def __exit__(self, *args: object) -> None:
+        """退出时不关闭 channel（缓存复用）。"""
         pass  # 缓存复用，不关闭
 
 
@@ -145,6 +158,7 @@ def _parse_payload_json(payload_json: str) -> tuple[dict[str, Any], str | None]:
 
 
 def _emit_event(callback: GrpcEventCallback | None, update: dict[str, Any]) -> None:
+    """安全地调用事件回调；回调异常只记日志，不影响主流程。"""
     if callback is None:
         return
     try:
@@ -288,6 +302,11 @@ def _call_grpc_unlocked(
     client_uuid: str,
     on_event: GrpcEventCallback | None,
 ) -> dict[str, Any]:
+    """在已持有 _EDA_LOCK 的前提下执行完整 gRPC 调用（无锁实现）。
+
+    顺序：FetchEvent 订阅 → PerformAction 提交 → 三重回显校验 → 消费事件流 → 终态返回。
+    调用方负责获取/释放 _EDA_LOCK，并传入 deadline 控制总超时。
+    """
     task_type_name = ecserver_pb2.EventType.Name(task_type)
 
     request = ecserver_pb2.Request(
@@ -305,6 +324,7 @@ def _call_grpc_unlocked(
     action_accepted = False
 
     def remaining() -> float:
+        """返回距 deadline 的剩余秒数（下限 0.1，避免超时参数为 0）。"""
         return max(0.1, deadline - time.monotonic())
 
     try:

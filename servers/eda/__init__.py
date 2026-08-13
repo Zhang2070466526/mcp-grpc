@@ -1,11 +1,11 @@
 r"""EDI gRPC MCP 工具包 -- 通过 ExternalCall gRPC 操作 EDI 工程。
 
-project_manage.py  工程管理（7 个工具）
+project_manage.py  工程管理（6 个工具）
     list_epp_projects             扫描文件夹中的所有 .epp 工程文件
     open_edi_project              打开 .epp 工程
     close_edi_project             关闭已打开的工程
-    list_project_components       列出工程中的元件
-    get_component_parameters      查询单个元件的完整参数
+    list_schematic_components     查询原理图全部器件（gRPC，含完整参数）
+    get_schematic_component_info  按实例名查询器件完整信息（gRPC）
     get_project_summary           工程概览（元数据/原理图/仿真）
     analyze_variables             分析变量定义和引用关系
 
@@ -45,8 +45,8 @@ from servers.eda.project_manage import (  # noqa: F401
     list_epp_projects,
     open_edi_project,
     close_edi_project,
-    list_project_components,
-    get_component_parameters,
+    list_schematic_components,
+    get_schematic_component_info,
     get_project_summary,
     analyze_variables,
 )

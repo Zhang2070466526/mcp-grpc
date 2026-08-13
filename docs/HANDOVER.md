@@ -64,7 +64,7 @@ PyPI: https://pypi.org/project/edi-mcp/  |  当前版本：0.1.5
 
 ## MCP 工具清单（启动时动态统计，配置 OPENCLAW_WORKSPACE 后多 1 个）
 
-**工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_project_components, get_component_parameters, get_project_summary, analyze_variables
+**工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_schematic_components, get_schematic_component_info, get_project_summary, analyze_variables
 
 **仿真器件**：get_simulation_component_schema, list_simulation_components, create_simulation_component, update_simulation_component, delete_simulation_component, set_component_active_state, generate_schematic_from_netlist, replace_port_component, attach_out_component
 
@@ -278,6 +278,13 @@ python -m grpc_tools.protoc -I proto --python_out=proto --grpc_python_out=proto 
 49. `_encode()` 返回值 bug：成功时 MIME 字符串被误当作 error 返回
 50. URL 拼接双 `/v1` 修复、DashScope Omni 缺少 `modalities: ["text"]` 修复
 51. 默认 prompt 加强，content 数组兼容，短内容（<5 字符）拒绝
+
+### 知识库 (RAG)
+52. 可选模块：`servers/knowledge/`，基于 ChromaDB + DashScope 嵌入
+53. 4 个 MCP 工具：search / ask / add / list_knowledge
+54. 三层架构：VectorStoreService（存储）→ KnowledgeBaseService（业务）→ RagService（RAG 链）
+55. Streamlit 界面：`streamlit run servers/knowledge/knowledge_web.py`
+56. 安装依赖：`pip install chromadb langchain langchain-community langchain-text-splitters dashscope streamlit`
 
 ## 维护人
 

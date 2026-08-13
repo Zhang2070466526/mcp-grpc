@@ -101,6 +101,7 @@ def _get_task_snapshot(task_id: str) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 def _handle_sim_event(task_id: str, update: dict[str, Any]) -> None:
+    """gRPC 事件回调：把增量日志/状态实时写入任务注册表。"""
     with _sim_lock:
         task = _sim_tasks.get(task_id)
         if task is None:
@@ -143,6 +144,7 @@ def _run_sim_task(
     log_source: str,
     timeout_seconds: int,
 ) -> None:
+    """后台线程执行体：调用 call_grpc 跑仿真，把最终结果写回任务注册表。"""
     try:
         result = call_grpc(
             ecserver_pb2.SIMULATE_PROJECT,

@@ -383,6 +383,16 @@ class TestFormatComponentParameters:
         })
         assert "Freq[2]" in result
 
+    def test_full_metadata_preserved(self):
+        result = _format_component_parameters("SParameter", {
+            "Start": {"value": "1.0", "unit": "GHz", "default_unit": "GHz",
+                      "tunable": False, "visible": True},
+        })
+        assert result["Start"]["default_unit"] == "GHz"
+        assert result["Start"]["tunable"] is False
+        assert result["Start"]["visible"] is True
+        assert result["Start"]["initial"] == ""
+
 
 # ═══════════════════════════════════════════════════════════
 # 7. Active states

@@ -61,7 +61,7 @@ class TestPromptsDirect:
         msgs = prompt_inspect_edi_project("C:/test.epp", "full")
         assert msgs[0]["role"] == "user"
         assert "get_project_summary" in msgs[0]["content"]
-        assert "list_project_components" in msgs[0]["content"]
+        assert "list_simulation_components" in msgs[0]["content"]
         assert "analyze_variables" in msgs[0]["content"]
 
     def test_run_and_review_async(self):

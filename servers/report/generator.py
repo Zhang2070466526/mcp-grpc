@@ -42,6 +42,7 @@ _MAX_FIELD_LENGTHS = {"description": 50_000, "conclusion": 50_000}
 # ═══════════════════════════════════════════════════════════
 
 def _validate_output(path: str, overwrite: bool) -> tuple[str, str] | tuple[None, dict]:
+    """校验输出路径（绝对、扩展名、目录存在、overwrite），返回 (文件类型, 错误)。"""
     if not isinstance(path, str) or not path.strip():
         return None, _error("INVALID_OUTPUT_PATH", "output_path 不能为空")
     p = Path(path)
@@ -61,6 +62,7 @@ def _validate_output(path: str, overwrite: bool) -> tuple[str, str] | tuple[None
 
 
 def _validate_spec_table(table: list | None) -> dict | None:
+    """校验 spec_table 为二维数组、固定 7 列、单元格类型合法。"""
     if table is None:
         return None
     if not isinstance(table, list):
@@ -89,6 +91,7 @@ def _validate_spec_table(table: list | None) -> dict | None:
 
 
 def _validate_charts(charts: list | None) -> tuple[list | None, list[str], dict | None]:
+    """校验 charts 数组（path/title、后缀、数量），返回 (规范化列表, 警告, 错误)。"""
     warnings: list[str] = []
     if charts is None:
         return None, warnings, None
@@ -133,38 +136,46 @@ _COMPONENT_KEY_MAP = {
 }
 
 
-def _validate_components(comps: list | None) -> dict | None:
+def _validate_components(comps: list | None) -> tuple[list | None, dict | None]:
+    """校验并规范化 components（中文 key → 英文 key），不修改传入的 comps。
+
+    Returns:
+        (normalized_comps, error)。无错误时 error 为 None；
+        comps 为 None 或空列表时 normalized_comps 为 None。
+    """
     if comps is None:
-        return None
+        return None, None
     if not isinstance(comps, list):
-        return tool_error("INVALID_REPORT_PARAMETERS", "components 必须是数组")
+        return None, tool_error("INVALID_REPORT_PARAMETERS", "components 必须是数组")
     if not comps:
-        return None
+        return None, None
     if len(comps) > 500:
-        return tool_error("INVALID_REPORT_PARAMETERS", "components 最多 500 条")
+        return None, tool_error("INVALID_REPORT_PARAMETERS", "components 最多 500 条")
+    normalized_list: list[dict] = []
     for i, c in enumerate(comps):
         if not isinstance(c, dict):
-            return tool_error("INVALID_REPORT_PARAMETERS", f"components[{i}] 必须是对象")
+            return None, tool_error("INVALID_REPORT_PARAMETERS", f"components[{i}] 必须是对象")
         # 中文 key → 英文 key 映射
         normalized: dict = {}
         for k, v in c.items():
             target = _COMPONENT_KEY_MAP.get(k.strip(), k)
             normalized[target] = v
-        comps[i] = normalized
         for field in ("type", "model", "manufacturer", "specs"):
             val = normalized.get(field, "")
             if not isinstance(val, str):
-                return tool_error("INVALID_REPORT_PARAMETERS", f"components[{i}].{field} 必须是字符串")
+                return None, tool_error("INVALID_REPORT_PARAMETERS", f"components[{i}].{field} 必须是字符串")
             if not val.strip():
-                return tool_error("INVALID_REPORT_PARAMETERS",
+                return None, tool_error("INVALID_REPORT_PARAMETERS",
                                f"components[{i}] 缺少必填字段 '{field}'（支持中英文 key）")
             if len(val) > 2000:
-                return tool_error("INVALID_REPORT_PARAMETERS",
+                return None, tool_error("INVALID_REPORT_PARAMETERS",
                                f"components[{i}].{field} 最长 2000 字符")
-    return None
+        normalized_list.append(normalized)
+    return normalized_list, None
 
 
 def _validate_schematic(path: str) -> tuple[str | None, bool, dict | None]:
+    """校验 schematic 图片路径，返回 (规范化路径, 是否缺失, 错误)。"""
     if not path or not isinstance(path, str) or not path.strip():
         return None, False, None
     p = Path(path)
@@ -248,7 +259,7 @@ def generate_simulation_report(
 
     # 6. components：对象数组 {type, model, manufacturer, specs}，四项全字符串
     #    支持中英文 key 映射（如 "器件类型" → "type"）
-    err = _validate_components(components)
+    components, err = _validate_components(components)
     if err:
         return err
 
@@ -401,6 +412,7 @@ def generate_simulation_report(
 # ═══════════════════════════════════════════════════════════
 
 def _safe_json_text(resp) -> str:
+    """从报告服务响应中安全提取错误文本，解析失败时截断返回原文。"""
     try:
         data = resp.json()
         return data.get("error", resp.text[:200])

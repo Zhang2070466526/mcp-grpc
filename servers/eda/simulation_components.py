@@ -47,6 +47,7 @@ _ACTIVE_STATES = {"NORMAL", "DISABLED", "SHORTED"}
 
 @lru_cache(maxsize=1)
 def _load_catalog() -> dict:
+    """加载仿真器件参数目录 JSON（缓存单例），失败返回空 dict。"""
     try:
         here = Path(__file__).parent
         path = here / "simulation_component_catalog.json"
@@ -57,6 +58,7 @@ def _load_catalog() -> dict:
 
 
 def _catalog_component(component_type: str) -> dict:
+    """从目录中取出指定器件类型的定义，不存在返回空 dict。"""
     cat = _load_catalog()
     return cat.get("components", {}).get(component_type, {})
 
@@ -409,18 +411,27 @@ def _format_component_parameters(
 
     paramsinfo is the already-parsed dict from parse_paramsinfo().
     Does NOT call parse_paramsinfo again.
+
+    保留完整元数据字段（value/unit/default_unit/tunable/visible/initial/max/min/status），
+    unit 无值时省略该键。
     """
     parameters: dict = {}
     for wire_name, metadata in paramsinfo.items():
         if not isinstance(metadata, dict):
             continue
 
-        value = metadata.get("value", "")
-        unit = metadata.get("unit", "")
-
-        entry: dict = {"value": value}
-        if unit:
-            entry["unit"] = unit
+        entry: dict = {
+            "value": metadata.get("value", ""),
+            "default_unit": metadata.get("default_unit", ""),
+            "tunable": metadata.get("tunable", False),
+            "visible": metadata.get("visible", True),
+            "initial": metadata.get("initial", ""),
+            "max": metadata.get("max", ""),
+            "min": metadata.get("min", ""),
+            "status": metadata.get("status", ""),
+        }
+        if metadata.get("unit"):
+            entry["unit"] = metadata["unit"]
 
         parameters[wire_name] = entry
 
@@ -438,6 +449,7 @@ def _param_error(
     parameter: str = "",
     **extra,
 ) -> dict:
+    """构建器件参数校验的错误响应（含 component_type/parameter 等 details）。"""
     result: dict = {
         "success": False,
         "error_code": code,
@@ -453,17 +465,25 @@ def _param_error(
 
 
 def _component_error(code: str, message: str, **extra) -> dict:
+    """构建器件查找类错误响应（如 COMPONENT_NOT_FOUND）。"""
     result: dict = {"success": False, "error_code": code, "message": message}
     if extra:
         result["details"] = extra
     return result
 
 
-def _find_sim_components(project_path: str, component_type: str = "") -> list[dict]:
-    """Local lookup of all components from saved project files."""
+def _find_sim_components(project_path: str, component_type: str = "", schematic_name: str = "", include_hidden: bool = False) -> list[dict]:
+    """Local lookup of all components from saved project files.
+
+    schematic_name 为空时遍历所有原理图，指定时只读取该原理图。
+    include_hidden=False 时过滤 visible=false 的隐藏参数。
+    """
     reader = ProjectReader(project_path)
+    schematics = reader.list_schematics() or []
+    if schematic_name:
+        schematics = [s for s in schematics if s == schematic_name]
     results: list[dict] = []
-    for sname in reader.list_schematics() or []:
+    for sname in schematics:
         raw = reader.read_schematic(sname)
         if not raw:
             continue
@@ -472,6 +492,12 @@ def _find_sim_components(project_path: str, component_type: str = "") -> list[di
             if component_type and ct != component_type:
                 continue
             params = comp.get("paramsinfo", {})
+            # 默认过滤 visible=false 的隐藏参数，include_hidden=True 时放开
+            if not include_hidden:
+                params = {
+                    k: v for k, v in params.items()
+                    if not isinstance(v, dict) or v.get("visible", True)
+                }
             # SP/HB/XDB: format with wire→public name mapping
             # Other types (Var, Sweep, P_nToneG, etc.): raw paramsinfo
             if ct in _COMPONENT_TYPES:
@@ -482,6 +508,9 @@ def _find_sim_components(project_path: str, component_type: str = "") -> list[di
                 "component_type": ct,
                 "instance_name": comp.get("name", ""),
                 "component_id": comp.get("component_id", ""),
+                "model_id": comp.get("model_id", ""),
+                "pin_count": comp.get("pin_count", 0),
+                "parameter_count": comp.get("parameter_count", 0),
                 "schematic": sname,
                 "parameters": formatted,
             })
@@ -548,18 +577,30 @@ def get_simulation_component_schema(
 def list_simulation_components(
     project_path: str,
     component_type: str = "",
+    name_contains: str = "",
+    schematic_name: str = "",
+    offset: int = 0,
+    limit: int = 100,
+    include_hidden: bool = False,
 ) -> dict[str, Any]:
-    """读取已保存工程中的全部可解析器件及参数。
+    """列出已保存工程中的全部器件及参数（含 wire→public 参数名映射）。
 
     可列出所有器件（SP/HB/XDB/Var/Sweep/P_nToneG/TermG 等）。
     已知类型做 wire→public 映射；其他类型返回原始 paramsinfo。
     读取磁盘文件，EDI 未保存的修改不会反映到结果中。
+    字段包含：component_type/instance_name/component_id/model_id/pin_count/parameter_count/schematic/parameters。
 
+    本工具同时覆盖原 list_project_components 的能力：支持按原理图过滤和分页。
     修改器件后建议先保存工程再调用本工具确认。
 
     Args:
         project_path: .epp 工程文件绝对路径。
         component_type: 按类型过滤（可选）。
+        name_contains: 按实例名模糊匹配（可选）。
+        schematic_name: 只读指定原理图（可选，默认遍历全部原理图）。
+        offset: 分页偏移（默认 0）。
+        limit: 每页数量（默认 100，最大 500）。
+        include_hidden: 是否包含 Visible=false 的隐藏参数（默认 False）。
     """
     try:
         reader = ProjectReader(project_path)
@@ -569,16 +610,29 @@ def list_simulation_components(
     except ValueError:
         return {"success": False, "error_code": "INVALID_PROJECT_PATH",
                 "message": "project_path 必须是 .epp 文件"}
-    components = _find_sim_components(project_path, component_type)
+    components = _find_sim_components(project_path, component_type, schematic_name=schematic_name, include_hidden=include_hidden)
+    if name_contains:
+        components = [c for c in components
+                      if name_contains.lower() in c["instance_name"].lower()]
+
     type_counts: dict[str, int] = {}
     for c in components:
         type_counts[c["component_type"]] = type_counts.get(c["component_type"], 0) + 1
+
+    total = len(components)
+    offset = max(0, offset)
+    limit = max(1, min(limit, 500))
+    paged = components[offset:offset + limit]
+
     return {
         "success": True,
         "project_path": str(reader.epp_path.resolve()),
-        "count": len(components),
+        "total": total,
+        "count": total,
+        "offset": offset,
+        "limit": limit,
         "component_type_counts": type_counts,
-        "components": components,
+        "components": paged,
     }
 
 
@@ -782,8 +836,7 @@ def delete_simulation_component(
     这是通用删除工具，不限于仿真器件。删除直接由 EDI 按实例名执行，
     不做本地磁盘预检查，因此即使 EDI 中有未保存的更改也能正常工作。
 
-    建议调用前先用 list_simulation_components 或 list_project_components
-    确认目标实例名。
+    建议调用前先用 list_simulation_components 确认目标实例名。
 
     Args:
         project_path: .epp 工程文件绝对路径。

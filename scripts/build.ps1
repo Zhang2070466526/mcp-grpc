@@ -6,9 +6,9 @@ $root = Get-Location
 Write-Host "=== EDA MCP Build ===" -ForegroundColor Cyan
 
 # ── 阈值 ──
-$MAX_DIR_MB  = 120
-$MAX_ZIP_MB  = 80
-$MAX_EXE_MB  = 15   # 超过此值提示可能重复打包
+$MAX_DIR_MB  = 150
+$MAX_ZIP_MB  = 100
+$MAX_EXE_MB  = 45   # 超过此值提示可能重复打包
 
 # ── [1/7] 清理 ──
 Write-Host "[1/7] Cleaning..." -ForegroundColor Yellow

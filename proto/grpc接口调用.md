@@ -56,6 +56,8 @@ enum EventType {
   UPDATE_SIMULATION_COMPONENT = 15;
   REPLACE_PORT_COMPONENT = 16;
   ATTACH_OUT_COMPONENT = 17;
+  LIST_SCHEMATIC_COMPONENTS = 18;
+  GET_SCHEMATIC_COMPONENT_INFO = 19;
 }
 ```
 
@@ -76,6 +78,8 @@ enum EventType {
 - `UPDATE_SIMULATION_COMPONENT`：按器件实例名更新任意普通器件的已有参数；指定器件类型额外支持动态参数或变量新增。
 - `REPLACE_PORT_COMPONENT`：将原理图上的 `TermG` 与 `P_nToneG` 相互替换，并保留原有外部引脚连线。
 - `ATTACH_OUT_COMPONENT`：为指定器件的目标引脚新增并连接一个 `Out` 器件。
+- `LIST_SCHEMATIC_COMPONENTS`：查询指定工程唯一原理图上的全部器件信息。
+- `GET_SCHEMATIC_COMPONENT_INFO`：根据器件实例名查询指定器件的完整信息。
 
 ## 4. payload_json 示例
 
@@ -124,6 +128,8 @@ enum EventType {
   "csv_path": "C:/path/to/replace.csv"
 }
 ```
+
+模型替换成功后，服务端先发送最终结果事件，再关闭当前工程且不保存旧内存中的原理图，随后自动重新打开同一个 `.epp`，使文件中的替换结果加载到原理图界面。替换失败时不会关闭或重新打开工程。
 
 ### CAPTURE_SCHEMATIC
 
@@ -249,6 +255,33 @@ enum EventType {
 - 每个候选位置会将 `Out` 图元包围框向外扩展 10 个坐标单位，再与原理图已有器件的包围框检测重叠。首选方向冲突时，按顺时针顺序尝试其余三个方向；四个方向都冲突时任务失败，不创建器件。
 - 目标引脚已有网络时，新增网线加入原网段；没有网络时创建新网段。
 - 器件与网线在同一个撤销命令组内创建；连接或保存失败时整体回滚。
+
+### LIST_SCHEMATIC_COMPONENTS
+
+```json
+{
+  "project_path": "C:/path/to/project.epp"
+}
+```
+
+- 服务端复用已打开的工程；工程未打开时自动打开，并读取工程唯一原理图。
+- 返回原理图上的真实器件，不包含 `InsertText` 文字图元。
+- 每个器件返回 `instance_name`、`component_type`、`general_type`、`sub_type`、`active_state`、`state` 和完整的 `parameters`。
+- `active_state` 的数值 `0`、`1`、`2` 分别对应 `state` 的 `NORMAL`、`DISABLED`、`SHORTED`；其他数值对应 `UNKNOWN`。
+- `parameters` 保持器件内部 `paramsInfo_` 的完整分组结构，不裁剪字段。
+
+### GET_SCHEMATIC_COMPONENT_INFO
+
+```json
+{
+  "project_path": "C:/path/to/project.epp",
+  "instance_name": "R1"
+}
+```
+
+- `instance_name` 按原理图器件实例名精确匹配。
+- 返回的 `component` 对象与 `LIST_SCHEMATIC_COMPONENTS` 的数组元素结构完全一致。
+- 指定器件不存在或名称对应 `InsertText` 文字图元时，最终事件返回失败及具体原因。
 
 ### REPLACE_PORT_COMPONENT
 
@@ -386,6 +419,8 @@ enum ResultStatus {
 - `SET_COMPONENT_ACTIVE_STATE`：`project_path`、`instance_name`、`state`
 - `REPLACE_PORT_COMPONENT`：`project_path`、`target_instance_name`、`old_component_type`、`new_component_type`、`new_instance_name`
 - `ATTACH_OUT_COMPONENT`：`project_path`、`target_instance_name`、可选的 `pin_index`、`out_instance_name`
+- `LIST_SCHEMATIC_COMPONENTS`：`project_path`、`component_count`、`components`
+- `GET_SCHEMATIC_COMPONENT_INFO`：`project_path`、`instance_name`；成功时额外包含 `component`
 - `GENERATE_SCHEMATIC_FROM_NETLIST`：`project_path`、`netlist_path`、`schematic_path`、`clear_before_import`、`symbols_added`、`nets_added`、`lines_added`、`net_points_added`
 
 ## 8. SIMULATE_NETLIST 完整调用示例
@@ -743,6 +778,54 @@ enum ResultStatus {
 ```
 
 `pin_index` 仅在请求提供时回传；`out_instance_name` 是服务端实际创建的 `Out` 实例名。单引脚器件可以省略 `pin_index`。若省略后目标不是单引脚器件、指定引脚不存在、无法创建或连接 `Out`，最终事件返回 `RESULT_STATUS_FAILED`，工程保持调用前状态。
+
+### 9.7 查询原理图全部器件
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-list-components-001",
+  "type": "LIST_SCHEMATIC_COMPONENTS",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\"}"
+}
+```
+
+最终成功事件示例：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-list-components-001",
+  "event_type": "LIST_SCHEMATIC_COMPONENTS",
+  "status": "RESULT_STATUS_SUCCESS",
+  "message": "schematic components listed",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"component_count\":1,\"components\":[{\"instance_name\":\"R1\",\"component_type\":\"R\",\"general_type\":\"\",\"sub_type\":\"\",\"active_state\":0,\"state\":\"NORMAL\",\"parameters\":{\"R\":{\"Value\":\"50\",\"Unit\":\"Ohm\"}}}]}"
+}
+```
+
+### 9.8 根据器件名查询信息
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-get-component-001",
+  "type": "GET_SCHEMATIC_COMPONENT_INFO",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"R1\"}"
+}
+```
+
+最终成功事件示例：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-get-component-001",
+  "event_type": "GET_SCHEMATIC_COMPONENT_INFO",
+  "status": "RESULT_STATUS_SUCCESS",
+  "message": "schematic component found",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"R1\",\"component\":{\"instance_name\":\"R1\",\"component_type\":\"R\",\"general_type\":\"\",\"sub_type\":\"\",\"active_state\":0,\"state\":\"NORMAL\",\"parameters\":{\"R\":{\"Value\":\"50\",\"Unit\":\"Ohm\"}}}}"
+}
+```
 
 ## 10. 网表生成链路完整调用示例
 

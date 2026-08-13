@@ -128,7 +128,7 @@ def compare_simulation_results(
 
     if alignment == "intersection":
         x_sets = [set(xv) for xv, _ in raw_curves]
-        common_x = sorted(x_sets[reference_index] & set.intersection(*x_sets))
+        common_x = sorted(set.intersection(*x_sets))
         if not common_x:
             return {"success": False, "error_code": "INVALID_RAW_DATA", "message": "所有 RAW 文件没有共同的依赖轴数据点"}
         for i, (xv, yv) in enumerate(raw_curves):
@@ -155,7 +155,7 @@ def compare_simulation_results(
     aligned = [c for c in curves_aligned if c is not None]
     series = [
         {"label": labels[i], "points": len(aligned[i])}
-        for i in range(n)
+        for i in range(file_count)
     ]
 
     # Step 3: compute metrics (each vs reference)
@@ -195,10 +195,10 @@ def compare_simulation_results(
     csv_ok = False
     if csv_path:
         with open(csv_path, "w", encoding="utf-8") as f:
-            headers = [dep_key] + [f"{labels[i]}_{curve}" for i in range(n)]
+            headers = [dep_key] + [f"{labels[i]}_{curve}" for i in range(file_count)]
             f.write(",".join(headers) + "\n")
             for j, x in enumerate(common_x):
-                row = [str(x)] + [str(aligned[i][j]) for i in range(n)]
+                row = [str(x)] + [str(aligned[i][j]) for i in range(file_count)]
                 f.write(",".join(row) + "\n")
         csv_ok = Path(csv_path).exists()
 

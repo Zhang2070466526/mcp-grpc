@@ -7,8 +7,6 @@
     list_epp_projects             扫描文件夹中的 .epp 工程
     open_edi_project              打开 .epp 工程
     close_edi_project             关闭 .epp 工程
-    list_project_components       列出工程中的元件
-    get_component_parameters      查询元件的完整参数
     get_project_summary           工程概览
     analyze_variables             分析变量定义和引用关系
 

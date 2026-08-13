@@ -69,6 +69,7 @@ class ProjectReader:
     """读取 EDA 工作空间中的工程文件。"""
 
     def __init__(self, project_path: str) -> None:
+        """校验并记录工程文件路径，workspace 为工程所在目录。"""
         self.epp_path = Path(project_path).expanduser()
         if not self.epp_path.is_file():
             raise FileNotFoundError(f"工程文件不存在: {self.epp_path}")
@@ -146,9 +147,11 @@ def parse_sexp(text: str) -> Any:
     pos = 0
 
     def peek():
+        """返回当前位置的字符，越界返回空串。"""
         return text[pos] if pos < len(text) else ""
 
     def skip_ws():
+        """跳过空白字符。"""
         nonlocal pos
         while pos < len(text) and text[pos] in " \t\n\r":
             pos += 1
@@ -156,6 +159,7 @@ def parse_sexp(text: str) -> Any:
     _escape_map = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"'}
 
     def read_string():
+        """读取引号字符串，处理转义字符。"""
         nonlocal pos
         result = []
         pos += 1  # skip opening "
@@ -174,6 +178,7 @@ def parse_sexp(text: str) -> Any:
         return "".join(result)
 
     def read_bare():
+        """读取裸词（直到空白或括号）。"""
         nonlocal pos
         start = pos
         while pos < len(text) and text[pos] not in " \t\n\r()":
@@ -181,6 +186,7 @@ def parse_sexp(text: str) -> Any:
         return text[start:pos]
 
     def parse_one():
+        """解析一个 S-expression（列表 / 字符串 / 裸词）。"""
         nonlocal pos
         skip_ws()
         if pos >= len(text):
