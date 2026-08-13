@@ -14,10 +14,12 @@
   VectorStoreService            ← 存储层：ChromaDB 读写
         │
         ├── search_knowledge    → 语义检索，返回原文片段
-        ├── ask_knowledge       → 检索 + LLM 生成回答（RagService 链）
+        ├── ask_knowledge       → 查询重写 → 检索 → LLM 生成回答（RagService 链）
         ├── add_knowledge       → 文档入库
         └── list_knowledge_sources → 已入库文档列表
 ```
+
+> `ask_knowledge` 的完整链路：**查询重写 → 向量检索 → LLM 生成回答**。查询重写会把口语化问题（如「张三是谁」）改写成更利于检索的查询（如「张三的基本信息、生平简介」），召回更准确；重写失败时自动回退原问题，保证可用。
 
 ## 模块结构
 
@@ -88,7 +90,7 @@ answer = _rag.chain.invoke("解释 S 参数")
 |---|---|---|
 | 存储层 | `vector_store_service.py` | ChromaDB 连接、读写、检索、删除 |
 | 业务层 | `knowledge_base_service.py` | 文本分块、MD5 去重、上传/检索 |
-| 应用层 | `rag/rag_chain.py` | RAG 链（检索 + LLM 生成） |
+| 应用层 | `rag/rag_chain.py` | RAG 链（查询重写 + 检索 + LLM 生成） |
 | 工具层 | `rag/rag_mcp_tools.py` | MCP 工具注册 |
 
 ## 存储路径

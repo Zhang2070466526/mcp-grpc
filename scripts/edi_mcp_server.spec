@@ -122,6 +122,16 @@ a = Analysis(
         'mmh3', 'orjson', 'httptools',
         'kubernetes', 'opentelemetry', 'opentelemetry.*',
         'uvloop', 'watchfiles',
+        # ── 进一步精简 ──
+        # chromadb 的剩余传递依赖（知识库不打包）
+        'posthog', 'posthog.*', 'chroma_hnswlib', 'chroma_hnswlib.*',
+        'tenacity', 'langsmith', 'fastapi', 'fastapi.*', 'coloredlogs',
+        # Pillow 可选格式插件（AVIF/BLP 未使用；保留 WebP 供 analyze_image 校验）
+        'PIL.AvifImagePlugin', 'PIL.BlpImagePlugin',
+        # matplotlib 3D 工具（未使用）
+        'mpl_toolkits',
+        # 文档 / 测试模块
+        'pydoc', 'doctest', 'unittest',
     ],
     hooksconfig={
         'matplotlib': {

@@ -539,7 +539,7 @@ open_hfss_project(project_path: str, aedt_path: str = "", wait_timeout: int = 30
 | `aedt_path` | str | 否 | 自动检测 | ansysedt.exe 路径 |
 | `wait_timeout` | int | 否 | 30 | 等待超时秒数（1-120） |
 
-返回：`{"success": True, "status": "opened/already_open", "project_opened": True, "method": "com/subprocess", "duration_s": 1.2}`
+返回：`{"success": true, "status": "opened/already_open", "project_opened": true, "method": "com/subprocess", "duration_s": 1.2}`；失败 `{"success": false, "status": "invalid_path"/"aedt_not_found"/"project_locked"/"com_open_failed", "message": "..."}`
 
 ### `close_hfss_project`
 
@@ -558,6 +558,8 @@ close_hfss_project(project_name: str = "", project_path: str = "", save_before_c
 | `save_before_close` | bool | 否 | False | 关闭前保存 |
 | `force` | bool | 否 | False | 仅结束 MCP 最后启动的 PID |
 
+返回：`{"success": true, "method": "com", "project_closed": true, "message": "已关闭: demo"}`；失败 `{"success": false, "message": "..."}`。
+
 ### `launch_aedt`
 
 ```python
@@ -572,6 +574,8 @@ launch_aedt(aedt_path: str = "", wait_timeout: int = 30) -> dict
 |---|---|---|---|---|
 | `aedt_path` | str | 否 | 自动检测 | ansysedt.exe 路径 |
 | `wait_timeout` | int | 否 | 30 | 等待超时秒数 |
+
+返回：`{"success": true, "status": "started"/"already_running", "com_ready": true, "pid": 12345, "message": "..."}`
 
 ### `get_hfss_project_info`
 
@@ -602,7 +606,7 @@ start_hfss_analysis_async(project_path: str, design_name: str, setup_name: str, 
 | `setup_name` | str | 是 | — | Setup 名称 |
 | `save_before_run` | bool | 否 | True | 仿真前保存 |
 
-返回：`{"success": True, "task_id": "hfss-xxx", "status": "QUEUED", ...}`
+返回：`{"success": true, "task_id": "hfss-xxx", "status": "QUEUED", ...}`；失败 `{"success": false, "status": "aedt_not_running"/"project_not_open"/"design_not_found"/"setup_not_found"/"analysis_busy"}`
 
 ### `get_hfss_analysis_status`
 
@@ -618,6 +622,8 @@ get_hfss_analysis_status(task_id: str, refresh_from_aedt: bool = False) -> dict
 |---|---|---|---|---|
 | `task_id` | str | 是 | — | `start_hfss_analysis_async` 返回的 task_id |
 | `refresh_from_aedt` | bool | 否 | False | 是否实时查询 AEDT 仿真状态 |
+
+返回：`{"success": true, "task_id": "...", "status": "RUNNING"/"SUCCEEDED"/"FAILED", "completed": false, "task_success": null, "outcome_known": false, "result_directory": "..."}`；不存在 `{"success": false, "error_code": "TASK_NOT_FOUND", "status": "UNKNOWN"}`。
 
 ---
 
