@@ -1,5 +1,26 @@
 # EDA MCP 项目交接文档
 
+## 目录
+
+- **[项目概述](#项目概述)**：项目定位、本地 MCP 模式
+- **[代码仓库](#代码仓库)**：仓库地址
+- **[目录结构](#目录结构)**：项目文件树
+- **[技术栈](#技术栈)**：依赖库、版本
+- **[MCP 工具清单](#MCP工具清单)**：全部工具分类
+- **[配置说明](#配置说明)**：.env 配置
+- **[启动方式](#启动方式)**：运行命令
+- **[通信流程](#通信流程)**：gRPC / 本地调用
+- **[并发控制](#并发控制)**：锁、信号量
+- **[测试](#测试)**：测试命令
+- **[打包](#打包)**：PyPI / PyInstaller
+- **[工具注册机制](#工具注册机制)**：@mcp.tool() 装饰器
+- **[扩展开发](#扩展开发)**：新增工具、重编译 proto
+- **[关键设计决策](#关键设计决策)**：传输、异步语义、产物格式等
+- **[注意事项](#注意事项)**：50+ 条避坑清单
+- **[维护人](#维护人)**：负责人、版本
+
+---
+
 ## 项目概述
 
 将 EDA-PMDS/EDI 的 gRPC 接口和本地命令行工具封装为 MCP 服务，使 AI 客户端能通过自然语言操作 EDA 工程。
@@ -62,27 +83,24 @@ Python 3.12+ / uv 包管理 / FastMCP (mcp >= 1.0.0) / grpcio >= 1.81.0 / protob
 
 PyPI: https://pypi.org/project/edi-mcp/  |  当前版本：0.1.5
 
-## MCP 工具清单（启动时动态统计，配置 OPENCLAW_WORKSPACE 后多 1 个）
+## MCP 工具清单
 
-**工程管理**：list_epp_projects, open_edi_project, close_edi_project, list_schematic_components, get_schematic_component_info, get_project_summary, analyze_variables
+共 42 个工具（含 1 个条件注册），按功能分 10 类：
 
-**仿真器件**：get_simulation_component_schema, list_simulation_components, create_simulation_component, update_simulation_component, delete_simulation_component, set_component_active_state, generate_schematic_from_netlist, replace_port_component, attach_out_component
+| 分类 | 数量 | 说明 |
+|---|---|---|
+| 工程管理 | 7 | 扫描 / 打开 / 关闭工程、查询器件、分析变量 |
+| 仿真器件 | 9 | 器件 Schema、增删改、状态、网表导入 |
+| 仿真 | 7 | 同步 / 异步仿真、网表仿真、任务查询 |
+| 导出分析 | 2 | 导出网表、截图原理图 |
+| 模型 / 启动 / 诊断 | 3 | 模型替换、启动 EDI、服务诊断 |
+| ANSYS HFSS | 6 | AEDT 工程开关、HFSS 异步仿真 |
+| 图表 | 3 | RAW 曲线、转图、结果对比 |
+| 图片 | 3 | 显示、视觉分析、复制到工作区 |
+| 文档 | 1 | 打开本地文档 |
+| 报告 | 1 | 生成仿真报告 |
 
-**仿真**：simulate_project, start_simulation_async, get_simulation_async_status, get_simulation_async_result, list_eda_tasks, simulate_netlist, simulate_netlist_with_ads
-
-**ANSYS**：open_hfss_project, close_hfss_project, launch_aedt, get_hfss_project_info, start_hfss_analysis_async, get_hfss_analysis_status
-
-**导出分析**：export_project_netlist, capture_schematic
-
-**模型/启动**：replace_models_from_csv, launch_edi
-
-**图片**：show_image（MCP ImageContent）+ analyze_image（视觉模型分析，默认关闭）+ copy_image_to_workspace（需配置工作区，条件注册）
-
-**文档**：open_document（临时 HTTP 链接）+ open_local_document（系统默认程序打开）
-
-**图表**：list_result_curves, turbocharts_convert, compare_simulation_results
-
-**报告**：generate_simulation_report
+> 完整工具签名、参数、返回格式见 [TOOLS_API.md](./TOOLS_API.md)，工具一览表见 [README.md](../README.md)。
 
 ## 配置说明
 

@@ -43,8 +43,8 @@ _EDA_LOCK = threading.RLock()
 _CHANNEL_OPTIONS = [
     ("grpc.max_receive_message_length", 256 * 1024 * 1024),  # 4MB -> 256MB
     ("grpc.max_send_message_length", 64 * 1024 * 1024),
-    ("grpc.keepalive_time_ms", 30_000),
-    ("grpc.keepalive_timeout_ms", 10_000),
+    ("grpc.keepalive_time_ms", 300_000),  # 300s
+    ("grpc.keepalive_timeout_ms", 10_000),  # ping 发出后 10s 无响应才判定超时
     ("grpc.keepalive_permit_without_calls", 1),
 ]
 
@@ -172,19 +172,19 @@ def _emit_event(callback: GrpcEventCallback | None, update: dict[str, Any]) -> N
 # ---------------------------------------------------------------------------
 
 def _terminal_result(
-    success: bool,
-    status: str,
-    message: str,
-    client_uuid: str,
-    task_id: str,
-    task_type_name: str,
-    project_path: str,
-    result_path: str,
-    ads_output: str,
-    log_complete: bool,
-    latest_details: dict[str, Any],
-    *,
-    outcome_known: bool = False,
+        success: bool,
+        status: str,
+        message: str,
+        client_uuid: str,
+        task_id: str,
+        task_type_name: str,
+        project_path: str,
+        result_path: str,
+        ads_output: str,
+        log_complete: bool,
+        latest_details: dict[str, Any],
+        *,
+        outcome_known: bool = False,
 ) -> dict[str, Any]:
     """构建终端结果字典。
 
@@ -214,14 +214,14 @@ def _terminal_result(
 # ---------------------------------------------------------------------------
 
 def call_grpc(
-    task_type: int,
-    payload: dict[str, Any],
-    timeout_seconds: int,
-    max_timeout_seconds: int = 3600,
-    *,
-    task_id: str | None = None,
-    client_uuid: str | None = None,
-    on_event: GrpcEventCallback | None = None,
+        task_type: int,
+        payload: dict[str, Any],
+        timeout_seconds: int,
+        max_timeout_seconds: int = 3600,
+        *,
+        task_id: str | None = None,
+        client_uuid: str | None = None,
+        on_event: GrpcEventCallback | None = None,
 ) -> dict[str, Any]:
     """所有 gRPC 工具的统一入口。全局 RLock 串行化，先 FetchEvent 后 PerformAction。
 
@@ -294,13 +294,13 @@ def call_grpc(
 # ---------------------------------------------------------------------------
 
 def _call_grpc_unlocked(
-    task_type: int,
-    payload: dict[str, Any],
-    deadline: float,
-    *,
-    task_id: str,
-    client_uuid: str,
-    on_event: GrpcEventCallback | None,
+        task_type: int,
+        payload: dict[str, Any],
+        deadline: float,
+        *,
+        task_id: str,
+        client_uuid: str,
+        on_event: GrpcEventCallback | None,
 ) -> dict[str, Any]:
     """在已持有 _EDA_LOCK 的前提下执行完整 gRPC 调用（无锁实现）。
 
@@ -396,8 +396,8 @@ def _call_grpc_unlocked(
                     latest_details={},
                 )
             if response.event_type not in (
-                ecserver_pb2.EVENT_TYPE_UNSPECIFIED,
-                task_type,
+                    ecserver_pb2.EVENT_TYPE_UNSPECIFIED,
+                    task_type,
             ):
                 msg = f"PerformAction event_type 不匹配: sent={task_type_name} got={ecserver_pb2.EventType.Name(response.event_type)}"
                 _logger.error("task=%s %s", task_id[:12], msg)

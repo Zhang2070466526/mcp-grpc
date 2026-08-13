@@ -1,6 +1,8 @@
 # EDI MCP API 参考
 
 > 所有函数均可通过 `from servers.xxx import func` 直接调用，无需启动 MCP 服务。
+>
+> 相关文档：[HTTP_API.md](./HTTP_API.md)（HTTP 路由）、[IMPLEMENTATION.md](./IMPLEMENTATION.md)（实现原理）。
 
 ```python
 # 安装
@@ -9,6 +11,24 @@ pip install edi-mcp
 # 使用
 from servers.eda.project_manage import list_epp_projects
 ```
+
+---
+
+## 目录
+
+- **[工程管理（7 个）](#工程管理7个)**：扫描 / 打开 / 关闭工程、查询器件、分析变量
+- **[仿真（7 个）](#仿真7个)**：同步 / 异步仿真、网表仿真、任务查询
+- **[导出与分析（2 个）](#导出与分析2个)**：导出网表、截图原理图
+- **[模型与启动（3 个）](#模型与启动3个)**：批量替换模型、启动 EDI、服务诊断
+- **[ANSYS HFSS（6 个）](#ansys-hfss6个)**：AEDT 工程开关、HFSS 异步仿真
+- **[图表（3 个）](#图表3个)**：RAW 曲线解析、转图、结果对比
+- **[图片（3 个，1 个条件注册）](#图片3个1个条件注册)**：显示图片、视觉分析、复制到工作区
+- **[仿真器件管理（9 个）](#仿真器件管理9个协议-v3)**：器件 Schema、增删改、状态、网表导入
+- **[Resources & Prompts](#resources--prompts)**：只读资源 + 可复用工作流
+- **[文档（1 个）](#文档1个)**：打开本地文档
+- **[报告（1 个）](#报告1个)**：生成仿真报告
+- **[辅助](#辅助)**：Chat 上下文
+- **[gRPC 工具统一返回格式](#gRPC工具统一返回格式)**：gRPC 工具的返回结构 + status 语义
 
 ---
 
@@ -445,7 +465,7 @@ capture_schematic(project_path: str, img_path: str, timeout_seconds: int = 60) -
 
 ---
 
-## 模型与启动（2 个）
+## 模型与启动（3 个）
 
 ### `replace_models_from_csv`
 
@@ -480,6 +500,124 @@ launch_edi(edi_path: str = "", wait_for_grpc: bool = True, wait_timeout: int = 3
 | `edi_path` | str | 否 | .env 配置 | EDI.exe 路径 |
 | `wait_for_grpc` | bool | 否 | True | 是否等待 gRPC 端口就绪 |
 | `wait_timeout` | int | 否 | 30 | 等待超时秒数 |
+
+---
+
+### `get_service_status`
+
+```python
+from servers.eda.grpc_client import get_service_status
+
+get_service_status() -> dict
+```
+
+返回 EDI gRPC 通道状态和队列占用信息（只读，不占执行槽位），用于诊断通道是否健康、是否有任务在排队。
+
+返回：
+```python
+{"grpc_target": "127.0.0.1:50055", "channel_state": "ready/unhealthy/unknown",
+ "channel_cached": True, "queue_locked": False, "max_receive_mb": 256}
+```
+
+---
+
+## ANSYS HFSS（6 个）
+
+### `open_hfss_project`
+
+```python
+from servers.ansys.project_manage import open_hfss_project
+
+open_hfss_project(project_path: str, aedt_path: str = "", wait_timeout: int = 30) -> dict
+```
+
+启动 AEDT 并打开 .aedt 项目（COM 附着优先，subprocess 单次启动兜底）。流程：检查锁文件 → 清理失效锁 → COM 附着打开或 subprocess 启动 → 轮询确认工程打开。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `project_path` | str | 是 | — | .aedt/.aedtz 文件绝对路径 |
+| `aedt_path` | str | 否 | 自动检测 | ansysedt.exe 路径 |
+| `wait_timeout` | int | 否 | 30 | 等待超时秒数（1-120） |
+
+返回：`{"success": True, "status": "opened/already_open", "project_opened": True, "method": "com/subprocess", "duration_s": 1.2}`
+
+### `close_hfss_project`
+
+```python
+from servers.ansys.project_manage import close_hfss_project
+
+close_hfss_project(project_name: str = "", project_path: str = "", save_before_close: bool = False, force: bool = False) -> dict
+```
+
+关闭 AEDT 项目（COM 优先，force 仅结束 MCP 最后启动的 PID）。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `project_name` | str | 否 | "" | 项目名，为空关闭活动项目 |
+| `project_path` | str | 否 | "" | 项目路径，用于清理锁文件 |
+| `save_before_close` | bool | 否 | False | 关闭前保存 |
+| `force` | bool | 否 | False | 仅结束 MCP 最后启动的 PID |
+
+### `launch_aedt`
+
+```python
+from servers.ansys.project_manage import launch_aedt
+
+launch_aedt(aedt_path: str = "", wait_timeout: int = 30) -> dict
+```
+
+启动 AEDT（不打开项目）。已运行时仅返回状态。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `aedt_path` | str | 否 | 自动检测 | ansysedt.exe 路径 |
+| `wait_timeout` | int | 否 | 30 | 等待超时秒数 |
+
+### `get_hfss_project_info`
+
+```python
+from servers.ansys.project_manage import get_hfss_project_info
+
+get_hfss_project_info() -> dict
+```
+
+查询当前 AEDT 项目信息（纯查询，不启动 AEDT）。
+
+返回：`{"success": True, "aedt_running": True, "pids": [...], "open_projects": [...], "active_project": "...", "active_design": "..."}`
+
+### `start_hfss_analysis_async`
+
+```python
+from servers.ansys.run_analysis import start_hfss_analysis_async
+
+start_hfss_analysis_async(project_path: str, design_name: str, setup_name: str, save_before_run: bool = True) -> dict
+```
+
+异步启动 HFSS Setup 仿真，立即返回 task_id。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `project_path` | str | 是 | — | .aedt 文件绝对路径 |
+| `design_name` | str | 是 | — | 设计名称 |
+| `setup_name` | str | 是 | — | Setup 名称 |
+| `save_before_run` | bool | 否 | True | 仿真前保存 |
+
+返回：`{"success": True, "task_id": "hfss-xxx", "status": "QUEUED", ...}`
+
+### `get_hfss_analysis_status`
+
+```python
+from servers.ansys.run_analysis import get_hfss_analysis_status
+
+get_hfss_analysis_status(task_id: str, refresh_from_aedt: bool = False) -> dict
+```
+
+查询 HFSS 异步仿真状态（默认只读本地，不访问 AEDT）。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `task_id` | str | 是 | — | `start_hfss_analysis_async` 返回的 task_id |
+| `refresh_from_aedt` | bool | 否 | False | 是否实时查询 AEDT 仿真状态 |
 
 ---
 
@@ -835,38 +973,27 @@ attach_out_component(project_path: str, target_instance_name: str, pin_index: in
 
 ---
 
-## 文档（2 个）
+## 文档（1 个）
 
 ### `open_document`
 
 ```python
 from servers.multimodal_vision import open_document
 
-open_document(file_path: str, disposition: str = "inline") -> dict
+open_document(file_path: str, mode: str = "link", disposition: str = "inline") -> dict
 ```
 
-为本地 PDF/DOCX 文件生成临时 HTTP 链接（10 分钟过期）。PDF 在线预览，DOCX 触发下载。
+打开本地文档：link 模式生成 10 分钟临时 HTTP 链接，local 模式用系统默认程序打开（os.startfile）。支持 10 种格式。仅用户明确要求时调用。
 
 | 参数 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|
-| `file_path` | str | 是 | — | 本地绝对路径（.pdf/.docx） |
-| `disposition` | str | 否 | "inline" | inline（预览）或 attachment（下载） |
+| `file_path` | str | 是 | — | 本地绝对路径（.pdf/.doc/.docx/.xls/.xlsx/.ppt/.pptx/.txt/.csv/.rtf） |
+| `mode` | str | 否 | "link" | "link"（生成 HTTP 链接）或 "local"（系统默认程序打开） |
+| `disposition` | str | 否 | "inline" | link 模式下：inline（预览）或 attachment（下载） |
 
-返回：`{"success": True, "url": "http://...", "file_name": "...", "expires_in": 600, "markdown_link": "[...](...)"}`
+返回（link 模式）：`{"success": True, "url": "http://...", "file_name": "...", "expires_in": 600, "markdown_link": "[...](...)"}`
 
-### `open_local_document`
-
-```python
-from servers.multimodal_vision import open_local_document
-
-open_local_document(file_path: str) -> dict
-```
-
-使用系统默认程序打开本地文档（Word/WPS/PDF 阅读器等）。支持 10 种格式。仅用户明确要求时调用。
-
-| 参数 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `file_path` | str | 是 | 本地绝对路径 |
+返回（local 模式）：`{"success": True, "status": "OPEN_REQUESTED", "file_path": "...", "file_type": ".pdf"}`
 
 ---
 
@@ -935,30 +1062,41 @@ response = await svc.chat(session_id="abc123", message="打开第一个工程")
 
 ---
 
-## 返回结构约定
+## gRPC 工具统一返回格式
 
-所有 gRPC 工具的返回结构统一为：
+所有 gRPC 工具（约 20 个）的返回结构统一如下（完整字段）：
 
-```python
+```json
 {
-    "success": bool,        # 本次 MCP 调用是否成功
-    "completed": bool,      # MCP 侧任务是否已结束（非 EDI 仿真是否成功）
-    "status": str,          # SUCCEEDED / FAILED / TIMEOUT / REJECTED /
-                            # STREAM_DISCONNECTED / GRPC_UNAVAILABLE /
-                            # PROTOCOL_MISMATCH / QUEUED / RUNNING / QUEUE_TIMEOUT
-    "outcome_known": bool,  # 是否收到 EDI 最终事件（SUCCEEDED/FAILED），
-                            # False 时 task_success 无意义
-    "task_success": bool|null,  # EDI 任务是否成功；仅 outcome_known=True 时有意义，
-                                # None 表示结果未知（超时/断连/协议不匹配等）
-    "failure_source": str|null,  # 异常来源："mcp" 表示 MCP 自身异常，非 EDI 业务失败
-    "message": str,         # 描述信息
-    "project_path": str,    # 工程路径（如适用）
-    "result_path": str,     # 结果路径（如适用）
-    "ads_output": str,      # 增量拼接的完整仿真器日志
-    "log_complete": bool,   # 日志是否接收完整
-    "details": dict,        # 原始事件 payload 字段
+    "success": true,
+    "completed": true,
+    "outcome_known": true,
+    "task_success": true,
+    "client_uuid": "a1b2c3d4",
+    "task_id": "e5f6g7h8",
+    "task_type": "OPEN_PROJECT",
+    "status": "SUCCEEDED",
+    "message": "task completed",
+    "project_path": "C:/test.epp",
+    "result_path": "",
+    "ads_output": "",
+    "log_complete": true,
+    "details": {}
 }
 ```
+
+各 `status`（成功 / 失败情况）语义：
+
+| status | 含义 | success | outcome_known | task_success |
+|---|---|---|---|---|
+| `SUCCEEDED` | 任务成功 | true | true | true |
+| `FAILED` | EDI 明确返回失败 | false | true | false |
+| `REJECTED` | EDI 未受理（参数/权限问题） | false | true | false |
+| `TIMEOUT` | 超时，EDI 结果未知 | false | false | null |
+| `STREAM_DISCONNECTED` | 长连接中断，结果未知 | false | false | null |
+| `GRPC_UNAVAILABLE` | 无法连接 EDI | false | false | null |
+| `PROTOCOL_MISMATCH` | 协议字段不一致 | false | false | null |
+| `PAYLOAD_TOO_LARGE` | 返回消息过大（>256MB） | false | false | null |
 
 字段语义：
 - `completed` — MCP 侧本次调用结束；TIMEOUT/STREAM_DISCONNECTED 也是 `completed=True`

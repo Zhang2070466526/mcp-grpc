@@ -218,10 +218,9 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | 工具 | 说明 |
 |---|---|
 | `generate_simulation_report` | 仿真数据 → PDF/DOCX，自动返回 HTTP 预览链接 |
-| `open_document` | 为 PDF/DOCX 生成临时 HTTP 链接 |
-| `open_local_document` | 用系统默认程序打开本地文档 |
+| `open_document` | 打开本地文档（link 链接 / local 系统打开） |
 
-> \*条件注册。完整参数说明见 [API 参考](./docs/API_REFERENCE.md)。
+> \*条件注册。完整参数说明见 [工具 API](./docs/TOOLS_API.md)。
 
 ---
 
@@ -445,7 +444,7 @@ mcp-grpc/
 │   │   ├── image_display.py            #     show_image + HTTP /images/{token} 路由
 │   │   ├── vision_analyzer.py          #     analyze_image (OpenAI Vision API, Semaphore(2))
 │   │   ├── workspace_copy.py           #     copy_image_to_workspace + 工作区自动检测
-│   │   └── document.py                 #     open_document / open_local_document + /documents/{token}
+│   │   └── document.py                 #     open_document（link/local）+ /documents/{token}
 │   │
 │   ├── report/                         #   仿真报告渲染 (1 个工具)
 │   │   ├── __init__.py                 #     公共 API re-export
@@ -460,7 +459,8 @@ mcp-grpc/
 │
 ├── docs/                               # 项目文档
 │   ├── DEPLOY.md                       #   部署指南（打包产物使用、客户端配置）
-│   ├── API_REFERENCE.md                #   API 参考（42 个工具完整签名+返回值示例）
+│   ├── TOOLS_API.md                    #   工具 API（42 个工具完整签名+返回值示例）
+│   ├── HTTP_API.md                     #   HTTP 接口（请求体、响应体、成功/失败情况）
 │   ├── IMPLEMENTATION.md               #   实现原理（通信类型、校验管线、并发控制、工具动机与依赖）
 │   ├── HANDOVER.md                     #   交接文档（架构设计、技术栈、47 条注意事项）
 │   └── EDI系统接口与外部调用汇总.md    #   EDI 系统全量对外接口
@@ -542,7 +542,8 @@ powershell -File scripts/build.ps1  # PyInstaller
 | 文档 | 说明 |
 |---|---|
 | [部署指南](./docs/DEPLOY.md) | 打包产物使用、客户端配置 |
-| [API 参考](./docs/API_REFERENCE.md) | 全部 42 个工具参数、返回值、示例 |
+| [工具 API](./docs/TOOLS_API.md) | 全部 42 个工具参数、返回值、示例 |
+| [HTTP 接口](./docs/HTTP_API.md) | 全部 HTTP 路由的请求体、响应体、成功/失败情况 |
 | [实现原理](./docs/IMPLEMENTATION.md) | 5 种通信类型、校验管线、并发控制、工具动机与依赖 |
 | [交接文档](./docs/HANDOVER.md) | 架构设计、技术栈、扩展开发、47 条注意事项 |
 | [gRPC 协议](./proto/grpc接口调用.md) | ExternalCall 接口调用说明 |

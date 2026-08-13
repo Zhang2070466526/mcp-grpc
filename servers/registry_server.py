@@ -52,8 +52,7 @@
     copy_image_to_workspace       条件注册，复制到 media/edi/mcp-cache/（需配置工作区）
 
   文档：
-    open_document                 为本地 PDF/DOCX 生成临时 HTTP 链接
-    open_local_document           使用系统默认程序打开本地文档
+    open_document                 打开本地文档（link 链接 / local 系统打开）
 
   报告：
     generate_simulation_report    生成本地仿真报告（PDF/DOCX）
@@ -80,7 +79,7 @@ import servers.turbocharts.compare_results  # noqa: F401
 import servers.turbocharts.convert_raw   # noqa: F401
 import servers.ansys.project_manage       # noqa: F401
 import servers.ansys.run_analysis         # noqa: F401
-import servers.multimodal_vision          # noqa: F401 — show_image + copy + analyze + open_document + open_local_document
+import servers.multimodal_vision          # noqa: F401 — show_image + copy + analyze + open_document
 import servers.report                     # noqa: F401 — generate_simulation_report
 # 知识库暂不注册为 MCP 工具，仅 Chat 内部使用
 # try:

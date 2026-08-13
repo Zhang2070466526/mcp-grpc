@@ -1,7 +1,6 @@
 """文档访问工具 — HTTP 临时链接 + 系统默认程序打开。
 
-open_document         — 为 PDF/DOCX 生成 10 分钟 HTTP Token，PDF inline 预览、DOCX 下载
-open_local_document   — 使用 os.startfile() 调用系统默认程序打开（10 种格式支持）
+open_document         — 打开本地文档：link 模式生成 10 分钟 HTTP 链接，local 模式系统默认程序打开
 register_document_url — 供 report 等模块注册文档 Token 并返回预览链接
 """
 
@@ -25,8 +24,8 @@ from servers.utils import get_server_base_url
 load_dotenv()
 _logger = logging.getLogger("multimodal.document")
 
-_LINK_EXTENSIONS = {".pdf", ".docx"}
-_LOCAL_EXTENSIONS = {
+# 支持的文档格式（link 和 local 两种模式共用）
+_ALLOWED_EXTENSIONS = {
     ".pdf", ".doc", ".docx", ".xls", ".xlsx",
     ".ppt", ".pptx", ".txt", ".csv", ".rtf",
 }
@@ -108,30 +107,33 @@ def register_document_url(file_path: str, disposition: str = "inline") -> str:
 
 
 # ═══════════════════════════════════════════════════════════
-# open_document — 临时 HTTP 链接
+# open_document — 打开本地文档（link / local 两种模式）
 # ═══════════════════════════════════════════════════════════
 
 @mcp.tool()
 def open_document(
     file_path: str,
+    mode: str = "link",
     disposition: str = "inline",
 ) -> dict[str, Any]:
-    """为 PDF/DOCX 生成 10 分钟临时 HTTP 链接。PDF inline 预览，DOCX 下载。
+    """打开本地文档：link 模式生成 10 分钟 HTTP 链接，local 模式用系统默认程序打开。
 
-    用法："帮我打开这个 PDF"、"生成这个报告的可分享链接"
+    用法："帮我打开这个 PDF"、"用 Word 打开这个报告"
 
-    链接 10 分钟后自动失效。不会自动打开浏览器。
-    只生成链接，不自动打开。仅当用户明确要求查看文档时调用。
-     Args:
-        file_path: 本地 PDF/DOCX 文件绝对路径。
-        disposition: inline（浏览器内预览）或 attachment（触发下载）。
+    link 模式只生成链接、不自动打开浏览器；local 模式用 os.startfile 系统打开。
+    仅当用户明确要求时才调用，生成报告后不得自动打开。
+
+    Args:
+        file_path: 本地文档绝对路径（支持 10 种格式）。
+        mode: "link"（生成 HTTP 链接，默认）或 "local"（系统默认程序打开）。
+        disposition: link 模式下，inline（预览）或 attachment（下载）。
 
     Returns:
-        {"success": True, "file_name": "report.pdf", "url": "http://127.0.0.1:50026/documents/xxx",
-         "markdown_link": "[report.pdf](http://...)", "expires_in": 600}
+        link 模式：{"success": True, "url": "http://...", "markdown_link": "...", "expires_in": 600}
+        local 模式：{"success": True, "status": "OPEN_REQUESTED", "file_path": "..."}
     """
     try:
-        path = _validate_path(file_path, _LINK_EXTENSIONS)
+        path = _validate_path(file_path, _ALLOWED_EXTENSIONS)
     except PermissionError as e:
         return {"success": False, "error_code": "INVALID_PATH", "message": str(e)}
     except FileNotFoundError as e:
@@ -139,6 +141,26 @@ def open_document(
     except ValueError as e:
         return {"success": False, "error_code": "UNSUPPORTED_FORMAT", "message": str(e)}
 
+    if mode not in ("link", "local"):
+        mode = "link"
+
+    # local 模式：系统默认程序打开
+    if mode == "local":
+        try:
+            os.startfile(str(path))
+        except OSError as exc:
+            return {"success": False,
+                    "error_code": "DEFAULT_APPLICATION_UNAVAILABLE",
+                    "message": f"系统没有可用于打开该文件的默认程序: {exc}"}
+        return {
+            "success": True,
+            "status": "OPEN_REQUESTED",
+            "file_path": str(path),
+            "file_type": path.suffix.lower(),
+            "message": "已请求使用系统默认程序打开文件",
+        }
+
+    # link 模式：生成临时 HTTP 链接
     if disposition not in ("inline", "attachment"):
         disposition = "inline"
 
@@ -154,53 +176,6 @@ def open_document(
         "expires_in": _TOKEN_TTL,
         "display_mode": disposition,
         "markdown_link": f"[{path.name}]({url})",
-    }
-
-
-# ═══════════════════════════════════════════════════════════
-# open_local_document — 系统默认程序打开
-# ═══════════════════════════════════════════════════════════
-
-@mcp.tool()
-def open_local_document(file_path: str) -> dict[str, Any]:
-    """用系统默认程序打开本地文档（os.startfile）。支持 10 种格式。
-
-    用法："用 Word 打开这个报告"、"帮我打开这个 PDF"
-    注意：仅用户明确要求时才调用，生成报告后不得自动打开。
-
-    Windows 会根据文件关联自动选择程序：.docx→Word/WPS, .pdf→默认阅读器。
-    仅当用户明确要求"打开文件"时调用。不得在生成报告、查询文件或返回链接后自动调用。
-
-    注意：打开的是 MCP 服务所在电脑上的文件（本地模式即用户电脑）。
-
-    Args:
-        file_path: 本地文档绝对路径。
-
-    Returns:
-        {"success": True, "status": "OPEN_REQUESTED", "file_path": "C:/...", "file_type": ".pdf"}
-    """
-    try:
-        path = _validate_path(file_path, _LOCAL_EXTENSIONS)
-    except PermissionError as e:
-        return {"success": False, "error_code": "INVALID_PATH", "message": str(e)}
-    except FileNotFoundError as e:
-        return {"success": False, "error_code": "DOCUMENT_NOT_FOUND", "message": str(e)}
-    except ValueError as e:
-        return {"success": False, "error_code": "UNSUPPORTED_DOCUMENT_TYPE", "message": str(e)}
-
-    try:
-        os.startfile(str(path))
-    except OSError as exc:
-        return {"success": False,
-                "error_code": "DEFAULT_APPLICATION_UNAVAILABLE",
-                "message": f"系统没有可用于打开该文件的默认程序: {exc}"}
-
-    return {
-        "success": True,
-        "status": "OPEN_REQUESTED",
-        "file_path": str(path),
-        "file_type": path.suffix.lower(),
-        "message": "已请求使用系统默认程序打开文件",
     }
 
 

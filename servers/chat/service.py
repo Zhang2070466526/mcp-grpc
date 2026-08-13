@@ -58,7 +58,7 @@ from servers.eda.model_replace import replace_models_from_csv  # noqa: E402
 from servers.eda.edi_launcher import launch_edi  # noqa: E402
 from servers.turbocharts.compare_results import compare_simulation_results  # noqa: E402
 from servers.turbocharts.convert_raw import turbocharts_convert, list_result_curves  # noqa: E402
-from servers.multimodal_vision import show_image, copy_image_to_workspace, analyze_image, OPENCLAW_WORKSPACE_PATH, open_document, open_local_document, register_image_url  # noqa: E402
+from servers.multimodal_vision import show_image, copy_image_to_workspace, analyze_image, OPENCLAW_WORKSPACE_PATH, open_document, register_image_url  # noqa: E402
 from servers.report import generate_simulation_report  # noqa: E402
 from servers.settings import get_settings  # noqa: E402
 
@@ -118,11 +118,7 @@ _CHAT_TOOL_DESCRIPTIONS: dict[str, str] = {
         "只负责校验数据并调用渲染服务，不会自动仿真或编造数据"
     ),
     "open_document": (
-        "为本地 PDF/DOCX 生成临时 HTTP 链接。"
-        "只生成链接不自动打开，仅用户明确要求时调用"
-    ),
-    "open_local_document": (
-        "使用系统默认程序打开本地文档。"
+        "打开本地文档：link 模式生成临时 HTTP 链接，local 模式系统默认程序打开。"
         "仅用户明确要求时调用，生成报告后不得自动打开"
     ),
     "delete_simulation_component": (
@@ -541,10 +537,12 @@ class ChatService:
                     )
 
                     if resp.status_code != 200:
+                        _logger.error("request=%s llm_status=%d body=%s",
+                                      request_id, resp.status_code, resp.text[:500])
                         return ChatResponse(
                             success=False, session_id=session.session_id,
                             request_id=request_id,
-                            reply=f"LLM 调用失败: {resp.status_code}",
+                            reply=f"LLM 调用失败: {resp.status_code}: {resp.text[:200]}",
                         )
 
                     data = resp.json()
@@ -947,7 +945,6 @@ _TOOL_LABELS: dict[str, str] = {
     "analyze_image": "分析图片",
     "generate_simulation_report": "生成报告",
     "open_document": "打开文档",
-    "open_local_document": "本地打开",
     "get_simulation_component_schema": "控件参数",
     "list_simulation_components": "查询器件",
     "list_schematic_components": "实时器件列表",

@@ -1,6 +1,25 @@
 # 工具实现原理
 
 每个 MCP 工具按底层通信方式分为 5 种实现类型：gRPC 远程调用、本地文件读取、subprocess 命令行、COM 对象、内存服务。本文逐一说明每种工具的协议交互、数据结构、校验流程、错误处理和设计决策。
+>
+> 相关文档：[TOOLS_API.md](./TOOLS_API.md)（42 个工具接口）、[HTTP_API.md](./HTTP_API.md)（HTTP 路由）。
+
+---
+
+## 目录
+
+- **[一、gRPC 远程调用（14 个工具）](#一gRPC远程调用14个工具)**：通信协议、call_grpc 统一入口、11 步参数校验管线
+- **[二、本地文件读取（6 个工具）](#二本地文件读取6个工具)**：.epp 格式、S-expression 解析、参数格式化
+- **[三、参数目录与 Schema](#三参数目录与-Schema)**：目录设计动机、核心函数、动态参数模式
+- **[四、subprocess 命令行（3 个工具）](#四subprocess命令行3个工具)**：TurboCharts、RAW 曲线查询、结果对比、EDI 启动
+- **[五、COM 对象（6 个 ANSYS 工具）](#五COM对象6个-ANSYS-工具)**：COM 附着、AEDT 检测、锁文件管理
+- **[六、图片工具（3 个，1 个条件注册）](#六图片工具3个1个条件注册)**：show_image、工作区复制、视觉分析
+- **[七、Chat 聊天服务](#七Chat聊天服务)**：会话管理、多轮闭环、工具 Schema、安全加固
+- **[八、Resources 与 Prompts](#八Resources与-Prompts)**：只读资源、可复用工作流
+- **[九、文档工具（1 个工具）](#九文档工具1个工具)**：open_document
+- **[十、报告渲染（1 个工具）](#十报告渲染1个工具)**：16 步校验、调用流程
+- **[十一、跨层设计原则](#十一跨层设计原则)**：校验分层、错误码、并发、outcome_known、日志等
+- **[十二、工具设计动机与数据依赖](#十二工具设计动机与数据依赖)**：每个工具的动机 / 功能 / 依赖 / 底层机制
 
 ---
 
@@ -807,18 +826,17 @@ workspace_enabled = OPENCLAW_WORKSPACE_PATH is not None
 
 ---
 
-## 九、文档工具（2 个工具）
+## 九、文档工具（1 个工具）
 
-`open_document` 和 `open_local_document` 实现在 `servers/multimodal_vision/document.py`。
+`open_document` 实现在 `servers/multimodal_vision/document.py`，支持 link / local 两种模式。
 
-**`open_document`**：为本地 PDF/DOCX 生成临时 HTTP 链接。
-- Token 映射 `/documents/{token}`，10 分钟过期
-- 链接内保存 `disposition` 参数，PDF inline 预览、DOCX attachment 下载
+**`open_document`**：打开本地文档。
+- `mode="link"`（默认）：为本地文档生成 10 分钟临时 HTTP 链接
+  - Token 映射 `/documents/{token}`，10 分钟过期
+  - 链接内保存 `disposition` 参数，PDF inline 预览、DOCX attachment 下载
+- `mode="local"`：使用 `os.startfile()` 调用系统默认程序打开
+  - 支持 10 种格式（.pdf/.doc/.docx/.xls/.xlsx/.ppt/.pptx/.txt/.csv/.rtf）
 - 安全：UNC 拒绝、绝对路径校验、nosniff 头
-
-**`open_local_document`**：使用 `os.startfile()` 调用系统默认程序打开。
-- 支持 10 种格式（.pdf/.doc/.docx/.xls/.xlsx/.ppt/.pptx/.txt/.csv/.rtf）
-- 拒绝可执行文件、相对路径、网络路径
 - 工具描述明确"仅用户要求时调用，生成报告后不得自动打开"
 
 ---
@@ -1089,7 +1107,7 @@ simulate_* / simulate_netlist ──(result.raw)──> list_result_curves ─�
 get_simulation_component_schema ──(参数 schema)──> create/update_simulation_component
 list_simulation_components / list_schematic_components ──(instance_name)──> update/delete/set_state/attach_out
 
-get_project_summary + turbocharts_convert + capture_schematic + simulate_* ──> generate_simulation_report ──(PDF/DOCX)──> open_document / open_local_document
+get_project_summary + turbocharts_convert + capture_schematic + simulate_* ──> generate_simulation_report ──(PDF/DOCX)──> open_document
 ```
 
 ### 12.1 工程管理（7 个）
@@ -1172,18 +1190,17 @@ get_project_summary + turbocharts_convert + capture_schematic + simulate_* ─�
 | `analyze_image` | 让视觉模型理解图片内容（如原理图） | 调用视觉模型分析 | —（图片路径） | 分析 `capture_schematic` 截图 |
 | `copy_image_to_workspace`（条件） | OpenClaw 需要图片在工作区目录 | 复制到工作区 media/edi | — | OpenClaw 附件发送 |
 
-### 12.9 文档（2 个）
+### 12.9 文档（1 个）
 
 | 工具 | 动机 | 功能 | 依赖 | 被依赖 |
 |---|---|---|---|---|
-| `open_document` | PDF/DOCX 需要 HTTP 链接预览 | 生成 10 分钟临时链接 | `generate_simulation_report`（PDF/DOCX） | LLM 查看报告 |
-| `open_local_document` | 用系统默认程序打开文档 | `os.startfile` 打开 | `generate_simulation_report` | LLM 本地查看报告 |
+| `open_document` | PDF/DOCX 需要预览（HTTP 链接）或用系统程序打开 | link 模式生成 10 分钟链接，local 模式 os.startfile 打开 | `generate_simulation_report`（PDF/DOCX） | LLM 查看报告 |
 
 ### 12.10 报告（1 个）
 
 | 工具 | 动机 | 功能 | 依赖 | 被依赖 |
 |---|---|---|---|---|
-| `generate_simulation_report` | 把仿真结果整理成正式 PDF/DOCX 报告 | 聚合数据 + 调渲染服务 | `get_project_summary`（工程信息）、`turbocharts_convert`（曲线图）、`capture_schematic`（拓扑图）、`simulate_*`（结果数据） | `open_document`/`open_local_document`（查看报告） |
+| `generate_simulation_report` | 把仿真结果整理成正式 PDF/DOCX 报告 | 聚合数据 + 调渲染服务 | `get_project_summary`（工程信息）、`turbocharts_convert`（曲线图）、`capture_schematic`（拓扑图）、`simulate_*`（结果数据） | `open_document`（查看报告） |
 
 ### 12.11 解析文件类工具详解
 
@@ -1241,66 +1258,15 @@ Variables:
 
 > 其余「解析文件」发生在 EDI gRPC 服务端而非 MCP 本地：`replace_models_from_csv` 由服务端解析 CSV、`generate_schematic_from_netlist`/`simulate_netlist` 由服务端解析 netlist.log，MCP 只负责校验文件存在并传路径。
 
-### 12.12 通信与执行机制详解
+### 12.12 通信与执行机制速查
 
-除了「解析文件」，其余工具按底层执行方式分为 6 类。每类的核心机制、以及「为什么这样设计」如下。
+其余工具按底层执行方式分为 6 类。每类的「设计动机」如下，详细实现见对应章节（避免重复）：
 
-#### (1) gRPC 异步调用（15 个 EDA 工具）
-
-**为什么这样设计**：EDI 是单实例桌面程序，同一时间只能做一件事，且操作耗时不定（仿真可能几分钟）。用「提交 + 流式推送」的异步模型，避免长连接阻塞 MCP 服务。
-
-**核心机制**：
-- 调用顺序固定：先 `FetchEvent` 建立流式订阅，再 `PerformAction` 提交任务（否则 EDI 报 "external handler not ready"）
-- 全局 `RLock` 串行化：所有 gRPC 调用排队，同一时间只有一个在执行
-- 三重回显校验：`client_uuid`/`task_id`/`event_type` 全部匹配才消费事件流
-- 增量日志：`ads_output` 通过事件流增量推送，原样拼接不 strip
-- 异常分类：超时→TIMEOUT、消息过大→PAYLOAD_TOO_LARGE、断连→STREAM_DISCONNECTED、未受理→GRPC_UNAVAILABLE
-- `outcome_known`/`task_success`：区分「EDI 明确失败」和「结果未知」，禁止把超时误判为失败
-
-#### (2) subprocess 调用（3 个 turbocharts 工具）
-
-**为什么这样设计**：`turbocharts_app.exe` 一次只能运行一个实例（多开会冲突），必须串行。
-
-**核心机制**：
-- `BoundedSemaphore(1)` 串行化进程
-- `subprocess.run` 捕获 stdout/stderr，Windows 下 `CREATE_NO_WINDOW` 不弹黑框
-- 命令行参数：`--raw/--img/--type/--csv/--linename/--dependcy/--ac`（注意 `--dependcy` 是真实参数名，少个 n）
-
-#### (3) COM 自动化（6 个 ANSYS 工具）
-
-**为什么这样设计**：AEDT 是 Windows COM 程序，没有 gRPC 接口，只能通过 COM 附着操作；同时 AEDT 用锁文件防止工程被多进程同时打开。
-
-**核心机制**：
-- 多 ProgID 回退附着：先 `GetActiveObject(AnsoftHfss.HfssScriptInterface)`，失败再试 `Ansoft.ElectronicsDesktop`
-- 每次 COM 调用独立 `pythoncom.CoInitialize()/CoUninitialize()`
-- 锁文件管理：读 `.aedt.lock` 里的 `DesktopProcessID`，PID 存活时**绝不删除**，进程退出后才清理残留锁
-- 进程/路径检测：`psutil` 遍历找 `ansysedt.exe`；路径按「环境变量 → 注册表 → 默认目录（按版本取最新）」检测
-
-#### (4) 异步任务队列（2 个：start_simulation_async / start_hfss_analysis_async）
-
-**为什么这样设计**：仿真可能几分钟到几小时，不能让 MCP 请求一直阻塞。用「提交即返回 task_id + 后台线程执行」解耦提交和查询。
-
-**核心机制**：
-- 单工作线程（`ThreadPoolExecutor(max_workers=1)` / `queue.Queue`）串行执行，避免多任务同时抢 EDI/COM
-- 内存任务注册表（`_sim_tasks`/`_HFSS_TASKS`）+ 锁保护
-- TTL 2 小时自动清理；队列上限 8（EDA）/ 50（HFSS）
-- 查询时在锁内做浅拷贝快照，避免并发读写冲突
-
-#### (5) HTTP 调用 + 临时 Token（报告、视觉分析、文档）
-
-**为什么这样设计**：报告渲染、视觉分析是独立服务，只能走 HTTP；PDF/图片要能在浏览器预览，需要临时 URL。
-
-**核心机制**：
-- 报告：16 步校验 → `httpx.post` 渲染服务 → 自校验输出文件
-- 视觉分析：路径 + Pillow 校验 → Base64 编码 → `httpx.post` 视觉模型（`BoundedSemaphore(2)` 限流）
-- Token：`secrets.token_urlsafe` 生成随机 token，内存字典存 `{token: path, expires_at}`，10 分钟过期自动清理
-- 路由：`/documents/{token}`、`/images/{token}` 按 token 返回文件
-
-#### (6) 参数校验管线（器件参数、报告）
-
-**为什么这样设计**：AI 传参容易错（参数名拼错、单位不对、类型不符），在 MCP 层前置校验能拦掉大部分无效调用，减少 gRPC 往返和错误轮次。
-
-**核心机制**：
-- 器件参数 11 步校验：类型 → 空值 → 存在 → 解析 → 权限 → 结构 → value → 类型 → 枚举 → 单位 → 别名冲突
-- 报告 16 步校验：路径 → 模型名 → 字段 → spec_table → charts → components → schematic → 超时 → payload → HTTP → 文件确认
-- wire→public 映射：公开名 `Freq` 自动转底层名 `Freq[1]`，AI 无需关心 EDI 内部命名
+| 机制 | 涉及工具 | 为什么这样设计 | 详细实现见 |
+|---|---|---|---|
+| gRPC 异步调用 | 15 个 EDA 工具 | EDI 是单实例桌面程序，同一时间只能做一件事，用「提交 + 流式推送」避免长连接阻塞 | 第一节 |
+| subprocess 调用 | 3 个 turbocharts | `turbocharts_app.exe` 一次只能跑一个实例（多开会冲突），必须串行 | 第四节 |
+| COM 自动化 | 6 个 ANSYS | AEDT 是 Windows COM 程序，无 gRPC 接口；锁文件防多进程同时打开 | 第五节 |
+| 异步任务队列 | start_simulation_async / start_hfss_analysis_async | 仿真可能几分钟到几小时，用「提交即返回 task_id + 后台执行」解耦 | 第一节、第七节 |
+| HTTP + 临时 Token | 报告 / 视觉分析 / 文档 | 独立服务只能走 HTTP；PDF/图片要浏览器预览需临时 URL | 第六节、第十节 |
+| 参数校验管线 | 器件参数 / 报告 | AI 传参易错，前置校验拦掉大部分无效调用 | 第一节、第十节 |
