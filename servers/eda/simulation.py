@@ -28,6 +28,7 @@ get_simulation_async_result   获取结果（运行中返回部分日志，完�
 
 from __future__ import annotations
 
+import atexit
 import logging
 import threading
 import time
@@ -48,6 +49,9 @@ _sim_lock = threading.Lock()
 
 # 单工作线程执行器 — EDA 操作串行化，避免大量线程等待
 _SIM_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sim")
+
+# 进程退出时不等待正在执行的仿真（非 daemon 工作线程会阻塞退出，最长可达 timeout_seconds）
+atexit.register(_SIM_EXECUTOR.shutdown, wait=False)
 
 # 任务保留 2 小时
 _TASK_TTL = 7200

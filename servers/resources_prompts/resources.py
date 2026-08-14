@@ -85,6 +85,7 @@ def resource_operation_guide() -> str:
         "- 只有用户明确要求复制到工作区时才能调用 `copy_image_to_workspace`。\n"
         "- 不要检查或读取服务端环境变量。\n"
         "- 不要猜测工程文件路径，先通过 `list_epp_projects` 获取。\n"
+        "- 产生输出文件（截图/图表/报告）或采用默认值时，先告知用户输出位置或默认值，询问是否需要调整。\n"
     )
 
 

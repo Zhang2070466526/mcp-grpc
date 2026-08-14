@@ -214,8 +214,10 @@ def _ensure_chat_tools() -> None:
                 "description": "列出已入库的文档来源", "parameters": {"type": "object",
                 "properties": {}, "required": []}}},
         ])
-    except ImportError:
-        pass
+    except Exception as exc:
+        # 知识库是可选模块：依赖缺失（ImportError）或初始化异常（chroma.sqlite3 被锁/损坏等）
+        # 都应降级跳过，不能拖垮整个 Chat
+        _logger.warning("知识库工具注入失败，已跳过: %s", exc)
 
     CHAT_TOOL_MAP.clear()
     CHAT_TOOL_MAP.update(new_map)
@@ -317,7 +319,9 @@ _SYSTEM_PROMPT = (
     "8. 除非用户要求，不展示内部工具名称、参数和调用细节。\n"
     "9. analyze_image 返回的图片分析结果，用 Markdown 结构化输出："
     "表格展示列表数据，加粗标题，分节呈现，不直接粘贴原始内容。\n"
-    "10. 有数据时优先用表格，有代码时用代码块，有步骤时用有序列表。"
+    "10. 有数据时优先用表格，有代码时用代码块，有步骤时用有序列表。\n"
+    "11. 调用工具有默认值或会产生输出文件时，先告知用户将采用的默认值或输出位置，"
+    "并询问是否需要调整。例如：\"我将把原理图截图保存到 C:/screenshots/circuit.png，需要改位置请告诉我。\""
 )
 
 

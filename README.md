@@ -352,6 +352,7 @@ POST /chat
 - 最多 5 轮工具调用，单轮最多 8 个工具
 - 参数自动补齐：`project_path` 从会话上下文，`task_id` 从最近仿真
 - 破坏性操作确认门：delete/replace/close_save/overwrite 需用户确认，支持肯定词
+- 默认值透明：产生输出文件或采用默认值时，先告知用户输出位置/默认值并询问是否调整
 - 重复调用保护：同轮同参数指纹去重
 - 空 session_id 自动创建，服务重启后旧 session 返回 Session not found
 
