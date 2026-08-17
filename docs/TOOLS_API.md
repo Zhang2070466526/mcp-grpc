@@ -23,7 +23,7 @@ from servers.eda.project_manage import list_epp_projects
 - **[ANSYS HFSS（6 个）](#ansys-hfss6个)**：AEDT 工程开关、HFSS 异步仿真
 - **[图表（3 个）](#图表3个)**：RAW 曲线解析、转图、结果对比
 - **[图片（3 个，1 个条件注册）](#图片3个1个条件注册)**：显示图片、视觉分析、复制到工作区
-- **[仿真器件管理（9 个）](#仿真器件管理9个协议-v3)**：器件 Schema、增删改、状态、网表导入
+- **[仿真器件管理（10 个）](#仿真器件管理10个协议-v3)**：器件 Schema、增删改、状态、网表导入、原理图加载
 - **[Resources & Prompts](#resources--prompts)**：只读资源 + 可复用工作流
 - **[文档（1 个）](#文档1个)**：打开本地文档
 - **[报告（1 个）](#报告1个)**：生成仿真报告
@@ -826,7 +826,7 @@ copy_image_to_workspace(image_path: str) -> dict
 
 ---
 
-## 仿真器件管理（9 个）— 协议 v3
+## 仿真器件管理（10 个）— 协议 v3
 
 ### `get_simulation_component_schema`
 
@@ -944,6 +944,26 @@ attach_out_component(project_path: str, target_instance_name: str, pin_index: in
 | `target_instance_name` | str | 是 | — | 目标器件实例名 |
 | `pin_index` | int | 否 | None | 0 开始的目标引脚编号 |
 | `timeout_seconds` | int | 否 | 120 | 最长等待秒数 |
+
+---
+
+### `replace_schematic_from_file`
+
+```python
+from servers.eda.simulation_components import replace_schematic_from_file
+
+replace_schematic_from_file(project_path: str, schematic_path: str, timeout_seconds: int = 300) -> dict
+```
+
+从 .ep 文件整体替换原理图（不追加不合并）。成功后立即保存，失败恢复原原理图状态。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| `project_path` | str | 是 | — | .epp 绝对路径 |
+| `schematic_path` | str | 是 | — | .ep 原理图文件绝对路径（完整 S-Expression） |
+| `timeout_seconds` | int | 否 | 300 | 最长等待秒数 |
+
+> ⚠️ 整体替换当前原理图，原内容丢失；自定义器件须已在工作区模型库。
 
 ---
 

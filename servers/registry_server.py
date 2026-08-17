@@ -27,6 +27,7 @@
     generate_schematic_from_netlist  从网表生成原理图
     replace_port_component          替换端口器件类型
     attach_out_component            为器件引脚挂载 Out 器件
+    replace_schematic_from_file        从 .ep 文件整体替换原理图
 
   分析：
     export_project_netlist        查看/导出工程网表
@@ -95,6 +96,46 @@ from servers.chat.routes import ui_page, health_check, chat_endpoint, tool_list,
 from servers.multimodal_vision import serve_image  # noqa: E402
 from servers.multimodal_vision import serve_document  # noqa: E402
 
+
+async def metrics_endpoint(request):
+    """GET /metrics — 输出 Prometheus 格式的运行时指标。"""
+    from starlette.responses import PlainTextResponse
+    from servers.metrics import get_tool_metrics
+    from servers.utils import server_uptime_seconds
+    from servers.eda.simulation import _sim_tasks
+
+    metrics = get_tool_metrics()
+    lines = []
+
+    # 工具调用总次数 / 失败次数 / 总耗时
+    lines.append("# HELP edi_tool_calls_total 工具调用总次数")
+    lines.append("# TYPE edi_tool_calls_total counter")
+    for tool in sorted(metrics):
+        lines.append(f'edi_tool_calls_total{{tool="{tool}"}} {metrics[tool]["count"]}')
+
+    lines.append("# HELP edi_tool_errors_total 工具调用失败次数")
+    lines.append("# TYPE edi_tool_errors_total counter")
+    for tool in sorted(metrics):
+        lines.append(f'edi_tool_errors_total{{tool="{tool}"}} {metrics[tool]["errors"]}')
+
+    lines.append("# HELP edi_tool_duration_ms_sum 工具调用总耗时(毫秒)")
+    lines.append("# TYPE edi_tool_duration_ms_sum counter")
+    for tool in sorted(metrics):
+        lines.append(f'edi_tool_duration_ms_sum{{tool="{tool}"}} {metrics[tool]["total_ms"]:.0f}')
+
+    # 当前异步仿真任务数
+    lines.append("# HELP edi_sim_tasks 当前异步仿真任务数")
+    lines.append("# TYPE edi_sim_tasks gauge")
+    lines.append(f"edi_sim_tasks {len(_sim_tasks)}")
+
+    # 服务运行时长
+    lines.append("# HELP edi_uptime_seconds 服务运行时长(秒)")
+    lines.append("# TYPE edi_uptime_seconds gauge")
+    lines.append(f"edi_uptime_seconds {server_uptime_seconds():.0f}")
+
+    return PlainTextResponse("\n".join(lines) + "\n")
+
+
 mcp.custom_route("/", methods=["GET"])(ui_page)
 mcp.custom_route("/ui", methods=["GET"])(ui_page)
 mcp.custom_route("/health", methods=["GET"])(health_check)
@@ -103,4 +144,5 @@ mcp.custom_route("/tools/list", methods=["GET"])(tool_list)
 mcp.custom_route("/images/{token}", methods=["GET"])(serve_image)
 mcp.custom_route("/documents/{token}", methods=["GET"])(serve_document)
 mcp.custom_route("/upload", methods=["POST"])(upload_file)
+mcp.custom_route("/metrics", methods=["GET"])(metrics_endpoint)
 

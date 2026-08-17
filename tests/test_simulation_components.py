@@ -24,6 +24,7 @@ from servers.eda.simulation_components import (
     _from_wire_parameters,
     _find_component_by_instance,
     _format_component_parameters,
+    _find_sim_components,
     _COMPONENT_TYPES,
     _ACTIVE_STATES,
 )
@@ -763,3 +764,129 @@ class TestGrpcPayloads:
 
 
 # ═══════════════════════════════════════════════════════════
+# 10. _find_sim_components 过滤逻辑（include_hidden / schematic_name）
+# ═══════════════════════════════════════════════════════════
+
+class TestFindSimComponents:
+    """测试 _find_sim_components 的过滤逻辑（此前无单测覆盖的盲区）。"""
+
+    @staticmethod
+    def _setup(monkeypatch, comps, schematics=None):
+        """mock ProjectReader 和 parse_components，返回 simulation_components 模块。"""
+        from servers.eda import simulation_components as sc
+
+        class FakeReader:
+            def __init__(self, path):
+                self.path = path
+
+            def list_schematics(self):
+                return schematics or ["main"]
+
+            def read_schematic(self, name):
+                return f"fake:{name}"
+
+        monkeypatch.setattr(sc, "ProjectReader", FakeReader)
+        monkeypatch.setattr(sc, "parse_components", lambda raw: comps)
+        return sc
+
+    def test_include_hidden_filters_hidden_params(self, monkeypatch):
+        """include_hidden=False（默认）过滤 visible=false 的隐藏参数；True 保留。"""
+        comps = [{
+            "name": "R1", "type": "R", "component_id": "uuid1", "model_id": "m1",
+            "paramsinfo": {
+                "R": {"value": "50", "unit": "Ohm", "visible": True},
+                "Hidden": {"value": "x", "visible": False},
+            },
+            "pin_count": 2, "parameter_count": 2,
+        }]
+        sc = self._setup(monkeypatch, comps)
+
+        # 默认过滤隐藏参数
+        result = sc._find_sim_components("fake.epp")
+        assert "R" in result[0]["parameters"]
+        assert "Hidden" not in result[0]["parameters"]
+
+        # include_hidden=True 保留隐藏参数
+        result = sc._find_sim_components("fake.epp", include_hidden=True)
+        assert "R" in result[0]["parameters"]
+        assert "Hidden" in result[0]["parameters"]
+
+    def test_include_hidden_sp_type(self, monkeypatch):
+        """SP 类型走 wire→public 映射，同时过滤 visible=false。"""
+        comps = [{
+            "name": "SP1", "type": "SParameter", "component_id": "uuid2", "model_id": "m2",
+            "paramsinfo": {
+                "Start": {"value": "1", "unit": "GHz", "visible": True},
+                "Hidden": {"value": "x", "visible": False},
+            },
+            "pin_count": 0, "parameter_count": 2,
+        }]
+        sc = self._setup(monkeypatch, comps)
+
+        result = sc._find_sim_components("fake.epp")
+        params = result[0]["parameters"]
+        assert "Start" in params
+        assert params["Start"]["value"] == "1"
+        assert "Hidden" not in params
+
+    def test_schematic_name_filters(self, monkeypatch):
+        """schematic_name 指定时只读取匹配的原理图。"""
+        from servers.eda import simulation_components as sc
+
+        read_names = []
+
+        class FakeReader:
+            def __init__(self, path):
+                pass
+
+            def list_schematics(self):
+                return ["main", "other"]
+
+            def read_schematic(self, name):
+                read_names.append(name)
+                return f"fake:{name}"
+
+        monkeypatch.setattr(sc, "ProjectReader", FakeReader)
+        monkeypatch.setattr(sc, "parse_components", lambda raw: [{
+            "name": "R1", "type": "R", "component_id": "u", "model_id": "m",
+            "paramsinfo": {}, "pin_count": 2, "parameter_count": 0,
+        }])
+
+        # 指定 schematic_name="main" 只读 main
+        result = sc._find_sim_components("fake.epp", schematic_name="main")
+        assert read_names == ["main"]
+        assert len(result) == 1
+
+        # 不指定则读全部
+        read_names.clear()
+        result = sc._find_sim_components("fake.epp")
+        assert read_names == ["main", "other"]
+        assert len(result) == 2
+
+
+# ═══════════════════════════════════════════════════════════
+# 11. replace_schematic_from_file 工具
+# ═══════════════════════════════════════════════════════════
+
+class TestLoadSchematicFromFile:
+    """测试 replace_schematic_from_file 工具（参数校验 + payload）。"""
+
+    def test_load_enum_and_payload(self):
+        """正确传递 LOAD_SCHEMATIC_FROM_FILE 枚举和 payload。"""
+        from servers.eda.simulation_components import replace_schematic_from_file
+        with _VALIDATE_PATCH, _NETLIST_ISFILE_PATCH, _CALL_GRPC_PATCH as mock:
+            replace_schematic_from_file("C:/test.epp", "C:/test/schematic.ep")
+            args = mock.call_args.args
+            assert args[0] == ecserver_pb2.LOAD_SCHEMATIC_FROM_FILE
+            assert args[1]["project_path"] == "C:/test.epp"
+            assert args[1]["schematic_path"].endswith("schematic.ep")
+
+    def test_load_schematic_file_not_found(self):
+        """schematic_path 不存在时返回 FILE_NOT_FOUND。"""
+        from servers.eda.simulation_components import replace_schematic_from_file
+        with _VALIDATE_PATCH, patch(
+            "servers.eda.simulation_components.Path.is_file", return_value=False
+        ):
+            result = replace_schematic_from_file("C:/test.epp", "C:/test/missing.ep")
+            assert result["success"] is False
+            assert result["error_code"] == "FILE_NOT_FOUND"

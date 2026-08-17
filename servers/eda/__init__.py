@@ -62,6 +62,7 @@ from servers.eda.simulation_components import (  # noqa: F401
     generate_schematic_from_netlist,
     replace_port_component,
     attach_out_component,
+    replace_schematic_from_file,
 )
 
 from servers.eda.simulation import (  # noqa: F401

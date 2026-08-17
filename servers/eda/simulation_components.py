@@ -966,6 +966,63 @@ def generate_schematic_from_netlist(
 
 
 # ═══════════════════════════════════════════════════════════
+# 8.5 replace_schematic_from_file
+# ═══════════════════════════════════════════════════════════
+
+@mcp.tool()
+def replace_schematic_from_file(
+    project_path: str,
+    schematic_path: str,
+    timeout_seconds: int = 300,
+) -> dict[str, Any]:
+    """从 .ep 文件整体替换原理图（对应 gRPC LOAD_SCHEMATIC_FROM_FILE）。
+
+    用指定的 schematic.ep 文件（完整 edi-schematic S-Expression）整体替换工程唯一原理图，
+    不追加、不合并。成功后立即保存，失败恢复原原理图状态。
+
+    ⚠️ 此操作会整体替换当前原理图，原内容丢失，请谨慎使用。
+
+    Args:
+        project_path: .epp 工程文件绝对路径。
+        schematic_path: .ep 原理图文件路径（本地文件、必须已存在、内容为完整 S-Expression 且不能为空；
+                        建议传绝对路径，Windows 下路径用 / 或 \\ 分隔）。
+        timeout_seconds: 最长等待秒数，默认 300。
+    """
+    resolved = validate_project_path(project_path)
+
+    # 必填校验：不能为空
+    if not schematic_path or not schematic_path.strip():
+        return {"success": False,
+                "error_code": "INVALID_PATH",
+                "message": "schematic_path 不能为空"}
+
+    sch_path = Path(schematic_path).expanduser().resolve()
+
+    # 仅允许本地文件，拒绝网络路径（UNC）
+    if str(sch_path).startswith(r"\\") or str(sch_path).startswith("//"):
+        return {"success": False,
+                "error_code": "INVALID_PATH",
+                "message": f"禁止访问网络路径: {sch_path}"}
+
+    if not sch_path.is_file():
+        return {"success": False,
+                "error_code": "FILE_NOT_FOUND",
+                "message": f"原理图文件不存在: {sch_path}"}
+    if sch_path.suffix.lower() != ".ep":
+        return {"success": False,
+                "error_code": "INVALID_PATH",
+                "message": "schematic_path 必须是 .ep 文件"}
+
+    return call_grpc(
+        ecserver_pb2.LOAD_SCHEMATIC_FROM_FILE,
+        {"project_path": resolved,
+         "schematic_path": str(sch_path)},
+        timeout_seconds,
+        max_timeout_seconds=600,
+    )
+
+
+# ═══════════════════════════════════════════════════════════
 # 8. attach_out_component
 # ═══════════════════════════════════════════════════════════
 

@@ -49,7 +49,7 @@ servers/
     grpc_client.py        # gRPC 通信层（FetchEvent → PerformAction）
     project_manage.py     # 工程管理（7 工具）
     simulation.py         # 仿真（7 工具）
-    simulation_components.py  # 仿真器件（9 工具）
+    simulation_components.py  # 仿真器件（10 工具）
     simulation_component_catalog.json  # 参数目录 v2.0
     design_export.py      # 网表/截图（2 工具）
     model_replace.py      # 模型替换（1 工具）
@@ -90,7 +90,7 @@ PyPI: https://pypi.org/project/edi-mcp/  |  当前版本：0.1.5
 | 分类 | 数量 | 说明 |
 |---|---|---|
 | 工程管理 | 7 | 扫描 / 打开 / 关闭工程、查询器件、分析变量 |
-| 仿真器件 | 9 | 器件 Schema、增删改、状态、网表导入 |
+| 仿真器件 | 10 | 器件 Schema、增删改、状态、网表导入、原理图加载 |
 | 仿真 | 7 | 同步 / 异步仿真、网表仿真、任务查询 |
 | 导出分析 | 2 | 导出网表、截图原理图 |
 | 模型 / 启动 / 诊断 | 3 | 模型替换、启动 EDI、服务诊断 |

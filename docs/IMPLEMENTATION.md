@@ -148,7 +148,7 @@ return STREAM_DISCONNECTED
 |---|---|
 | `DEADLINE_EXCEEDED` | `status: "TIMEOUT"`，保留已收日志 |
 | 流建立后断连 | `status: "STREAM_DISCONNECTED"`，保留已收日志 |
-| 流建立前断连 | `status: "GRPC_UNAVAILABLE"`（统一字典，不抛异常） |
+| 流建立前断连 | `status: "GRPC_UNAVAILABLE"`（统一字典，不抛异常），message 提示「手动启动 EDI 软件后重试」 |
 
 #### 返回结构
 
@@ -786,6 +786,11 @@ Chat 工具列表和 Schema 从 MCP 注册表自动生成（`_auto_build_chat_to
 - 一次确认只能执行一次，5 分钟过期
 - 确认执行时使用原始保存参数，防止模型在确认前后篡改目标
 
+**默认值透明**（产生文件 / 采用默认值时先告知用户）：
+- 内置 Chat 的 system prompt 规则 11：产生输出文件（截图/图表/报告）或采用默认值时，先告知用户输出位置/默认值并询问是否调整
+- 外部 agent（OpenClaw 等）通过 FastMCP `instructions` 下发同一规则（告知，暂不强制询问，避免打断 agent 自动执行流程）
+- `edi://reference/operation-guide` Resource 也列出该规则，供 agent 主动读取
+
 ---
 
 ## 八、Resources 与 Prompts
@@ -800,7 +805,7 @@ MCP 协议除了 Tool，还定义了 Resource（只读上下文）和 Prompt（�
 |---|---|---|---|
 | `edi://service/overview` | `application/json` | 动态生成 | `server_version`, `protocol_version`, `grpc_target`, `workspace_copy_enabled`, `safety_rules` |
 | `edi://reference/simulation-components` | `application/json` | `_load_catalog()` | 与 `get_simulation_component_schema` 同源 |
-| `edi://reference/operation-guide` | `text/markdown` | 静态维护 | 创建/删除/网表导入安全性约束 |
+| `edi://reference/operation-guide` | `text/markdown` | 静态维护 | 操作安全约束（创建/删除/网表导入/默认值透明等） |
 | `edi://service/status` | `application/json` | 动态生成 | 与 `get_service_status` 同源（gRPC 通道、队列占用） |
 | `edi://reference/error-codes` | `text/markdown` | 静态维护 | gRPC 状态码词典及建议动作 |
 
@@ -1122,7 +1127,7 @@ get_project_summary + turbocharts_convert + capture_schematic + simulate_* ─�
 | `get_project_summary` | 一次看全工程概览，避免零散多轮查询 | 聚合元数据/原理图/器件/仿真配置/最新结果 | —（本地读） | LLM 了解全貌、`generate_simulation_report` |
 | `analyze_variables` | EDA 参数化设计依赖 Var/Sweep，需理解变量关系 | 分析 Var 定义、引用、Sweep 配置 | —（本地读） | LLM 理解参数化设计 |
 
-### 12.2 仿真器件（9 个）
+### 12.2 仿真器件（10 个）
 
 | 工具 | 动机 | 功能 | 依赖 | 被依赖 |
 |---|---|---|---|---|
@@ -1135,6 +1140,7 @@ get_project_summary + turbocharts_convert + capture_schematic + simulate_* ─�
 | `generate_schematic_from_netlist` | 从网表快速重建/追加原理图 | 网表导入生成 main 原理图 | `export_project_netlist`/`simulate_netlist`（netlist 文件） | — |
 | `replace_port_component` | 端口类型切换（TermG↔P_nToneG）保留连线 | 替换端口器件类型 | `list_schematic_components`（instance_name） | — |
 | `attach_out_component` | 给器件引脚挂 Out 器件观察输出 | 挂载 Out 并自动连线 | `list_schematic_components`（instance_name） | — |
+| `replace_schematic_from_file` | 用现成 .ep 文件整体替换原理图 | 整体替换原理图 | 现成 schematic.ep 文件 | — |
 
 ### 12.3 仿真（7 个）
 

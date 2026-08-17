@@ -26,6 +26,7 @@ def test_all_tools_registered():
         "update_simulation_component", "delete_simulation_component",
         "generate_schematic_from_netlist", "set_component_active_state",
         "replace_port_component", "attach_out_component",
+        "replace_schematic_from_file",
         "list_schematic_components", "get_schematic_component_info",
         "open_hfss_project", "close_hfss_project", "launch_aedt", "get_hfss_project_info",
         "start_hfss_analysis_async", "get_hfss_analysis_status",

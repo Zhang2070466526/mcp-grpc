@@ -18,6 +18,7 @@
 | POST | `/upload` | 文件上传（multipart/form-data） |
 | GET | `/images/{token}` | 图片访问（10 分钟临时 Token） |
 | GET | `/documents/{token}` | 文档访问（10 分钟临时 Token） |
+| GET | `/metrics` | 运行时指标（Prometheus 格式） |
 | POST | `/mcp` | MCP 协议端点（JSON-RPC） |
 
 ---
@@ -386,9 +387,49 @@
 
 ---
 
+## 10. GET /metrics — 运行时指标
+
+**用途**：输出 Prometheus 格式的运行时指标，供监控系统（Prometheus / Grafana）抓取。
+
+**请求**：无参数。
+
+**成功响应**（HTTP 200，`Content-Type: text/plain`）：
+```
+# HELP edi_tool_calls_total 工具调用总次数
+# TYPE edi_tool_calls_total counter
+edi_tool_calls_total{tool="list_epp_projects"} 5
+
+# HELP edi_tool_errors_total 工具调用失败次数
+# TYPE edi_tool_errors_total counter
+edi_tool_errors_total{tool="list_epp_projects"} 0
+
+# HELP edi_tool_duration_ms_sum 工具调用总耗时(毫秒)
+# TYPE edi_tool_duration_ms_sum counter
+edi_tool_duration_ms_sum{tool="list_epp_projects"} 1234
+
+# HELP edi_sim_tasks 当前异步仿真任务数
+# TYPE edi_sim_tasks gauge
+edi_sim_tasks 1
+
+# HELP edi_uptime_seconds 服务运行时长(秒)
+# TYPE edi_uptime_seconds gauge
+edi_uptime_seconds 3600
+```
+
+**指标说明**：
+| 指标 | 类型 | 含义 |
+|---|---|---|
+| `edi_tool_calls_total` | counter | 各工具调用总次数（label `tool`） |
+| `edi_tool_errors_total` | counter | 各工具调用失败次数 |
+| `edi_tool_duration_ms_sum` | counter | 各工具调用总耗时（毫秒） |
+| `edi_sim_tasks` | gauge | 当前异步仿真任务数 |
+| `edi_uptime_seconds` | gauge | 服务运行时长（秒） |
+
+---
+
 ## 附：统一返回字段说明（gRPC 工具）
 
-所有 gRPC 工具的返回（经 `/mcp` 的 `tools/call`）统一包含以下字段，语义见 [TOOLS_API.md](./TOOLS_API.md) 末尾「返回结构约定」：
+所有 gRPC 工具的返回（经 `/mcp` 的 `tools/call`）统一包含以下字段，语义见 [TOOLS_API.md](./TOOLS_API.md) 的「gRPC 工具统一返回格式」：
 
 ```json
 {

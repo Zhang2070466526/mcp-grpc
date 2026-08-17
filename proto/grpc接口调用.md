@@ -58,6 +58,7 @@ enum EventType {
   ATTACH_OUT_COMPONENT = 17;
   LIST_SCHEMATIC_COMPONENTS = 18;
   GET_SCHEMATIC_COMPONENT_INFO = 19;
+  LOAD_SCHEMATIC_FROM_FILE = 20;
 }
 ```
 
@@ -80,6 +81,7 @@ enum EventType {
 - `ATTACH_OUT_COMPONENT`：为指定器件的目标引脚新增并连接一个 `Out` 器件。
 - `LIST_SCHEMATIC_COMPONENTS`：查询指定工程唯一原理图上的全部器件信息。
 - `GET_SCHEMATIC_COMPONENT_INFO`：根据器件实例名查询指定器件的完整信息。
+- `LOAD_SCHEMATIC_FROM_FILE`：使用指定的 `schematic.ep` 整体替换工程唯一原理图。
 
 ## 4. payload_json 示例
 
@@ -177,6 +179,38 @@ enum EventType {
 - 每次调用都创建新器件，同类型器件可以存在多个。服务端根据工厂默认器件名自动分配未占用的实例名，并在最终事件的 `instance_name` 中返回。
 - 工厂无法创建指定类型时，最终事件返回失败原因，原理图不会新增器件。
 
+#### CREATE_SIMULATION_COMPONENT 支持的器件
+
+该接口没有单独维护器件白名单，`component_type` 直接交给原理图 `SI_Factory` 创建。因此，当前版本支持下列已注册类型（名称区分大小写）：
+
+```text
+R, L, C, Ground, Pin,
+ITRISEMI_ISV, ITRISEMI_OSV1, ITRISEMI_LNA, ITRISEMI_CPW,
+XDB, ITRISEMI_Process_Include,
+Match1, Match2, Match3, Match4, Match5, Match6, Match7, Match8, Match9,
+PublicFET, ModelCorrection, Tran, VtPWL, LimiterSML, TimeDelay, Equalizer,
+V_nTone, Out, TermG, CST, Ansys, Ice, P_nTone, SNP,
+SParameter,
+LPF_Butterworth, BPF_Butterworth, HPF_Butterworth, BSF_Butterworth,
+LPF_Chebyshev, BPF_Chebyshev, HPF_Chebyshev, BSF_Chebyshev,
+Amplifier2, PwrSplit2, PwrSplit3, TLIN, CouplerSingle, CouplerDual,
+HarmonicBalance, MixerWithLO, Mixer2, LSSP, Var, Attenuator,
+PhaseShifterSML, AntLoad, SPDTStatic, Optim, Goal,
+PA_MS_OSV, V_Source, Term, Hybrid90, Hybrid180, Sweep,
+Ckt_MGA_72543_LNA, EBOND, FreqMult, EBOND_ShapeJedec, VIA, VIA2,
+InsertText, EnvTempVar, Misc_VTW_slot_30X60, TML_mlin, Misc_PAD,
+Cap_M1AB, P_nToneG, SL_RDL1_C, ML_RDL1_C, SL_RDL1, ML_RDL1,
+BGA_up, BGA_nup, TSV1_BGA_up, TSV1_BGA_nup, TSV1_D30,
+TSV_pad, TSV_SL, CPW_SL, CPW_pad, CPW_TSV, CPWG_RDL1,
+CPWG_RDL1_C, I1T_Device1, I1T_Device2, PROCESS_INCLUDE, TLIND,
+Balun1, Balun2, Balun3Port, DAttenuator, MLoad, Circulator,
+AC, BudNF, BudNFdeg, V_1Tone, Options, MeasEqn, Mixer
+```
+
+其中当前接口重点覆盖、并在 `UPDATE_SIMULATION_COMPONENT` 中具有明确特殊更新规则的仿真器件为：`SParameter`、`HarmonicBalance`、`XDB`、`Sweep(对应网表中的ParamSweep)`、`Var`、`P_nTone`、`P_nToneG`。
+
+> 注册列表来自当前程序版本，工厂注册项发生变化时，以实际程序及 `CREATE_SIMULATION_COMPONENT` 的最终事件为准。
+
 ### UPDATE_SIMULATION_COMPONENT
 
 ```json
@@ -207,6 +241,45 @@ enum EventType {
 - `Var` 变量必须提供 `value`，可选提供 `min`、`max`、`status`、`tunable`，不支持 `unit`。
 - 新增变量未提供可选字段时，默认 `Min=""`、`Max=""`、`Status="Disable"`、`Tunable="false"`。
 - `status` 只接受 `min/max`、`+/- Delta %`、`Disable`；`tunable` 只接受布尔值或字符串 `"true"`、`"false"`。
+
+#### UPDATE_SIMULATION_COMPONENT 支持的器件及参数名
+
+该接口可以更新原理图上除 `InsertText` 外的任意已有器件，但参数名区分大小写，且禁止修改 `BasicParameters`：
+
+- 普通器件：只能更新该器件当前 `paramsInfo_` 中已经存在的一级参数名，不能新增参数。
+- 特殊器件：除更新已有参数外，还可按下表规则新增动态参数或变量。
+- 调用前可使用 `GET_SCHEMATIC_COMPONENT_INFO` 查询单个器件，或使用 `LIST_SCHEMATIC_COMPONENTS` 查询全部器件；返回的 `parameters` 一级 key（排除 `BasicParameters`）就是该器件当前可更新的已有参数名。
+
+| 器件类型 | 默认可更新参数名 | 允许新增的参数名 |
+| --- | --- | --- |
+| `TermG` | `Z0`、`Num`、`Noise` | 不支持新增参数 |
+| `Out` | `ItemName`（器件实例名） | 不支持新增参数；仅允许通过该字段重命名 `Out` |
+| `SParameter` | `Start`、`Stop`、`Step`、`Pts`、`NoiseInputPort`、`NoiseOutputPort`、`BandwidthForNoise`、`CalcNoise`、`CalcS`、`CalcGroupDelay`、`EnforcePassivity`、`GroupDelayAperture`、`FreqConversion`、`FreqConversionPort` | 不支持新增参数 |
+| `HarmonicBalance` | `Freq[1]`、`Order[1]` | `Freq[x]`、`Order[x]`，`x` 为从 `1` 开始的正整数；同下标必须成对存在，并且下标连续 |
+| `XDB` | `Freq[1]`、`Order[1]`、`GC_XdB`、`GC_InputPort`、`GC_OutputPort`、`GC_InputFreq`、`GC_OutputFreq`、`GC_InputPowerTol`、`GC_OutputPowerTol`、`GC_MaxInputPower`、`StatusLevel` | `Freq[x]`、`Order[x]`，规则与 `HarmonicBalance` 相同 |
+| `Sweep` | `SweepVar`、`SimInstanceName[1]`～`SimInstanceName[6]`、`Start`、`Stop`、`Step`、`Pts` | 不支持新增参数；`SweepVar` 和 `SimInstanceName[x]` 需通过引用校验 |
+| `Var` | 没有固定变量名；每个非 `BasicParameters` 的一级 key 都是一个变量名 | 任意非空变量名；已有同名变量时更新，否则新增 |
+| `P_nTone` | `Z0`、`P[1]`、`Freq[1]`、`Num`、`Noise`、`Temp` | `P[x]`、`Freq[x]`，`x` 为从 `1` 开始的正整数；两类参数可独立新增且不要求连续 |
+| `P_nToneG` | `Z0`、`P[1]`、`Freq[1]`、`Num`、`Noise`、`Temp` | `P[x]`、`Freq[x]`，规则与 `P_nTone` 相同 |
+
+普通参数的请求字段为：
+
+```json
+"参数名": {
+  "value": "参数值",
+  "unit": "可选单位"
+}
+```
+
+- `value` 必填，支持字符串、数字或布尔值。
+- `unit` 可选；只有器件当前参数定义了 `Unit` 且请求单位存在于该列表中时才能传入。
+- `Order[x]` 不支持 `unit`。
+- `Out` 是唯一允许通过本接口修改 `ItemName` 的器件类型，请求格式为 `"ItemName":{"value":"OutResult"}`。新名称必须以字母或下划线开头，只能包含字母、数字和下划线，且不能与原理图上的其他器件实例名重复；不支持 `unit`。重命名成功后，后续接口应使用新名称定位该器件。
+- `TermG.Z0` 和 `R.R` 可用单位为 `mOhm`、`Ohm`、`kOhm`、`MOhm`、`GOhm`、`TOhm`；`TermG.Num` 和 `TermG.Noise` 不支持单位。
+- `L.L` 可用单位为 `fH`、`pH`、`nH`、`uH`、`mH`、`H`。
+- `C.C` 可用单位为 `fF`、`pF`、`nF`、`uF`、`mF`、`F`。
+- `SParameter` 的 `Start`、`Stop`、`Step`、`BandwidthForNoise`，`HarmonicBalance`/`XDB` 的 `Freq[x]`，以及 `XDB` 的 `GC_InputFreq`、`GC_OutputFreq` 等带单位参数，具体可用单位应以查询接口返回的 `Unit` 为准。
+- `Var` 不使用上述普通参数结构，其变量字段仍为 `value`、可选 `min`、`max`、`status`、`tunable`。
 
 ### DELETE_SIMULATION_COMPONENT
 
@@ -282,6 +355,22 @@ enum EventType {
 - `instance_name` 按原理图器件实例名精确匹配。
 - 返回的 `component` 对象与 `LIST_SCHEMATIC_COMPONENTS` 的数组元素结构完全一致。
 - 指定器件不存在或名称对应 `InsertText` 文字图元时，最终事件返回失败及具体原因。
+
+### LOAD_SCHEMATIC_FROM_FILE
+
+```json
+{
+  "project_path": "C:/path/to/project.epp",
+  "schematic_path": "C:/path/to/schematic.ep"
+}
+```
+
+- `schematic_path` 必须指向已存在的 `.ep` 文件，文件内容必须是完整的 `edi-schematic` S-Expression 原理图数据。
+- 服务端复用已打开工程；工程未打开时自动打开，并操作工程唯一原理图。
+- 该任务调用 `Schematic::loadFromFile()`，会整体替换当前原理图，不执行追加或合并。
+- 成功后立即保存目标工程，并返回加载后的器件数量和网段数量。
+- 加载、解析或保存失败时恢复调用前的原理图状态。
+- 该任务不复制模板目录中的 `model_data`、`symbol`、`match` 等依赖文件，也不触发模型库扫描；自定义器件必须已存在于当前工作区模型库，否则会沿用 `loadFromFile()` 的现有行为跳过无法创建的器件。
 
 ### REPLACE_PORT_COMPONENT
 
@@ -421,6 +510,7 @@ enum ResultStatus {
 - `ATTACH_OUT_COMPONENT`：`project_path`、`target_instance_name`、可选的 `pin_index`、`out_instance_name`
 - `LIST_SCHEMATIC_COMPONENTS`：`project_path`、`component_count`、`components`
 - `GET_SCHEMATIC_COMPONENT_INFO`：`project_path`、`instance_name`；成功时额外包含 `component`
+- `LOAD_SCHEMATIC_FROM_FILE`：`project_path`、`schematic_path`、`component_count`、`net_segment_count`
 - `GENERATE_SCHEMATIC_FROM_NETLIST`：`project_path`、`netlist_path`、`schematic_path`、`clear_before_import`、`symbols_added`、`nets_added`、`lines_added`、`net_points_added`
 
 ## 8. SIMULATE_NETLIST 完整调用示例
@@ -790,6 +880,8 @@ enum ResultStatus {
 }
 ```
 
+如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `18`。
+
 最终成功事件示例：
 
 ```json
@@ -814,6 +906,8 @@ enum ResultStatus {
 }
 ```
 
+如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `19`。
+
 最终成功事件示例：
 
 ```json
@@ -824,6 +918,32 @@ enum ResultStatus {
   "status": "RESULT_STATUS_SUCCESS",
   "message": "schematic component found",
   "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"instance_name\":\"R1\",\"component\":{\"instance_name\":\"R1\",\"component_type\":\"R\",\"general_type\":\"\",\"sub_type\":\"\",\"active_state\":0,\"state\":\"NORMAL\",\"parameters\":{\"R\":{\"Value\":\"50\",\"Unit\":\"Ohm\"}}}}"
+}
+```
+
+### 9.9 从文件加载原理图
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-load-schematic-001",
+  "type": "LOAD_SCHEMATIC_FROM_FILE",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"schematic_path\":\"C:/test/schematic.ep\"}"
+}
+```
+
+如果 Postman 未识别最新枚举，请重新导入 `ecserver.proto`，也可以临时将 `type` 填为数值 `20`。
+
+最终成功事件示例：
+
+```json
+{
+  "client_uuid": "postman-test-client-001",
+  "task_id": "postman-load-schematic-001",
+  "event_type": "LOAD_SCHEMATIC_FROM_FILE",
+  "status": "RESULT_STATUS_SUCCESS",
+  "message": "schematic loaded from file",
+  "payload_json": "{\"project_path\":\"C:/test/project.epp\",\"schematic_path\":\"C:/test/schematic.ep\",\"component_count\":12,\"net_segment_count\":4}"
 }
 ```
 
