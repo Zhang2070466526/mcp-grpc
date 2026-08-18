@@ -273,7 +273,7 @@ def prompt_troubleshoot_edi_error(
     elif status == "GRPC_UNAVAILABLE":
         steps += [
             "3. 确认 EDI 是否已启动、gRPC 地址端口是否正确。",
-            "4. 如 EDI 确认运行中，可调用 `launch_edi` 尝试重新启动。",
+            "4. 若 EDI 已掉线，请手动启动 EDI 软件后重试。",
         ]
     elif status in ("QUEUE_TIMEOUT",):
         steps += [

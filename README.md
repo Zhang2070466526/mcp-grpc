@@ -150,7 +150,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `get_project_summary` | 工程概览（元数据/原理图/仿真配置） |
 | `analyze_variables` | 分析变量定义、引用和 Sweep 配置 |
 
-### 仿真器件（9 个）— 工具 API v3 / gRPC 协议 v2
+### 仿真器件（10 个）— 工具 API v3 / gRPC 协议 v2
 
 | 工具 | 说明 |
 |---|---|
@@ -163,6 +163,7 @@ r = start_simulation_async("C:/Projects/test/test.epp")
 | `set_component_active_state` | 确定性设置 NORMAL / DISABLED / SHORTED |
 | `generate_schematic_from_netlist` | 从网表导入生成原理图 |
 | `attach_out_component` | 为器件引脚挂载 Out 器件并自动连线 |
+| `replace_schematic_from_file` | 从 .ep 文件整体替换原理图 |
 
 ### 仿真（7 个）
 
@@ -248,6 +249,7 @@ Streamable HTTP 模式启用 `stateless_http=True`，服务不保留 MCP 会话�
 | `/images/{token}` | GET | 临时图片访问（10 分钟有效） | 图片文件 |
 | `/documents/{token}` | GET | 临时文档访问（10 分钟有效） | PDF/DOCX 文件 |
 | `/upload` | POST | 文件上传（multipart/form-data） | `{"success":true,"file_path":"C:/...","file_name":"..."}` |
+| `/metrics` | GET | 运行时指标（Prometheus 格式） | 见 HTTP_API.md |
 
 ### MCP Resources（5 个，只读上下文）
 

@@ -138,7 +138,7 @@ def resource_error_codes() -> str:
         "| QUEUE_TIMEOUT | 等待执行槽位超时 | 稍后重试，检查是否有长任务卡住 |\n"
         "| TIMEOUT | 总超时，EDI 结果未知 | 延长 timeout 或检查仿真进度 |\n"
         "| STREAM_DISCONNECTED | FetchEvent 流中断，结果未知 | 确认 EDI 进程存活，可重试一次 |\n"
-        "| GRPC_UNAVAILABLE | 无法连接 EDI gRPC | 确认 EDI 已启动，确认地址端口正确 |\n"
+        "| GRPC_UNAVAILABLE | 无法连接 EDI gRPC（掉线） | 手动启动 EDI 软件后重试 |\n"
         "| PAYLOAD_TOO_LARGE | EDI 返回消息过大（>256MB） | 日志已部分接收，考虑延长仿真时间或减少日志量 |\n"
         "| PROTOCOL_MISMATCH | client_uuid/task_id/event_type 不一致 | 调用链错误，不要重试，先排查代码 |\n"
         "| TASK_NOT_FOUND | 任务不存在（过期/重启） | 重新提交仿真任务 |\n"

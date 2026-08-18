@@ -46,6 +46,7 @@ from servers.eda.simulation_components import (  # noqa: E402
     delete_simulation_component, set_component_active_state,
     generate_schematic_from_netlist,
     replace_port_component,
+    replace_schematic_from_file,
 )
 from servers.eda.simulation import (  # noqa: E402
     start_simulation_async, get_simulation_async_status, get_simulation_async_result,
@@ -61,6 +62,7 @@ from servers.turbocharts.convert_raw import turbocharts_convert, list_result_cur
 from servers.multimodal_vision import show_image, copy_image_to_workspace, analyze_image, OPENCLAW_WORKSPACE_PATH, open_document, register_image_url  # noqa: E402
 from servers.report import generate_simulation_report  # noqa: E402
 from servers.settings import get_settings  # noqa: E402
+from servers.metrics import record_tool_call  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # 常量
@@ -81,6 +83,7 @@ _DESTRUCTIVE_CHAT_TOOLS = {
     "delete_simulation_component",
     "replace_models_from_csv",
     "replace_port_component",
+    "replace_schematic_from_file",   # 整体替换原理图，无条件确认
     "close_edi_project",          # 确认时需要 need_save=true
     "generate_simulation_report",  # 确认时需要 overwrite=true
 }
@@ -681,6 +684,9 @@ class ChatService:
                         act.duration_ms = round((time.time() - t0) * 1000)
                         act.summary = _result_summary(act)
 
+                        # 记录运行时指标（次数/失败/耗时，供 /metrics 端点）
+                        record_tool_call(tool_name, act.status == "success", act.duration_ms)
+
                         # 记录关键参数（脱敏：不记录完整路径中的用户名）
                         tool_args_log = _tool_args_summary(tool_name, validation_result)
                         _logger.info("request=%s tool=%s args=%s duration=%dms success=%s",
@@ -766,6 +772,7 @@ class ChatService:
             "generate_schematic_from_netlist",
             "replace_models_from_csv",
             "replace_port_component", "attach_out_component",
+            "replace_schematic_from_file",
         }
         if tool_name in _PROJECT_PATH_TOOLS:
             if not args.get("project_path"):
@@ -960,6 +967,7 @@ _TOOL_LABELS: dict[str, str] = {
     "generate_schematic_from_netlist": "生成原理图",
     "replace_port_component": "替换端口",
     "attach_out_component": "挂载Out器件",
+    "replace_schematic_from_file": "替换原理图",
 }
 if OPENCLAW_WORKSPACE_PATH is not None:
     _TOOL_LABELS["copy_image_to_workspace"] = "复制到工作区"
@@ -1021,6 +1029,8 @@ def _create_pending(tool_name: str, args: dict) -> PendingAction:
             f"覆盖已有报告文件 {args.get('output_path', '?')}",
         "replace_port_component":
             f"替换端口器件 {args.get('target_instance_name', '?')} 为 {args.get('replacement_component_type', '?')}",
+        "replace_schematic_from_file":
+            f"用 {args.get('schematic_path', '?')} 整体替换当前原理图",
     }.get(tool_name, f"执行 {tool_name}")
     return PendingAction(
         action_id=uuid.uuid4().hex[:8],
@@ -1038,6 +1048,7 @@ def _confirmation_text(pending: PendingAction) -> str:
         "close_edi_project": f"{pending.summary}。保存后无法撤销。",
         "generate_simulation_report": f"{pending.summary}。原文件将被覆盖。",
         "replace_port_component": f"{pending.summary}。此操作将替换器件并重新连线。",
+        "replace_schematic_from_file": f"{pending.summary}。当前原理图将被整体替换，原内容丢失。",
     }.get(pending.tool_name, pending.summary)
     return (
         f"⚠️ **确认操作**\n\n{target}\n\n"

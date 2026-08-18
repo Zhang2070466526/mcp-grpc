@@ -577,7 +577,7 @@ def _call_grpc_unlocked(
             )
         return _terminal_result(
             success=False, status="GRPC_UNAVAILABLE",
-            message=f"无法连接 EDA gRPC ({EDA_GRPC_SERVER}, {code}): {exc.details() or exc}",
+            message=f"无法连接 EDA gRPC ({EDA_GRPC_SERVER}, {code})，请手动启动 EDI 软件后重试: {exc.details() or exc}",
             client_uuid=client_uuid, task_id=task_id,
             task_type_name=task_type_name,
             project_path=payload.get("project_path", ""),

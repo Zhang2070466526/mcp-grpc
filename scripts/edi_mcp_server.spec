@@ -130,8 +130,8 @@ a = Analysis(
         'PIL.AvifImagePlugin', 'PIL.BlpImagePlugin',
         # matplotlib 3D 工具（未使用）
         'mpl_toolkits',
-        # 文档 / 测试模块
-        'pydoc', 'doctest', 'unittest',
+        # 文档模块（不能排除 unittest：matplotlib 依赖的 pyparsing.testing 会 import unittest）
+        'pydoc', 'doctest',
     ],
     hooksconfig={
         'matplotlib': {
